@@ -1,19 +1,20 @@
 (define (problem coffee-pod-installation)
-  (:domain tabletop-manipulation-domain)
+  (:domain coffee-pod-installation)
   (:objects 
-	coffee-pod1 - coffee-pod
-	coffee-machine1 - coffee-machine
-	nothing - nothing
+	coffee-pod - coffee-pod
+	coffee-machine - coffee-machine
+  	table - table
+	gripper - gripper
   )
   (:init 
-	(holding nothing)
+	(free gripper)
 	(not (open coffee-machine1))
-	(not (in-drawer coffee-pod1))
+	(on coffee-pod table)
   )
   (:goal 
 	(and 
-	  (pod-installed coffee-pod1)
-	  (not (open coffee-machine1))
+	  (in coffee-pod coffee-machine)
+	  (not (open coffee-machine))
 	)
   )
 )

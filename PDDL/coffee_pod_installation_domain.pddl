@@ -1,49 +1,52 @@
-(define (domain coffee_pod_installation_domain)
+(define (domain coffee-pod-installation)
     (:requirements :strips :typing)
     
     ;; Define types
     (:types
         object
+        robot
         holdable - object
         opennable - object
-        nothing mug coffee-pod - holdable
+        support - object
+        gripper - robot
+        mug coffee-pod - holdable
         container - opennable
-        container - containable
-        coffee-pod-holder - container
+        table - support
+        coffee-machine - container
     )
     
     ;; Define predicates
     (:predicates
         (holding ?obj - holdable)
         (open ?container - opennable)
-        (pod-installed ?obj - coffee-pod)
-        (in ?obj - holdable ?container - containable)
-        ）
+        (free ?gripper - gripper)
+        (on ?obj - holdable ?support - support)
+        (in ?obj - holdable ?container - container)
     )
     
-    ;; Define actions
+    ;; Define actions using the predicates given
     (:action pick-up-pod
-        :parameters (?pod - coffee-pod ?hand - hand)
-        :precondition (and (empty ?hand) (on-table ?pod))
-        :effect (and (not (empty ?hand)) (holding ?pod))
+        :parameters (?pod - coffee-pod ?gripper - gripper)
+        :precondition (and (free ?gripper) (on ?pod table))
+        :effect (and (holding ?pod) (not (on ?pod table)) (not (free ?gripper)))
     )
 
     (:action open-machine
-        :parameters (?machine - coffee-machine)
-        :precondition (and (closed ?machine))
-        :effect (and (not (closed ?machine)) (open ?machine))
+        :parameters (?machine - opennable ?gripper - gripper)
+        :precondition (and (not (open ?machine)) (free ?gripper))
+        :effect (and (open ?machine) (free ?gripper))
     )
 
     (:action place-pod-in-machine
-        :parameters (?pod - coffee-pod ?machine - coffee-machine ?hand - hand)
+        :parameters (?pod - coffee-pod ?machine - container ?gripper - gripper)
         :precondition (and (holding ?pod) (open ?machine))
-        :effect (and (not (holding ?pod)) (in ?pod ?machine) (empty ?hand))
+        :effect (and (not (holding ?pod)) (in ?pod ?machine) (free ?gripper))
     )
 
     (:action close-machine
-        :parameters (?machine - coffee-machine)
-        :precondition (and (open ?machine))
-        :effect (and (not (open ?machine)) (closed ?machine) (pod-installed ?pod))
+        :parameters (?machine - opennable ?gripper - gripper)
+        :precondition (and (open ?machine) (free ?gripper))
+        :effect (and (not (open ?machine)) (free ?gripper))
     )
     
     

@@ -2,3 +2,4 @@ Metaworld/
 mimicgen/
 robosuite/
 .venv/
+.DS_Store
