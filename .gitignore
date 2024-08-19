@@ -3,3 +3,4 @@ mimicgen/
 robosuite/
 .venv/
 .DS_Store
+__pycache__/
