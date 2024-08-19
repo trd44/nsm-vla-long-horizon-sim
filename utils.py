@@ -73,7 +73,7 @@ def call_planner(domain:str, problem:str, structure="pddl"):
     domain_path =  planning_dir + os.sep + domain
     problem_path = planning_dir + os.sep + problem
     if structure == "pddl":
-        run_script = f"../Metric-FF-v2.1/./ff -o {domain_path} -f {problem_path} -s 0"
+        run_script = f"{planning_dir}/Metric-FF-v2.1/./ff -o {domain_path} -f {problem_path} -s 0"
         output = subprocess.getoutput(run_script)
         #print("Output = ", output)
         if "unsolvable" in output or "goal can be simplified to FALSE" in output:
@@ -86,8 +86,8 @@ def call_planner(domain:str, problem:str, structure="pddl"):
         except Exception as e:
             print("The planner failed because of: {}.\nThe output of the planner was:\n{}".format(e, output))
 
-        plan, game_action_set = _output_to_plan(output, structure=structure)
-        return plan, game_action_set
+        plan, _ = _output_to_plan(output, structure=structure)
+        return plan
     
 def check_predicates_subset(problem_predicates, domain_predicates):
     # Parse predicates
