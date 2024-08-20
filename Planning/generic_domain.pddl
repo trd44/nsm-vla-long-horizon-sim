@@ -11,7 +11,7 @@
         gripper - robot
         mug coffee-pod - holdable
         container - opennable
-        table - support
+        table dispenser - support
         coffee-machine - container
     )
     
@@ -22,14 +22,13 @@
         (free ?gripper - gripper)
         (on ?obj - holdable ?support - support)
         (in ?obj - holdable ?container - container)
-        (under ?obj1 - object ?obj2 - object)
     )
     
     ;; Define actions using the predicates given
     (:action pick-up-pod
         :parameters (?pod - coffee-pod ?gripper - gripper)
-        :precondition (and (free ?gripper) (on ?pod table))
-        :effect (and (holding ?pod) (not (on ?pod table)) (not (free ?gripper)))
+        :precondition (and (free ?gripper) (in ?pod drawer) (open drawer))
+        :effect (and (holding ?pod) (not (in ?pod drawer)) (not (free ?gripper)))
     )
 
     (:action open-machine
@@ -49,6 +48,29 @@
         :precondition (and (open ?machine) (free ?gripper))
         :effect (and (not (open ?machine)) (free ?gripper))
     )
-    
+
+    (:action open-drawer
+        :parameters (?drawer - opennable ?gripper - gripper)
+        :precondition (and (not (open ?drawer)) (free ?gripper))
+        :effect (and (open ?drawer) (free ?gripper))
+    )
+
+    (:action close-drawer
+        :parameters (?drawer - opennable ?gripper - gripper)
+        :precondition (and (open ?drawer) (free ?gripper))
+        :effect (and (not (open ?drawer)) (free ?gripper))
+    )
+
+    (:action place-cup-on-dispenser
+        :parameters (?cup - mug ?dispenser - dispenser ?gripper - gripper)
+        :precondition (and (holding ?cup))
+        :effect (and (on ?cup ?dispenser) (not (holding ?cup)) (free ?gripper))
+    )
+
+    (:action pick-up-cup
+        :parameters (?cup - mug ?gripper - gripper)
+        :precondition (and (free ?gripper) (on ?cup table))
+        :effect (and (holding ?cup) (not (on ?cup table)) (not (free ?gripper)))
+    )
     
 )

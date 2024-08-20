@@ -1,8 +1,16 @@
 #%%
-import yaml
+import base64
 from utils import *
+from prompts import *
+from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
 from langchain_community.agent_toolkits import FileManagementToolkit
-
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.agents.format_scratchpad.openai_tools import (
+    format_to_openai_tool_messages,
+)
+from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
+from langchain.agents import AgentExecutor
 # class PDDLRefiner:
 #     def __init__(self, config_file):
 #         self.config = self.load_config(config_file)
@@ -17,10 +25,6 @@ from langchain_community.agent_toolkits import FileManagementToolkit
 # refiner.refine_pddl('/path/to/pddl_file.pddl')
 #%%
 # Set the PYTHONPATH to include the current directory
-from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
-
-model = ChatOpenAI(model="gpt-4o")
 config = load_config("config.yaml")
 planning_dir = config["planning_dir"]
 read_tool, write_tool = FileManagementToolkit(
@@ -28,5 +32,36 @@ read_tool, write_tool = FileManagementToolkit(
     selected_tools=["read_file", "write_file"],
 ).get_tools() 
 tools = [call_planner, verify_predicates_domain, verify_predicates_problem, read_tool, write_tool]
-call_planner.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
-verify_predicates_problem.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
+model = ChatOpenAI(model=config['vlm_agent']['model'])
+model_with_tools = model.bind_tools(tools)
+prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            system_identify_missing_operators_msg
+        ),
+        ("user", "{input}"),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ]
+)
+agent = (
+    {
+        "input": lambda x: x["input"],
+        "agent_scratchpad": lambda x: format_to_openai_tool_messages(
+            x["intermediate_steps"]
+        ),
+    }
+    | prompt
+    | model_with_tools
+    | OpenAIToolsAgentOutputParser()
+)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+# call_planner.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
+# verify_predicates_problem.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
+
+if __name__ == "__main__":
+    # prompt the user for input and start a conversation with the agent
+    while True:
+        user_input = input("Enter your input: ")
+        response = list(agent_executor.stream({"input": user_input}))
+        print(response)
