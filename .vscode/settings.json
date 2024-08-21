@@ -1,1 +1,10 @@
-{}
+{
+    "python.envFile": "${workspaceFolder}/.env",
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "/path/to/your/module:/another/path"
+    },
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "/path/to/your/module;/another/path"
+    }
+}
+

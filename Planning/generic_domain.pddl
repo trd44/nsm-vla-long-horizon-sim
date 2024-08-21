@@ -1,4 +1,4 @@
-(define (domain coffee-pod-installation)
+(define (domain generic)
     (:requirements :strips :typing)
     
     ;; Define types
@@ -9,10 +9,10 @@
         opennable - object
         support - object
         gripper - robot
-        mug coffee-pod - holdable
+        mug coffee-pod coffee-dispenser-lid - holdable
         container - opennable
-        table dispenser - support
-        coffee-machine - container
+        table - support
+        drawer coffee-dispenser - container
     )
     
     ;; Define predicates
@@ -22,55 +22,40 @@
         (free ?gripper - gripper)
         (on ?obj - holdable ?support - support)
         (in ?obj - holdable ?container - container)
+        (under ?obj1 - object ?obj2 - object)
     )
     
     ;; Define actions using the predicates given
-    (:action pick-up-pod
-        :parameters (?pod - coffee-pod ?gripper - gripper)
-        :precondition (and (free ?gripper) (in ?pod drawer) (open drawer))
-        :effect (and (holding ?pod) (not (in ?pod drawer)) (not (free ?gripper)))
+    (:action pick-up
+        :parameters (?obj - holdable ?table - table ?gripper - gripper)
+        :precondition (and (free ?gripper) (on ?obj ?table))
+        :effect (and (holding ?obj) (not (on ?obj ?table)) (not (free ?gripper)))
     )
 
-    (:action open-machine
-        :parameters (?machine - opennable ?gripper - gripper)
-        :precondition (and (not (open ?machine)) (free ?gripper))
-        :effect (and (open ?machine) (free ?gripper))
+    (:action release-holding
+        :parameters (?held - holdable ?gripper - gripper)
+        :precondition (and (not (free ?gripper)) (holding ?held))
+        :effect (and (free ?gripper) (not (holding ?held)))
+    )
+    
+
+    (:action open-dispenser
+        :parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?gripper - gripper)
+        :precondition (and (not (open ?dispenser)) (free ?gripper))
+        :effect (and (open ?dispenser) (free ?gripper))
     )
 
-    (:action place-pod-in-machine
-        :parameters (?pod - coffee-pod ?machine - container ?gripper - gripper)
-        :precondition (and (holding ?pod) (open ?machine))
-        :effect (and (not (holding ?pod)) (in ?pod ?machine) (free ?gripper))
+    (:action place-pod-in-dispenser
+        :parameters (?pod - coffee-pod ?dispenser - coffee-dispenser ?gripper - gripper)
+        :precondition (and (holding ?pod) (open ?dispenser) (not (free ?gripper)))
+        :effect (and (not (holding ?pod)) (in ?pod ?dispenser) (free ?gripper))
     )
 
-    (:action close-machine
-        :parameters (?machine - opennable ?gripper - gripper)
-        :precondition (and (open ?machine) (free ?gripper))
-        :effect (and (not (open ?machine)) (free ?gripper))
+    (:action close-dispenser
+        :parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?gripper - gripper)
+        :precondition (and (open ?dispenser) (free ?gripper))
+        :effect (and (not (open ?dispenser)) (free ?gripper))
     )
-
-    (:action open-drawer
-        :parameters (?drawer - opennable ?gripper - gripper)
-        :precondition (and (not (open ?drawer)) (free ?gripper))
-        :effect (and (open ?drawer) (free ?gripper))
-    )
-
-    (:action close-drawer
-        :parameters (?drawer - opennable ?gripper - gripper)
-        :precondition (and (open ?drawer) (free ?gripper))
-        :effect (and (not (open ?drawer)) (free ?gripper))
-    )
-
-    (:action place-cup-on-dispenser
-        :parameters (?cup - mug ?dispenser - dispenser ?gripper - gripper)
-        :precondition (and (holding ?cup))
-        :effect (and (on ?cup ?dispenser) (not (holding ?cup)) (free ?gripper))
-    )
-
-    (:action pick-up-cup
-        :parameters (?cup - mug ?gripper - gripper)
-        :precondition (and (free ?gripper) (on ?cup table))
-        :effect (and (holding ?cup) (not (on ?cup table)) (not (free ?gripper)))
-    )
+    
     
 )

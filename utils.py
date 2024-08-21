@@ -56,7 +56,6 @@ def verify_predicates_problem(domain:str, problem:str, structure="pddl"):
         assert check_predicates_subset(problem_predicates, domain_predicates), f"Predicates in the problem file are not a subset of the domain file. The difference is {problem_predicates - domain_predicates}. Please make sure the problem file only contains predicates that are in the domain file."
     return True
 
-
 @tool
 def call_planner(domain:str, problem:str, structure="pddl"):
     """Given a domain and a problem file, this function return the ffmetric Planner output in the action format
@@ -64,7 +63,7 @@ def call_planner(domain:str, problem:str, structure="pddl"):
     Args:
         domain (str): domain file name
         problem (str): problem file name
-        structure (str, optional): _description_. Defaults to "pddl".
+        structure (str, optional): The type of the files for planning. Defaults to "pddl".
 
     Returns:
         _type_: _description_
@@ -75,19 +74,21 @@ def call_planner(domain:str, problem:str, structure="pddl"):
     if structure == "pddl":
         run_script = f"{planning_dir}/Metric-FF-v2.1/./ff -o {domain_path} -f {problem_path} -s 0"
         output = subprocess.getoutput(run_script)
-        #print("Output = ", output)
-        if "unsolvable" in output or "goal can be simplified to FALSE" in output:
-            return False, False
+        
+        if "unsolvable" in output or "goal can be simplified to FALSE" in output: # unsolvable
+            return "the planner did not find a plan given the problem specification in the problem file and available actions in the domain file. Please double check the actions in the domain file and the init and goal specifications in the problem file", []
+        elif 'ff: found legal plan as follows\n' not in output: # symbolic planning specifications have errors
+            return "The planner failed due to errors in the domain and/or problem specifications. Please double check the syntax and semantics in the domain and problem files:\n{}".format(output), []
         try:
             output = output.split('ff: found legal plan as follows\n')[1]
             output = output.split('\ntime spent:')[0]
             # Remove empty lines
             output = os.linesep.join([s for s in output.splitlines() if s])
         except Exception as e:
-            print("The planner failed because of: {}.\nThe output of the planner was:\n{}".format(e, output))
+            return "The planner failed.\nThe output of the planner was:\n{}".format(output), []
 
         plan, _ = _output_to_plan(output, structure=structure)
-        return plan
+        return "successfully found a plan", plan
     
 def check_predicates_subset(problem_predicates, domain_predicates):
     # Parse predicates
@@ -185,3 +186,10 @@ def _output_to_plan(output, structure):
         #        if game_action_set[i][j] in applicator.keys():
         #            game_action_set[i][j] = applicator[game_action_set[i]]
         return action_set, game_action_set
+    return [], []
+
+if __name__ == "__main__":
+    config = load_config('config.yaml')
+    #verify_predicates_domain("domain.pddl", "domain.pddl")
+    # verify_predicates_problem("domain.pddl", "problem.pddl")
+    call_planner(config['generic_planning_domain'], config['new_planning_problem'])

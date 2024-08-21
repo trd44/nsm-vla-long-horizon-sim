@@ -11,6 +11,7 @@ from langchain.agents.format_scratchpad.openai_tools import (
 )
 from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
 from langchain.agents import AgentExecutor
+#from langgraph.prebuilt import create_react_agent
 # class PDDLRefiner:
 #     def __init__(self, config_file):
 #         self.config = self.load_config(config_file)
@@ -55,13 +56,17 @@ agent = (
     | model_with_tools
     | OpenAIToolsAgentOutputParser()
 )
+
+#agent_executor = create_react_agent(model, tools)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 # call_planner.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
 # verify_predicates_problem.invoke({"domain":config['init_planning_domain'], "problem":config['init_planning_problem']})
 
 if __name__ == "__main__":
     # prompt the user for input and start a conversation with the agent
-    while True:
-        user_input = input("Enter your input: ")
-        response = list(agent_executor.stream({"input": user_input}))
-        print(response)
+    # while True:
+    # user_input = input("Enter your input: ")
+    res = list(agent_executor.stream({"input": "There is a drawer. There is a coffee pod inside the drawer. Install the coffee pod in the coffee dispenser and place the mug that is on the table under the dispenser"}))
+    print(res)
+            # print(chunk)
+            # print("===")

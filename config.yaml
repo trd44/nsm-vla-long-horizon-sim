@@ -1,13 +1,14 @@
 # config.yaml
 
 vlm_agent:
-  api_key: "your_openai_api_key_here"
-  model: "gpt-4-turbo"
+  api_key: "your_api_key"
+  model: "gpt-4o"
   temperature: 0
 planning_dir: "Planning"
 init_planning_domain: "coffee_pod_installation_domain.pddl"
 init_planning_problem: "coffee_pod_installation_problem.pddl"
 generic_planning_domain: "generic_domain.pddl"
+new_planning_problem: "new_problem.pddl"
 
 logging:
   level: "INFO"

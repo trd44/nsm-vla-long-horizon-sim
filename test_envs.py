@@ -8,66 +8,71 @@ Similar to the demo_random_action.py script from robosuite.
 """
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
+import mimicgen
 
 
-# def choose_mimicgen_environment():
-#     """
-#     Prints out environment options, and returns the selected env_name choice
+def choose_mimicgen_environment():
+    """
+    Prints out environment options, and returns the selected env_name choice
 
-#     Returns:
-#         str: Chosen environment name
-#     """
+    Returns:
+        str: Chosen environment name
+    """
 
-#     # try to import robosuite task zoo to include those envs in the robosuite registry
-#     try:
-#         import robosuite_task_zoo
-#     except ImportError:
-#         pass
+    # try to import robosuite task zoo to include those envs in the robosuite registry
+    try:
+        import robosuite_task_zoo
+    except ImportError:
+        pass
 
-#     # all base robosuite environments (and maybe robosuite task zoo)
-#     robosuite_envs = set(suite.ALL_ENVIRONMENTS)
+    # all base robosuite environments (and maybe robosuite task zoo)
+    robosuite_envs = set(suite.ALL_ENVIRONMENTS)
 
-#     # all environments including mimicgen environments
-#     import mimicgen
-#     all_envs = set(suite.ALL_ENVIRONMENTS)
+    # all environments including mimicgen environments
+    import mimicgen
+    all_envs = set(suite.ALL_ENVIRONMENTS)
 
-#     # get only mimicgen envs
-#     only_mimicgen = sorted(all_envs - robosuite_envs)
+    # get only mimicgen envs
+    only_mimicgen = sorted(all_envs - robosuite_envs)
 
-#     # keep only envs that correspond to the different reset distributions from the paper
-#     envs = [x for x in only_mimicgen if x[-1].isnumeric()]
+    # keep only envs that correspond to the different reset distributions from the paper
+    envs = [x for x in only_mimicgen if x[-1].isnumeric()]
 
-#     # Select environment to run
-#     print("Here is a list of environments in the suite:\n")
+    # Select environment to run
+    print("Here is a list of environments in the suite:\n")
 
-#     for k, env in enumerate(envs):
-#         print("[{}] {}".format(k, env))
-#     print()
-#     try:
-#         s = input("Choose an environment to run " + "(enter a number from 0 to {}): ".format(len(envs) - 1))
-#         # parse input into a number within range
-#         k = min(max(int(s), 0), len(envs))
-#     except:
-#         k = 0
-#         print("Input is not valid. Use {} by default.\n".format(envs[k]))
+    for k, env in enumerate(envs):
+        print("[{}] {}".format(k, env))
+    print()
+    try:
+        s = input("Choose an environment to run " + "(enter a number from 0 to {}): ".format(len(envs) - 1))
+        # parse input into a number within range
+        k = min(max(int(s), 0), len(envs))
+    except:
+        k = 0
+        print("Input is not valid. Use {} by default.\n".format(envs[k]))
 
-#     # Return the chosen environment name
-#     return envs[k]
+    # Return the chosen environment name
+    return envs[k]
 
 
 if __name__ == "__main__":
 
     # Create dict to hold options that will be passed to env creation call
-    options = {}
+    options = {
+        "env_name":"CoffeePreparation_D0",
+        "robots":"Kinova3",
+        "controller_configs":load_controller_config(default_controller="OSC_POSE")
+    }
 
     # Choose environment
-    options["env_name"] = choose_mimicgen_environment()
+    # options["env_name"] = choose_mimicgen_environment()
 
     # Choose robot
-    options["robots"] = choose_robots(exclude_bimanual=True)
+    # options["robots"] = choose_robots(exclude_bimanual=True)
 
     # Load the desired controller
-    options["controller_configs"] = load_controller_config(default_controller="OSC_POSE")
+    # options["controller_configs"] = load_controller_config(default_controller="OSC_POSE")
 
     # initialize the task
     env = suite.make(
@@ -80,12 +85,12 @@ if __name__ == "__main__":
     )
     env.reset()
     env.viewer.set_camera(camera_id=0)
+    # Get action limits
+    low, high = env.action_spec
 
-    # # Get action limits
-    # low, high = env.action_spec
-
-    # # do visualization
-    # for i in range(10000):
-    #     action = np.random.uniform(low, high)
-    #     obs, reward, done, _ = env.step(action)
-    #     env.render()
+    # do visualization
+    for i in range(10000):
+        action = np.random.uniform(low, high)
+        action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 1, 0.0])
+        obs, reward, done, _ = env.step(action)
+        env.render()
