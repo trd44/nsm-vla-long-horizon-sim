@@ -1,0 +1,15 @@
+_*
+*.pdf
+*.o
+*.a
+lib/*
+lilotane
+.vscode
+OUT
+*.cnf
+CORE
+SOLUTION
+picosat
+PANDA.jar
+logs/
+src/pandaPIparser/

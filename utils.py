@@ -90,6 +90,7 @@ def call_planner(domain:str, problem:str, structure="pddl"):
         plan, _ = _output_to_plan(output, structure=structure)
         return "successfully found a plan", plan
     
+    
 def check_predicates_subset(problem_predicates, domain_predicates):
     # Parse predicates
     parsed_problem_predicates = {parse_predicate(pred, grounded=True) for pred in problem_predicates}
