@@ -5,11 +5,11 @@ vlm_agent:
   model: "gpt-4o"
   temperature: 0
 planning_dir: "Planning/HDDL"
-init_planning_domain: "coffee_pod_installation_domain.pddl"
-init_planning_problem: "coffee_pod_installation_problem.pddl"
-generic_planning_domain: "generic_domain.pddl"
-new_planning_problem: "new_problem.pddl"
+init_planning_domain: "coffee_prep_domain.hddl"
+init_planning_problem: "coffee_prep_problem.hddl"
+generic_planning_domain: "generic_domain.hddl"
+new_planning_problem: "new_problem.hddl"
 
-logging:
+logging: # TODO: enable this
   level: "INFO"
   file: "vlm_agent.log"

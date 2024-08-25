@@ -1,6 +1,8 @@
 Metaworld/
 mimicgen/
 robosuite/
+robomimic/
+Planning/HDDL/lilotane/
 .venv/
 .DS_Store
 __pycache__/
