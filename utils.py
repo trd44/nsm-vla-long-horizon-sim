@@ -89,6 +89,9 @@ def call_planner(domain:str, problem:str, structure="pddl"):
 
         plan, _ = _output_to_plan(output, structure=structure)
         return "successfully found a plan", plan
+    elif structure == "hddl":
+        run_script = f"{planning_dir}/lilotane/build/lilotane {domain_path} {problem_path} -v=0 -cs"# | cut -d' ' -f2- | sed 1,2d | head -n -2" # > + sub_plan_name
+        
     
     
 def check_predicates_subset(problem_predicates, domain_predicates):

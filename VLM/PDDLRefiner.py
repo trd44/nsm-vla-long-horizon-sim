@@ -1,7 +1,7 @@
 #%%
 import base64
 from utils import *
-from prompts import *
+from VLM.PDDLprompts import *
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain_community.agent_toolkits import FileManagementToolkit

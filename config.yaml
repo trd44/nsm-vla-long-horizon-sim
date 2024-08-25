@@ -4,11 +4,20 @@ vlm_agent:
   api_key: "your_api_key"
   model: "gpt-4o"
   temperature: 0
+planning_dir: "Planning/PDDL"
+init_planning_domain: "tabletop_domain.pddl"
+init_planning_problem: "tabletop_problem.pddl"
+generic_planning_domain: "tabletop_domain.pddl"
+new_planning_problem: "tabletop_problem.pddl"
+max_missing_operators: 3
+
+# setting for testing HDDL
 planning_dir: "Planning/HDDL"
-init_planning_domain: "coffee_prep_domain.hddl"
-init_planning_problem: "coffee_prep_problem.hddl"
-generic_planning_domain: "generic_domain.hddl"
-new_planning_problem: "new_problem.hddl"
+init_planning_domain: "tabletop_domain.hddl"
+init_planning_problem: "tabletop_problem.hddl"
+generic_planning_domain: "tabletop_domain.hddl"
+new_planning_problem: "tabletop_problem.hddl"
+max_missing_operators: 3
 
 logging: # TODO: enable this
   level: "INFO"

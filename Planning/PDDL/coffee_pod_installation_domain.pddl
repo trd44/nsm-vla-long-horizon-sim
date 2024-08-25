@@ -12,7 +12,7 @@
         mug coffee-pod coffee-dispenser-lid - holdable
         container - opennable
         table - support
-        coffee-dispenser - container
+        coffee-dispenser, drawer - container
     )
     
     ;; Define predicates
@@ -56,6 +56,12 @@
         :precondition (and (open ?dispenser) (free ?gripper))
         :effect (and (not (open ?dispenser)) (free ?gripper))
     )
-    
+
+    ;; New action to place an object under another object
+    (:action place-under
+        :parameters (?obj - object ?under - object ?gripper - gripper)
+        :precondition (and (holding ?obj) (free ?gripper))
+        :effect (and (under ?obj ?under) (not (holding ?obj)) (free ?gripper))
+    )
     
 )

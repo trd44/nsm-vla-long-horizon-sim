@@ -1,0 +1,135 @@
+(define (domain coffee-prep)
+	(:requirements :strips :typing :hierarchy)
+	
+	;; Define types
+	(:types
+		robot, holdable, opennable, flippable, support - object
+		gripper - robot
+		mug coffee-pod coffee-dispenser-lid - holdable
+		container - opennable
+		coffee-dispenser-lid - flippable
+		table - support
+		coffee-dispenser - container
+	)
+	
+	;; Define predicates
+	(:predicates
+		(holding ?obj - holdable ?gripper - gripper)
+		(open ?container - opennable)
+		(free ?gripper - gripper)
+		(can-contain ?container - container ?obj - object)
+		(on ?obj - holdable ?support - support)
+		(in ?obj - holdable ?container - container)
+		(under ?obj1 - object ?obj2 - object)
+		(reached ?obj - holdable ?gripper - gripper)
+		(flipped-up ?lid - flippable)
+	)
+	
+	;; Define primitive actions
+	(:action reach
+        :parameters (?obj - holdable ?table - table ?gripper - gripper)
+        :precondition (free ?gripper)
+        :effect (reached ?obj ?gripper)
+    )
+
+    (:action grasp
+        :parameters (?obj - holdable ?gripper - gripper)
+        :precondition (and (reached ?obj ?gripper) (free ?gripper))
+        :effect (and (holding ?obj ?gripper) (not (free ?gripper)))
+    )
+
+    (:action flip-up
+        :parameters (?obj - flippable ?gripper - gripper)
+        :precondition (and (not (flipped-up ?obj)) (free ?gripper))
+        :effect (flipped-up ?obj)
+    )
+
+    ; (:action flip-down
+    ;     :parameters (?lid - flippable ?gripper - gripper)
+    ;     :precondition (and (flipped-up ?lid) (free ?gripper))
+    ;     :effect (not (flipped-up ?lid))
+    ; )
+
+    ; (:action place-in
+    ;     :parameters (?obj - holdable ?container - container ?gripper - gripper)
+    ;     :precondition (and (holding ?obj ?gripper) (open ?container) (can-contain ?container ?obj))
+    ;     :effect (and (in ?obj ?container) (not (holding ?obj ?gripper)) (free ?gripper))
+    ; )
+    
+
+	; (:action release-holding
+	; 	:parameters (?held - holdable ?gripper - gripper)
+	; 	:precondition (and (not (free ?gripper)) (holding ?held))
+	; 	:effect (and (free ?gripper) (not (holding ?held)))
+	; )
+
+	;; Define tasks
+
+	(:task open-dispenser-task
+		:parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?table - table ?gripper - gripper)
+	)
+
+	(:task pick-up-task
+		:parameters (?obj - holdable ?table - table ?gripper - gripper)
+	)
+
+	; (:task place-pod-in-dispenser-task
+	; 	:parameters (?pod - coffee-pod ?dispenser - coffee-dispenser ?gripper - gripper)
+	; )
+
+	; (:task close-dispenser-task
+	; 	:parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?gripper - gripper)
+	; )
+
+	; (:task prepare-coffee-task
+	; 	:parameters (?pod - coffee-pod ?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?table - table ?gripper - gripper)
+	; )
+
+	;; Define methods
+	(:method open-dispenser-method
+		:parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?table - table ?gripper - gripper)
+		:task (open-dispenser-task ?dispenser ?lid ?table ?gripper)
+		:subtasks (and
+			(reach ?lid ?table ?gripper)
+			(flip-up ?lid ?gripper)
+		)
+	)
+
+	(:method pick-up-method
+		:parameters (?obj - holdable ?table - table ?gripper - gripper)
+		:task (pick-up-task ?obj ?table ?gripper)
+		:subtasks (and
+			(reach ?obj ?table ?gripper)
+			(grasp ?obj ?gripper)
+		)
+	)
+
+	; (:method place-pod-in-dispenser-method
+	; 	:parameters (?pod - coffee-pod ?dispenser - coffee-dispenser ?gripper - gripper)
+	; 	:task (place-pod-in-dispenser-task ?pod ?dispenser ?gripper)
+	; 	:subtasks (and
+	; 		(reach ?dispenser ?gripper)
+	; 		(place-in ?pod ?dispenser ?gripper)
+	; 	)
+	; )
+
+	; (:method close-dispenser-method
+	; 	:parameters (?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?gripper - gripper)
+	; 	:task (close-dispenser-task ?dispenser ?lid ?gripper)
+	; 	:subtasks (and
+	; 		(reach ?lid ?gripper)
+	; 		(flip-down ?lid ?gripper)
+	; 	)
+	; )
+	
+	; (:method prepare-coffee-method
+	; 	:parameters (?pod - coffee-pod ?dispenser - coffee-dispenser ?lid - coffee-dispenser-lid ?table - table ?gripper - gripper)
+	; 	:task (prepare-coffee-task ?pod ?dispenser ?lid ?table ?gripper)
+	; 	:subtasks (and
+	; 		(open-dispenser-task ?dispenser ?lid ?gripper)
+	; 		(pick-up-task ?pod ?table ?gripper)
+	; 		(place-pod-in-dispenser-task ?pod ?dispenser ?gripper)
+	; 		(close-dispenser-task ?dispenser ?lid ?gripper)
+	; 	)
+	; )
+)

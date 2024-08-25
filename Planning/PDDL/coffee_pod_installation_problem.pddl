@@ -1,5 +1,5 @@
 (define (problem coffee-pod-installation)
-  (:domain generic)
+  (:domain coffee-pod-installation)
   (:objects 
 	coffee-pod1 - coffee-pod
 	coffee-dispenser1 - coffee-dispenser

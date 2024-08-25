@@ -1,0 +1,29 @@
+(define (problem coffee-prep-problem)
+	(:domain coffee-prep)
+	
+	;; Define objects
+	(:objects
+		mug1 - mug
+		pod1 - coffee-pod
+		dispenser1 - coffee-dispenser
+		lid1 - coffee-dispenser-lid
+		table1 - table
+		gripper1 - gripper
+	)
+	
+	;; Define initial state
+	(:init
+		(on lid1 table1)
+		(not (flipped-up lid1))
+		(free gripper1)
+	)
+	
+	;; Define tasks
+	(:htn
+		:tasks (and 
+			(open-dispenser-task dispenser1 lid1 table1 gripper1)
+			(pick-up-task lid1 table1 gripper1)
+		;:tasks (prepare-coffee-task pod1 dispenser1 lid1 table1 gripper1)
+		)
+	)
+)
