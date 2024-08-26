@@ -1,24 +1,16 @@
-(define (problem generic)
-  (:domain generic)
+(define (problem coffee_task)
+  (:domain tabletop)
   (:objects
-    drawer1 - drawer
-    coffee-pod1 - coffee-pod
-    coffee-dispenser1 - coffee-dispenser
-    coffee-dispenser-lid1 - coffee-dispenser-lid
-    table1 - table
-    mug1 - mug
-    gripper1 - gripper
+    coffee_pod drawer coffee_dispenser mug table
   )
   (:init
-    (free gripper1)
-    (not (open coffee-dispenser1))
-    (in coffee-pod1 drawer1)
-    (on mug1 table1)
+    (inside coffee_pod drawer)
+    (on mug table)
   )
-  (:goal 
-    (and 
-      (in coffee-pod1 coffee-dispenser1)
-      (under mug1 coffee-dispenser1)
+  (:goal
+    (and
+      (installed coffee_pod coffee_dispenser)
+      (under mug coffee_dispenser)
     )
   )
 )

@@ -6,6 +6,7 @@
 Script that offers an easy way to test random actions in a MimicGen environment.
 Similar to the demo_random_action.py script from robosuite.
 """
+from utils import *
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 import mimicgen
@@ -78,13 +79,16 @@ if __name__ == "__main__":
     env = suite.make(
         **options,
         has_renderer=True,
-        has_offscreen_renderer=False,
+        has_offscreen_renderer=True,
         ignore_done=True,
-        use_camera_obs=False,
+        use_camera_obs=True,
+        use_object_obs=True,
         control_freq=20,
     )
-    env.reset()
     env.viewer.set_camera(camera_id=0)
+    obs = env.reset()
+    # save the agentview image
+    save_agent_view_image(obs["agentview_image"])
     # Get action limits
     low, high = env.action_spec
 

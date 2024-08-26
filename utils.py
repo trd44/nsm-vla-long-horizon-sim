@@ -1,7 +1,10 @@
 import os
 import yaml
 import copy
+import numpy as np
 import subprocess
+import base64
+from PIL import Image
 from langchain.tools import tool
 
 config_file = "config.yaml"
@@ -10,6 +13,8 @@ def load_config(config_file):
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
     return config
+
+config = load_config(config_file)
 
 @tool
 def verify_predicates_domain(old_domain:str, new_domain:str, structure="pddl"):
@@ -91,9 +96,10 @@ def call_planner(domain:str, problem:str, structure="pddl"):
         return "successfully found a plan", plan
     elif structure == "hddl":
         run_script = f"{planning_dir}/lilotane/build/lilotane {domain_path} {problem_path} -v=0 -cs"# | cut -d' ' -f2- | sed 1,2d | head -n -2" # > + sub_plan_name
-        
-    
-    
+        output = subprocess.getoutput(run_script)
+        #TODO：implement logic for processing the output
+        return "planner output processing not implemented yet", []
+             
 def check_predicates_subset(problem_predicates, domain_predicates):
     # Parse predicates
     parsed_problem_predicates = {parse_predicate(pred, grounded=True) for pred in problem_predicates}
@@ -191,6 +197,27 @@ def _output_to_plan(output, structure):
         #            game_action_set[i][j] = applicator[game_action_set[i]]
         return action_set, game_action_set
     return [], []
+
+def save_agent_view_image(image:np.array):
+    """Save the image of the agent's view to a file
+
+    Args:
+        image (np.array): image of the agent's view
+    """
+    image = Image.fromarray(image)
+    # PIL image is flipped, so flip it back
+    image = image.transpose(Image.FLIP_TOP_BOTTOM)
+    image.save(config['image_path'])
+
+def encode_image(image_path:str):
+    """Encode the image at `image_path`
+
+    Args:
+        image_path (str): path to the image
+    """
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
 
 if __name__ == "__main__":
     config = load_config('config.yaml')

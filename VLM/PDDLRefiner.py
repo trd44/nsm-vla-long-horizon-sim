@@ -11,19 +11,7 @@ from langchain.agents.format_scratchpad.openai_tools import (
 )
 from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
 from langchain.agents import AgentExecutor
-#from langgraph.prebuilt import create_react_agent
-# class PDDLRefiner:
-#     def __init__(self, config_file):
-#         self.config = self.load_config(config_file)
-        
 
-#     def refine_pddl(self, pddl_file):
-#         # Implement your PDDL refinement logic here
-#         pass
-
-# # Example usage
-# refiner = PDDLRefiner('config.yaml')
-# refiner.refine_pddl('/path/to/pddl_file.pddl')
 #%%
 # Set the PYTHONPATH to include the current directory
 config = load_config("config.yaml")
@@ -35,11 +23,15 @@ read_tool, write_tool = FileManagementToolkit(
 tools = [call_planner, verify_predicates_domain, verify_predicates_problem, read_tool, write_tool]
 model = ChatOpenAI(model=config['vlm_agent']['model'])
 model_with_tools = model.bind_tools(tools)
+
+# get the encoded agentview image
+base64_image = encode_image(config['image_path'])
+human
 prompt = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            system_identify_missing_operators_msg
+            system_identify_goal_msg
         ),
         ("user", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
