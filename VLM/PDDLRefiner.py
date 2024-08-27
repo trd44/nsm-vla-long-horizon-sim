@@ -21,12 +21,11 @@ read_tool, write_tool = FileManagementToolkit(
     selected_tools=["read_file", "write_file"],
 ).get_tools() 
 tools = [call_planner, verify_predicates_domain, verify_predicates_problem, read_tool, write_tool]
-model = ChatOpenAI(model=config['vlm_agent']['model'])
+model = ChatOpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
 model_with_tools = model.bind_tools(tools)
 
 # get the encoded agentview image
 base64_image = encode_image(config['image_path'])
-human
 prompt = ChatPromptTemplate.from_messages(
     [
         (
@@ -58,7 +57,6 @@ if __name__ == "__main__":
     # prompt the user for input and start a conversation with the agent
     # while True:
     # user_input = input("Enter your input: ")
-    res = list(agent_executor.stream({"input": "There is a drawer. There is a coffee pod inside the drawer. Install the coffee pod in the coffee dispenser and place the mug that is on the table under the dispenser"}))
+    res = list(agent_executor.stream({"input": "There is a drawer. There is a coffee pod inside the drawer. Install the coffee pod in the coffee pod holder and place the mug under the coffee pod holder"}))
     print(res)
-            # print(chunk)
-            # print("===")
+            

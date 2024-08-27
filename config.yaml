@@ -10,7 +10,7 @@ image_path: "images/agent_view.jpg"
 planning_dir: "Planning/PDDL"
 init_planning_domain: "tabletop_domain.pddl"
 init_planning_problem: "tabletop_problem.pddl"
-generic_planning_domain: "tabletop_domain.pddl"
+new_planning_domain: "tabletop_domain.pddl"
 new_planning_problem: "tabletop_problem.pddl"
 max_missing_operators: 3
 

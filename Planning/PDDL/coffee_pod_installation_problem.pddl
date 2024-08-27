@@ -1,24 +1,26 @@
-(define (problem coffee-pod-installation)
-  (:domain coffee-pod-installation)
-  (:objects 
-	coffee-pod1 - coffee-pod
-	coffee-dispenser1 - coffee-dispenser
-  	table1 - table
-	gripper1 - gripper
-  	mug1 - mug
-  	coffee-dispenser-lid1 - coffee-dispenser-lid
+(define (problem generic)
+  (:domain generic)
+  (:objects
+    coffee-pod1 - coffee-pod
+    coffee-pod-holder1 - coffee-pod-holder
+    coffee-machine-lid1 - coffee-machine-lid
+    table1 - table
+    mug1 - mug
+    gripper1 - gripper
   )
-  (:init 
-	(free gripper1)
-	(not (open coffee-dispenser1))
-	(on coffee-pod1 table1)
-	(under mug1 coffee-dispenser1)
+
+  ;initial symbolic state of the task using ONLY available predicates
+  (:init
+    (free gripper1)
+    (not (open coffee-pod-holder1))
+    (under mug1 coffee-pod-holder1)
+    (on coffee-pod1 table1)
   )
+
   (:goal 
-	(and 
-	  (in coffee-pod1 coffee-dispenser1)
-	  (not (open coffee-dispenser1))
-	  (under mug1 coffee-dispenser1)
-	)
+    (and
+      (in coffee-pod1 coffee-pod-holder1)
+      (not (open coffee-pod-holder1))
+    )
   )
 )

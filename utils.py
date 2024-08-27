@@ -85,7 +85,7 @@ def call_planner(domain:str, problem:str, structure="pddl"):
         output = subprocess.getoutput(run_script)
         
         if "unsolvable" in output or "goal can be simplified to FALSE" in output: # unsolvable
-            return "the planner did not find a plan given the problem specification in the problem file and available actions in the domain file. Please double check the actions in the domain file and the init and goal specifications in the problem file", []
+            return "the planner did not find a plan given the problem specification in the problem file and available actions in the domain file. Please double check the actions in the domain file.", []
         elif 'ff: found legal plan as follows\n' not in output: # symbolic planning specifications have errors
             return "The planner failed due to errors in the domain and/or problem specifications. Please double check the syntax and semantics in the domain and problem files:\n{}".format(output), []
         try:
@@ -103,7 +103,78 @@ def call_planner(domain:str, problem:str, structure="pddl"):
         output = subprocess.getoutput(run_script)
         #TODO：implement logic for processing the output
         return "planner output processing not implemented yet", []
-             
+
+
+@tool          
+def read_file(file_path:str):
+    """read the file from the given file_path
+    """
+    # read the file from the given file_path
+    try:
+        with open(file_path, 'r') as file:
+            file_content = file.read()
+            return file_content
+    except e:
+        return e
+
+@tool
+def write_file(file_path:str, content:str):
+    """write the `content` to file_path"""
+    try:
+        with open(file_path, 'w') as file:
+            file.write(content)
+            return True
+    except e:
+        return e
+
+
+def parse_pddl_types(pddl_content):
+    # Regular expression to match the :types section
+    types_section_pattern = re.compile(r'\(:types\s+(.*?)\s+\)', re.DOTALL)
+    match = types_section_pattern.search(pddl_content)
+    
+    if not match:
+        raise ValueError("No :types section found in the PDDL content.")
+    
+    types_section = match.group(1).strip()
+    
+    # Split the types section into lines and parse each line
+    types_lines = types_section.split('\n')
+    types_hierarchy = {}
+    
+    for line in types_lines:
+        line = line.strip()
+        if '-' in line:
+            types, parent = line.split('-')
+            parent = parent.strip()
+            types = [t.strip() for t in types.split()]
+        else:
+            types = [t.strip() for t in line.split()]
+            parent = None
+        
+        for t in types:
+            if parent:
+                if parent not in types_hierarchy:
+                    types_hierarchy[parent] = []
+                types_hierarchy[parent].append(t)
+            else:
+                if t not in types_hierarchy:
+                    types_hierarchy[t] = []
+    
+    return types_hierarchy
+
+def build_hierarchical_json(types_hierarchy):
+    def build_tree(node):
+        if node not in types_hierarchy or not types_hierarchy[node]:
+            return {}
+        return {child: build_tree(child) for child in types_hierarchy[node]}
+    
+    root_nodes = [node for node in types_hierarchy if not any(node in children for children in types_hierarchy.values())]
+    hierarchical_json = {root: build_tree(root) for root in root_nodes}
+    
+    return hierarchical_json
+
+
 def check_predicates_subset(problem_predicates, domain_predicates):
     # Parse predicates
     parsed_problem_predicates = {parse_predicate(pred, grounded=True) for pred in problem_predicates}

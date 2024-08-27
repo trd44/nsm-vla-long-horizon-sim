@@ -1,4 +1,5 @@
 
+import os
 from utils import *
 from VLM.PDDLprompts import *
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -10,29 +11,12 @@ from langchain.agents.format_scratchpad.openai_tools import (
 )
 from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
 from langchain.agents import AgentExecutor
-#from langgraph.prebuilt import create_react_agent
-# class PDDLRefiner:
-#     def __init__(self, config_file):
-#         self.config = self.load_config(config_file)
-        
 
-#     def refine_pddl(self, pddl_file):
-#         # Implement your PDDL refinement logic here
-#         pass
-
-# # Example usage
-# refiner = PDDLRefiner('config.yaml')
-# refiner.refine_pddl('/path/to/pddl_file.pddl')
-#%%
-# Set the PYTHONPATH to include the current directory
 config = load_config("config.yaml")
-planning_dir = config["planning_dir"]
-read_tool, write_tool = FileManagementToolkit(
-    root_dir=str(planning_dir),
-    selected_tools=["read_file", "write_file"],
-).get_tools() 
-tools = [call_planner, verify_predicates_domain, verify_predicates_problem, read_tool, write_tool]
-model = ChatOpenAI(model=config['vlm_agent']['model'])
+root_dir = os.getcwd()
+planning_dir = root_dir + os.sep + config['planning_dir']
+tools = [verify_predicates_domain, verify_predicates_problem, read_file, write_file]
+model = ChatOpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
 model_with_tools = model.bind_tools(tools)
 
 # get the encoded agentview image
@@ -40,7 +24,6 @@ base64_image = encode_image(config['image_path'])
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", system_image_identify_missing_operators_msg),
         (
             "user",
             [
@@ -54,18 +37,29 @@ prompt = ChatPromptTemplate.from_messages(
                 }
             ],
         ),
+        ("system", system_image_describe_msg),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
     ]
 )
-# prompt = ChatPromptTemplate.from_messages(
-#     [
-#         (
-#             "system",
-#             system_image_identify_missing_operators_msg
-#         ),
-#         ("user", "{input}"),
-#         MessagesPlaceholder(variable_name="agent_scratchpad"),
-#     ]
-# )
+novel_object_detector_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "user",
+            [
+                {
+                    "type": "text",
+                    "text": "{input}",
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                }
+            ],
+        ),
+        ("system", system_novel_object_detection_msg),
+        MessagesPlaceholder(variable_name="agent_scratchpad"),
+    ]
+)
 agent = (
     {
         "input": lambda x: x["input"],
@@ -73,7 +67,7 @@ agent = (
             x["intermediate_steps"]
         ),
     }
-    | prompt
+    | novel_object_detector_prompt
     | model_with_tools
     | OpenAIToolsAgentOutputParser()
 )
@@ -88,7 +82,5 @@ if __name__ == "__main__":
     # while True:
     # user_input = input("Enter your input: ")
     # res = list(agent_executor.stream())
-    res = list(agent_executor.stream({"input": "There is a drawer. There is a coffee pod inside the drawer. Install the coffee pod in the coffee dispenser and place the mug that is on the table under the dispenser"}))
+    res = agent_executor.invoke({"input": "The novel object is the drawer. There is a coffee pod inside the drawer. Install the coffee pod in the coffee dispenser and place the mug under the coffee pod holder"})
     print(res)
-            # print(chunk)
-            # print("===")
