@@ -1,0 +1,32 @@
+[
+    {
+        "name": "free",
+        "value": true,
+        "args": {
+            "gripper1": "gripper"
+        }
+    },
+    {
+        "name": "open",
+        "value": false,
+        "args": {
+            "coffee-dispenser1": "coffee-dispenser"
+        }
+    },
+    {
+        "name": "in",
+        "value": true,
+        "args": {
+            "coffee-pod1": "coffee-pod",
+            "drawer1": "drawer"
+        }
+    },
+    {
+        "name": "on",
+        "value": true,
+        "args": {
+            "mug1": "mug",
+            "table1": "table"
+        }
+    }
+]

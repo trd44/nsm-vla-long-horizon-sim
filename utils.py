@@ -1,9 +1,13 @@
 import os
 import yaml
 import copy
+import json
+import re
+import copy
 import numpy as np
 import subprocess
 import base64
+from typing import *
 from PIL import Image
 from langchain.tools import tool
 
@@ -129,7 +133,38 @@ def parse_predicate(predicate, grounded=False):
         num_args = len([part for part in parts if part.startswith('?')])
     return (name, num_args)
 
-def extract_predicates(file_content, file_type='domain', scrape_action_conditions=False) -> list:
+def parse_ground_predicate(predicate:str, problem_objects:dict) -> dict:
+    """parse a ground predicate string to extract its name and arguments
+
+    Args:
+        predicate (str): a ground predicate string in lisp format
+        problem_objects (dict): a dictionary of objects in the problem file
+    Returns:
+        dict: dictionary containing the predicate name, value and arguments
+    """
+    def find_arg_type(arg_name:str, problem_objects:dict) -> str:
+        for obj_type, obj_list in problem_objects.items():
+            if arg_name in obj_list:
+                return obj_type
+        return None
+    
+    predicate = predicate.replace('(', '').replace(')', '')
+    parts = predicate.split()
+    name = parts[0]
+    val = True
+    arg_start_index = 1
+    if name == 'not':
+        name = parts[1]
+        val = False
+        arg_start_index = 2
+    args = {}
+    for i in range(arg_start_index, len(parts)):
+        arg_name = parts[i]
+        arg_type = find_arg_type(arg_name, problem_objects)
+        args[arg_name] = arg_type
+    return {'name': name, 'value': val, 'args': args}
+
+def extract_predicates(file_content, file_type='domain', scrape_action_conditions=False) -> List[str]:
     """extracts predicates from a symbolic planning file
 
     Args:
@@ -188,15 +223,10 @@ def _output_to_plan(output, structure):
         
         # convert the action set to the actions permissable in the domain
         game_action_set = copy.deepcopy(action_set)
-
-        #for i in range(len(game_action_set)):
-        #   game_action_set[i] = applicator[game_action_set[i].split(" ")[0]]
-        #for i in range(len(game_action_set)):
-        #    for j in range(len(game_action_set[i])):
-        #        if game_action_set[i][j] in applicator.keys():
-        #            game_action_set[i][j] = applicator[game_action_set[i]]
         return action_set, game_action_set
     return [], []
+
+
 
 def save_agent_view_image(image:np.array):
     """Save the image of the agent's view to a file
@@ -218,9 +248,216 @@ def encode_image(image_path:str):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
+def extract_type_parent_mapping(pddl_domain_file):
+    """Extract the types from the :types section of a PDDL domain file. The types are extracted as a dictionary where the key is the type and the value is the parent type. 
+
+    Args:
+        pddl_domain_file (str): path to the domain file
+
+    Returns:
+        dict: type -> parent_type mapping
+    """
+    type_hierarchy = {}
+    
+    with open(pddl_domain_file, 'r') as file:
+        content = file.read()
+        
+        # Extract the :types section using regex
+        types_section = re.findall(r":types(.*?)(?=\))", content, re.DOTALL)
+        
+        if types_section:
+            # Split by newlines to get the individual lines in the types section
+            lines = types_section[0].strip().split("\n")
+
+            for line in lines:
+                # Split by " - " to get the child and parent types
+                if " - " in line:
+                    children, parent = line.split(" - ")
+                    children = children.split()
+                    for child in children:
+                        type_hierarchy[child.strip()] = parent.strip()
+                else:
+                    child = line.strip()
+                    parent = None
+                    type_hierarchy[child.strip()] = parent
+            
+    
+    return type_hierarchy
+
+def matches_type(obj_type:str, expected_type:str, type_parent_mapping:dict) -> bool:
+    """Given an object and an expected type, this function checks if the object matches the expected type by traversing the type hierarchy.
+
+    Args:
+        obj_type (str): type of the object   
+        expected_type (str): expected type
+        type_parent_mapping (dict): mapping from type to parent type
+
+    Returns:
+        bool: True if the object matches the expected type, False otherwise
+    """
+    current_type = obj_type
+    while current_type:
+        if current_type == expected_type:
+            return True
+        current_type = type_parent_mapping.get(current_type)
+    return False
+
+def extract_objects_from_problem(problem_file:str) -> dict:
+    """Extracts the objects from a problem file in lisp format.
+
+    Args:
+        problem_file (str): the path to the problem file
+
+    Returns:
+        dict: object to type mapping
+    """
+    res = dict()
+    with open(problem_file, 'r') as file:
+        content = file.read()
+        objects_section = re.findall(r":objects(.*?)(?=\))", content, re.DOTALL)
+        if objects_section:
+            lines = objects_section[0].strip().split("\n")
+            for line in lines:
+                # split the object into objects before ' - ' and its type after ' - '
+                objs, obj_type = line.split(" - ")
+                res[obj_type] = [obj.strip() for obj in objs.split()]
+        return res
+
+def extract_ground_predicates_from_init(problem_file:str) -> List[dict]:
+    """Extract the ground applicable predicates from the `:init` section of a problem file.` Example:
+    {
+        "name": "in",
+        "value": true,
+        "args": {
+            "?coffee-pod1": "coffee-pod",
+            "?drawer1": "drawer"
+        }
+    },
+
+    Args:
+        problem_file (str): path to the problem file
+    Returns:
+        list: list of ground predicates
+    """
+    # get the problem objects
+    problem_objects = extract_objects_from_problem(problem_file)
+    # read the file content
+    with open(problem_file, 'r') as file:
+        content = file.read()
+        # extract the :init section using regex
+        preds:List[str] = extract_predicates(content, file_type='problem')
+        res = [parse_ground_predicate(pred, problem_objects) for pred in preds]
+    return res
+
+
+def extract_predicates_from_domain(domain_file:str) -> dict:
+    """Extracts the predicates from a domain file in list format.
+
+    Args:
+        domain_file (str): file path
+
+    Returns:
+        list: dict
+    """
+    res = dict()
+    # Read the domain file
+    with open(domain_file, 'r') as file:
+        content = file.read()
+        # Extract the predicates
+        extracted_predicates = extract_predicates(content)
+        for pred in extracted_predicates:
+            pred_dict = extract_predicate(pred)
+            res[pred_dict['name']] = pred_dict
+        return res
+
+
+def extract_predicate(predicate_str_lisp:str) -> dict:
+    """Given a predicate in lisp format, this function extracts the predicate name and arguments and returns them as a dictionary. Example: '(holding ?obj - holdable)' -> {'name': 'holding', 'args': {'?obj': 'holdable'}}
+
+    Args:
+        predicate_str_lisp (str): the predicate in lisp format
+
+    Returns:
+        dict: dictionary containing the predicate name and arguments
+    """
+    predicate_str_lisp = predicate_str_lisp.replace('(', '').replace(')', '')
+    parts = predicate_str_lisp.split()
+    name = parts[0]
+    args = {}
+    for i in range(1, len(parts)):
+        if parts[i].startswith('?'):
+            arg_name = parts[i]
+            arg_type = parts[i+2]
+            args[arg_name] = arg_type
+    return {'name': name, 'args': args}
+
+def find_applicable_predicates(type_name:str, type_parent_mapping:dict, predicates:List[dict]) -> set:
+    """Given a type name, this function finds the applicable predicates for that type by traversing the type hierarchy.
+
+    Args:
+        type_name (str): the name of the type
+        type_parent_mapping (dict): mapping from type to parent type
+        predicates (list): a list of predicates in dictionary format
+
+    Returns:
+        set: the set of all applicable predicates
+    """
+    # Initialize a set to store applicable predicates
+    applicable_predicates = []
+    
+    # Function to traverse the type hierarchy
+    def traverse_type_hierarchy(current_type):
+        # Iterate through all predicates
+        for predicate in predicates.values():
+            for arg, arg_type in predicate['args'].items():
+                if arg_type == current_type:
+                    applicable_pred = copy.deepcopy(predicate)
+                    applicable_pred['args'][arg] = type_name
+                    applicable_predicates.append(applicable_pred)
+        
+        # Recursively traverse the parent type
+        parent_type = type_parent_mapping.get(current_type)
+        if parent_type:
+            traverse_type_hierarchy(parent_type)
+    
+    # Start traversal from the given type
+    traverse_type_hierarchy(type_name)
+    
+    return applicable_predicates
+
+def extract_applicable_truth_assignments(problem_file:str, applicable_predicates:set) -> dict:
+    """Given the problem file and a set of applicable predicates, this function extracts the truth assignments for the applicable predicates from the problem file
+
+    Args:
+        problem_file (str): _description_
+        applicable_predicates (set): _description_
+
+    Returns:
+        dict: _description_
+    """
+    pass
+
+
+# def predicate_babble(predicate:dict, )
+
+
+def save_to_json(hierarchy, json_file):
+    with open(json_file, 'w') as file:
+        json.dump(hierarchy, file, indent=4)
 
 if __name__ == "__main__":
-    config = load_config('config.yaml')
-    #verify_predicates_domain("domain.pddl", "domain.pddl")
-    # verify_predicates_problem("domain.pddl", "problem.pddl")
-    call_planner(config['generic_planning_domain'], config['new_planning_problem'])
+    # type_parent_mapping = extract_type_parent_mapping('Planning/PDDL/llm_success_trial1_domain.pddl')
+    # save_to_json(type_parent_mapping, 'type_parent_mapping.json')
+    # preds = extract_predicates_from_domain('Planning/PDDL/llm_success_trial1_domain.pddl')
+    # save_to_json(preds, 'predicates.json')
+    # applicable_preds = find_applicable_predicates('drawer', type_parent_mapping, preds)
+    # save_to_json(applicable_preds, 'applicable_preds.json')
+
+    # objects = extract_objects_from_problem('Planning/PDDL/llm_success_trial1_problem.pddl')
+    # save_to_json(objects, 'problem_objects.json')
+
+    ground_preds = extract_ground_predicates_from_init('Planning/PDDL/llm_success_trial1_problem.pddl')
+    save_to_json(ground_preds, 'ground_init_preds.json')
+
+    
+

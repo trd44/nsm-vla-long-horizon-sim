@@ -1,0 +1,15 @@
+{
+    "object": null,
+    "robot": null,
+    "holdable": "object",
+    "opennable": "object",
+    "support": "object",
+    "gripper": "robot",
+    "mug": "holdable",
+    "coffee-pod": "holdable",
+    "coffee-dispenser-lid": "holdable",
+    "container": "opennable",
+    "table": "support",
+    "drawer": "container",
+    "coffee-dispenser": "container"
+}

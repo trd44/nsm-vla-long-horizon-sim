@@ -1,0 +1,23 @@
+{
+    "drawer": [
+        "drawer1"
+    ],
+    "coffee-pod": [
+        "coffee-pod1"
+    ],
+    "coffee-dispenser": [
+        "coffee-dispenser1"
+    ],
+    "coffee-dispenser-lid": [
+        "coffee-dispenser-lid1"
+    ],
+    "table": [
+        "table1"
+    ],
+    "mug": [
+        "mug1"
+    ],
+    "gripper": [
+        "gripper1"
+    ]
+}
