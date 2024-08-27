@@ -438,7 +438,42 @@ def extract_applicable_truth_assignments(problem_file:str, applicable_predicates
     pass
 
 
-# def predicate_babble(predicate:dict, )
+def generate_complete_value_assignments_relevant_to_obj(obj:str, obj_type:str, applicable_predicates:List[dict], ground_init_preds:List[dict],problem_objects:dict) -> List[dict]:
+    """Given an object, a list of applicable predicates, the ground init predicates, and the problem objects, this function generates the complete value assignments to the applicable predicates
+
+    Args:
+        obj (str): the object
+        onj_type (str): the type of the object
+        applicable_predicates (List[dict]): the list of applicable predicates for the object
+        ground_init_preds (List[dict]): the ground init predicates from a problem file
+        problem_objects (dict): the objects in the problem file
+
+    Returns:
+        List[dict]: value assignment to the applicable predicates
+    """
+    # get the type parent mapping
+    type_parent_mapping = extract_type_parent_mapping('Planning/PDDL/llm_success_trial1_domain.pddl')
+    # iterate over the applicable predicates
+    res = []
+    for pred in applicable_predicates:
+        true_pred = {'name': pred['name'], 'value': True, 'args': {}}
+        false_pred = {'name': pred['name'], 'value': False, 'args': {}}
+        # fill the object in the appropriate argument
+        args = pred['args']
+        for arg, arg_type in args.items():
+            if arg_type == obj_type:
+                true_pred['args'][obj] = arg_type
+                false_pred['args'][obj] = arg_type
+            else: # find an object of the type in the problem objects
+
+                for obj_type in problem_objects:
+                    if matches_type(obj_type, arg_type, type_parent_mapping):
+                    # iterate over the actual objects for each obj type
+                        detected_objs = problem_objects[obj_type]
+                        for detected_obj in detected_objs:
+                            true_pred['args'][detected_obj] = obj_type
+                            false_pred['args'][detected_obj] = obj_type
+                            break
 
 
 def save_to_json(hierarchy, json_file):
