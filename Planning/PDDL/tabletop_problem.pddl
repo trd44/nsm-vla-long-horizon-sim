@@ -13,9 +13,8 @@
   ;initial symbolic state of the task using ONLY available predicates
   (:init
     (free gripper1)
-    (not (open coffee-pod-holder1))
-    (in coffee-pod1 drawer1)
-    (on mug1 table1)
+    (on coffee-pod1 table1)
+    (under mug1 coffee-pod-holder1)
   )
 
   (:goal 
