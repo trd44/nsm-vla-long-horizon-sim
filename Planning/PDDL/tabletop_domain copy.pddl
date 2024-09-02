@@ -54,7 +54,7 @@
 
     (:action place-mug-under-holder
         :parameters (?mug - mug ?holder - coffee-pod-holder ?table - table ?gripper - gripper)
-        :precondition (and (holding ?mug) (on ?mug ?table) (free ?gripper))
+        :precondition (and (on ?mug ?table) (free ?gripper))
         :effect (and (under ?mug ?holder) (not (on ?mug ?table)) (free ?gripper))
     )
 

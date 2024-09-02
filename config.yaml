@@ -7,20 +7,20 @@ vlm_agent:
 # seting for image observation
 image_path: "images/agent_view.jpg"
 # setting for testing PDDL. Uncoment when testing.
+
 planning_dir: "Planning/PDDL"
-init_planning_domain: "tabletop_domain.pddl"
-init_planning_problem: "tabletop_problem.pddl"
-new_planning_domain: "tabletop_domain.pddl"
-new_planning_problem: "tabletop_problem.pddl"
-max_missing_operators: 3
+init_planning_domain: "tabletop_domain.pddl" # the initial domain file
+modified_planning_domain: "modified_tabletop_domain.pddl" # final domain file will be saved as this
+planning_problem: "tabletop_problem.pddl" # the partially defined planning problem file
+max_new_operators_branching_factor: 2
+max_depth: 10
 
 # setting for testing HDDL. Uncoment when testing.
-# planning_dir: "Planning/HDDL"
-# init_planning_domain: "tabletop_domain.hddl"
-# init_planning_problem: "tabletop_problem.hddl"
-# generic_planning_domain: "tabletop_domain.hddl"
-# new_planning_problem: "tabletop_problem.hddl"
-# max_missing_operators: 3
+# init_planning_domain: "tabletop_domain.hddl" # the initial domain file
+# modified_planning_domain: "modified_tabletop_domain.hddl" # final domain file will be saved as this
+# planning_problem: "tabletop_problem.hddl" # the partially defined planning problem file
+# max_new_operators_branching_factor: 2
+# max_depth: 10
 
 logging: # TODO: enable this
   level: "INFO"

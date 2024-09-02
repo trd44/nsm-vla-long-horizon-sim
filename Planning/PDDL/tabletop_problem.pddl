@@ -1,5 +1,5 @@
-(define (problem generic)
-  (:domain generic)
+(define (problem tabletop)
+  (:domain tabletop)
   (:objects
     drawer1 - container
     coffee-pod1 - coffee-pod
