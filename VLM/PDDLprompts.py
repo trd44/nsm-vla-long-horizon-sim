@@ -3,6 +3,7 @@ from utils import *
 
 config = load_config("config.yaml")
 full_planning_dir = os.getcwd() + os.sep + config['planning_dir'] + os.sep
+system_tot_propose_msg = f"""You are a robot capable of understanding planning domain definition language (PDDL)."""
 
 system_novel_object_detection_msg = f"""You are a robot capable of understanding planning domain definition language (PDDL). The task scene is captured in the image. There is a novel object in this scene not included in the `:types` section of the `{full_planning_dir}{config['init_planning_domain']}`.
 1. Update the `:types` section to include the novel object. Classify it as one of the existing types.

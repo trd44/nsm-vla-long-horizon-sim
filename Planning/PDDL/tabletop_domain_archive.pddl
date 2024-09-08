@@ -8,7 +8,7 @@
         mug coffee-pod coffee-machine-lid - holdable
         container - opennable
         table - support
-        coffee-pod-holder - container
+        coffee-pod-holder drawer - container
     )
 
     ;; Define predicates
@@ -54,8 +54,8 @@
 
     (:action place-mug-under-holder
         :parameters (?mug - mug ?holder - coffee-pod-holder ?table - table ?gripper - gripper)
-        :precondition (and (on ?mug ?table) (free ?gripper))
-        :effect (and (under ?mug ?holder) (not (on ?mug ?table)) (free ?gripper))
+        :precondition (holding ?mug)
+        :effect (and (under ?mug ?holder) (not (holding ?mug)) (free ?gripper))
     )
 
 )

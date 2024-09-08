@@ -6,7 +6,10 @@ from collections import deque
 from tarski.search import GroundForwardSearchModel
 from tarski.search.model import progress
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
-from tarski.io.fstrips import FstripsReader
+from tarski.io.fstrips import FstripsReader, FstripsWriter
+from tarski.syntax import land, neg
+from tarski import fstrips as fs
+from tarski.evaluators.simple import evaluate
 
 from utils import *
 
@@ -33,11 +36,27 @@ class HybridSymbolicLLMPlanner:
     def forward_search(self):
         """performs forward search
         """
+        drawer = self.problem.language.get_sort('drawer')
+        
+        drawer_var = self.problem.language.variable('?drawer', drawer)
+        gripper = self.problem.language.get_sort('gripper')
+        gripper_var = self.problem.language.variable('?gripper', gripper)
+        open = self.problem.language.get_predicate('open')
+        free = self.problem.language.get_predicate('free')
+        # self.problem.action(
+        #     name='open-drawer',
+        #     parameters=[drawer_var, gripper_var],
+        #     precondition=land(neg(open(drawer_var)), free(gripper_var)),
+        #     effects=[fs.AddEffect(open(drawer_var))]
+        # )
         model = GroundForwardSearchModel(self.problem, ground_problem_schemas_into_plain_operators(self.problem))
-        print(model.applicable(model.init()))
-        print(model.successors(model.init()))
-        search = DepthFirstSearch(model, max_expansions=self.config['max_depth'])
+        print(list(model.applicable(model.init())))
+        print(list(model.successors(model.init())))
+        search = BreadthFirstSearch(model, max_expansions=self.config['max_depth'])
         space, stats, plans = search.run()
+        domain_file_name = "temp.pddl"
+        writer = FstripsWriter(self.problem)
+        writer.write_domain(domain_file_name, constant_objects=None)
         return space, stats, plans
 
 
@@ -74,14 +93,15 @@ class DepthFirstSearch:
                 logging.info(f"Goal found after {stats.nexpansions} expansions. {stats.num_goals} goal states found.")
 
             if 0 <= self.max_expansions <= stats.nexpansions:
-                logging.info(f"Max. expansions reached. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
-                return space, stats
-
-            for operator, successor_state in self.model.successors(node.state):
-                if successor_state not in closed:
-                    openlist.append(make_child_node(node, operator, successor_state))
-                    closed.add(successor_state)
-            stats.nexpansions += 1
+                logging.info(f"Max. expansions reached on one branch. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
+                stats.nexpansions -= 1
+                continue
+            else:
+                for operator, successor_state in self.model.successors(node.state):
+                    if successor_state not in closed:
+                        openlist.append(make_child_node(node, operator, successor_state))
+                        closed.add(successor_state)
+                stats.nexpansions += 1
 
         logging.info(f"Search space exhausted. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
         space.complete = True
@@ -112,8 +132,15 @@ class BreadthFirstSearch:
         while openlist:
             stats.iterations += 1
             # logging.debug("brfs: Iteration {}, #unexplored={}".format(iteration, len(open_)))
-
+            
             node = openlist.popleft()
+            # open, drawer1 = self.model.problem.language.get('open', 'drawer1')
+            # under, mug1, coffee_pod_holder1 = self.model.problem.language.get('under', 'mug1', 'coffee-pod-holder1')
+            # inside, pod1 = self.model.problem.language.get('in', 'coffee-pod1')
+            # if evaluate(inside(pod1, coffee_pod_holder1), node.state):
+            #     print('pod is inside coffee-pod-holder1')
+            # if evaluate(under(mug1, coffee_pod_holder1), node.state):
+            #     print('mug1 is under coffee-pod-holder1')
             if self.model.is_goal(node.state):
                 stats.num_goals += 1
                 plan = reverse_engineer_plan(node)
@@ -122,7 +149,7 @@ class BreadthFirstSearch:
 
             if 0 <= self.max_expansions <= stats.nexpansions:
                 logging.info(f"Max. expansions reached. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
-                return space, stats
+                return space, stats, plans
 
             for operator, successor_state in self.model.successors(node.state):
                 if successor_state not in closed:

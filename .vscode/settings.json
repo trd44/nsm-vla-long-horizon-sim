@@ -1,10 +1,11 @@
 {
     "python.envFile": "${workspaceFolder}/.env",
     "terminal.integrated.env.linux": {
-        "PYTHONPATH": "/path/to/your/module:/another/path"
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/robosuite:${workspaceFolder}/robosuite/robosuite:${workspaceFolder}/tarski:${workspaceFolder}/tarski/src"
     },
     "terminal.integrated.env.windows": {
-        "PYTHONPATH": "/path/to/your/module;/another/path"
-    }
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/robosuite:${workspaceFolder}/robosuite/robosuite:${workspaceFolder}/tarski:${workspaceFolder}/tarski/src"
+    },
+    "cmake.sourceDirectory": "/Users/helenlu/OpLearn/Planning/HDDL/lilotane"
 }
 
