@@ -10,9 +10,10 @@ image_path: "images/agent_view.jpg"
 
 planning_dir: "Planning/PDDL"
 init_planning_domain: "coffee_domain.pddl" # the initial domain file
-modified_planning_domain: "modified_tabletop_domain.pddl" # final domain file will be saved as this
+modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
-max_new_operators_branching_factor: 2
+novel_objects: ["drawer1"]
+max_new_operators_branching_factor: 1
 max_depth: 100
 
 # setting for testing HDDL. Uncoment when testing.

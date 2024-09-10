@@ -4,21 +4,16 @@
 ;;; 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(define (domain tabletop)
-    (:requirements :typing :equality)
+(define (domain coffee)
+    (:requirements :equality :typing)
     (:types
-        robot - object
-        holdable - object
-        opennable - object
-        support - object
-        gripper - robot
-        mug - holdable
-        coffee-pod - holdable
-        coffee-machine-lid - holdable
-        container - opennable
-        table - support
-        coffee-pod-holder - container
-        drawer - container
+        mug - object
+        coffee-pod - object
+        coffee-pod-holder - object
+        coffee-machine-lid - object
+        drawer - object
+        table - object
+        gripper - object
         object
     )
 
@@ -27,11 +22,14 @@
     )
 
     (:predicates
-        (holding ?x1 - holdable)
-        (open ?x1 - opennable)
+        (can-hold ?x1 - object)
+        (can-open ?x1 - object)
+        (can-contain ?x1 - object ?x2 - object)
+        (on-table ?x1 - object ?x2 - table)
+        (holding ?x1 - object)
+        (in ?x1 - object ?x2 - object)
+        (open ?x1 - object)
         (free ?x1 - gripper)
-        (on ?x1 - holdable ?x2 - support)
-        (in ?x1 - holdable ?x2 - container)
         (under ?x1 - object ?x2 - object)
     )
 
@@ -42,41 +40,21 @@
     
 
     
-    (:action pick-up
-     :parameters (?obj - holdable ?table - table ?gripper - gripper)
-     :precondition (and (free ?gripper) (on ?obj ?table))
+    (:action pick-up-tabletop
+     :parameters (?obj - object ?table - table ?gripper - gripper)
+     :precondition (and (on-table ?obj ?table) (can-hold ?obj) (free ?gripper))
      :effect (and
         (holding ?obj)
-        (not (on ?obj ?table))
+        (not (on-table ?obj ?table))
         (not (free ?gripper)))
-    )
-
-
-    (:action release-holding
-     :parameters (?held - holdable ?gripper - gripper)
-     :precondition (and (not (free ?gripper)) (holding ?held))
-     :effect (and
-        (free ?gripper)
-        (not (holding ?held)))
     )
 
 
     (:action open-coffee-pod-holder
      :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
-     :precondition (and (not (open ?holder)) (free ?gripper))
+     :precondition (and (not (open ?holder)) (can-open ?holder) (free ?gripper))
      :effect (and
-        (open ?holder)
-        (free ?gripper))
-    )
-
-
-    (:action place-pod-in-holder
-     :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
-     :precondition (and (holding ?pod) (open ?holder) (not (free ?gripper)))
-     :effect (and
-        (not (holding ?pod))
-        (in ?pod ?holder)
-        (free ?gripper))
+        (open ?holder))
     )
 
 
@@ -84,13 +62,22 @@
      :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
      :precondition (and (open ?holder) (free ?gripper))
      :effect (and
-        (not (open ?holder))
+        (not (open ?holder)))
+    )
+
+
+    (:action place-pod-in-holder
+     :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
+     :precondition (and (holding ?pod) (open ?holder) (can-contain ?holder ?pod) (not (free ?gripper)))
+     :effect (and
+        (not (holding ?pod))
+        (in ?pod ?holder)
         (free ?gripper))
     )
 
 
     (:action place-mug-under-holder
-     :parameters (?mug - mug ?holder - coffee-pod-holder ?table - table ?gripper - gripper)
+     :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
      :precondition (holding ?mug)
      :effect (and
         (under ?mug ?holder)
@@ -98,12 +85,6 @@
         (free ?gripper))
     )
 
-
-    (:action open-drawer
-     :parameters (?drawer - drawer ?gripper - gripper)
-     :precondition (and (not (open ?drawer)) (free ?gripper))
-     :effect (and
-        (open ?drawer))
-    )
+    '(:action pick-up-from-drawer\n    :parameters (?obj - object ?drawer - drawer ?gripper - gripper)\n    :precondition (and (in ?obj ?drawer) (can-hold ?obj) (free ?gripper) (open ?drawer))\n    :effect (and (holding ?obj) (not (in ?obj ?drawer)) (not (free ?gripper)))\n)\n\n(:action close-drawer\n    :parameters (?drawer - drawer ?gripper - gripper)\n    :precondition (and (open ?drawer) (free ?gripper))\n    :effect (not (open ?drawer))\n)'
 
 )
