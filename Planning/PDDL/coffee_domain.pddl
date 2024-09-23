@@ -15,7 +15,7 @@
         (can-flip ?lid - object)
         (on-table ?obj - object ?table - table)
         (holding ?obj - object) ; whether the gripper is holding an object. If true, `free gripper` should be false.
-        (touching ?obj - object) ; whether the gripper is touching the object. If true, `free gripper` should be false.
+        (occupying-gripper ?obj - object) ; whether the object is occupying the gripper. If true, `free gripper` should be false.
         (reached ?obj - object) ; whether the gripper is within 1 unit of the object. If true, `can-reach` should be true.
         (attached ?obj1 - object ?obj2 - object) ; whether obj1 is attached to obj2. 
         (in ?obj - object ?container - object)
@@ -34,14 +34,14 @@
     (:action open-coffee-pod-holder
         :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
         :precondition (and (not (open ?holder)) (can-reach ?lid) (can-flip ?lid) (can-open ?holder) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (reached ?lid) (touching ?lid) (open ?holder) (not (free ?gripper)))
+        :effect (and (reached ?lid) (occupying-gripper ?lid) (open ?holder) (not (free ?gripper)))
     )
 
 
     (:action close-coffee-pod-holder
         :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
         :precondition (and (open ?holder) (can-reach ?lid) (can-flip ?lid) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (reached ?lid) (touching ?lid) (not (open ?holder)) (not (free ?gripper)))
+        :effect (and (reached ?lid) (occupying-gripperb ?lid) (not (open ?holder)) (not (free ?gripper)))
     )
 
     (:action free-gripper

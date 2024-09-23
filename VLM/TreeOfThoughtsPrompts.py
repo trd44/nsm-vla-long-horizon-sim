@@ -1,27 +1,60 @@
-propose_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest whose state can be changed, a set of available predicates, a set of existing operators, and a goal state, propose up to {n} new operators that would help you reach the goal state. The new operators must be executable in the current state i.e. check each operator's preconditions and make sure to only propose operators whose preconditions are satisfied in the current state. The operators' preconditions and effects must be defined using ONLY the available predicates. The operators' parameters must contain one or more of the novel object(s) of interest. An operator's preconditions and effects must ONLY involve objects in the operator's parameters list. Do not propose existing operators. If no new operator can be proposed, write nothing. Otherwise, separate each operator with a newline. Write each operator in the following PDDL format:
+propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest whose state can be changed, a set of existing operators, and a goal state, propose 1 non-existing operator for interacting with the novel object(s) that would help you reach the goal state. Output `no operator` if no new operator should be proposed. Otherwise, output the operator's name and parameters in the following format:
+```
 (:action operator_name
     :parameters (param1 param2 ...)
-    :precondition (and (precondition1 precondition2 ...))
-    :effect (and (effect1 effect2 ...))
 )
+```
+Problem:
+```
 Current state (unmentioned atoms are assumed false): 
 {current_state}
+Goal state:
+{goal_state}
 Relevant objects: 
 {relevant_objects}
 Novel object(s) of interest: 
 {novel_objects}
 Object types: 
 {object_types}
-Available predicates: 
-{available_predicates}
 Existing operators:
 {existing_operators}
-Possible operators on novel objects:
+```
+Answer: Let's think step by step.
 """
 
-# prompt asking the LLM to parse text containing operators and add them to a FOL problem using the problem's add_operator method
-parse_operators_prompt = """Given a text containing one or more operators separated with newlines in PDDL format, appropriately use the given tool to add each operator. The text is as follows:
-{operators}"""
+# prompt asking the LLM to define the precondition for the new operator
+define_precondition_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, fill in the preconditions of the operator by selecting a relevant subset of atoms in the `Current state` section. The preconditions must ALREADY be satisfied in the current state. Output the operator in the following format:
+(:action operator_name
+    :parameters (param1 param2 ...)
+    :precondition (and (precondition1 precondition2 ...))
+)
+Problem:
+```
+Current state: 
+{full_current_state_atoms}
+Operator:
+{proposed_operator}
+```
+Answer: Let's think step by step.
+"""
+
+# prompt asking the LLM to define the effect for the new operator
+define_effect_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, output the resulting state after applying the operator in the current state. Fill the effects of the operator based on the resulting state in the following format:
+(:action operator_name
+    :parameters (param1 param2 ...)
+    :precondition (and (precondition1 precondition2 ...))
+    :effect (and (effect1 effect2 ...))
+)
+Problem:
+```
+Current state: 
+{full_current_state_atoms}
+Operator:
+{proposed_operator_with_precondition}
+```
+Answer: Let's think step by step.
+"""
+
 
 vote_prompt = """Given a set of operators, several choices of world states and the goal state, decide which state is the most promising at reaching the goal state. Analyze each choice in detail, then conclude in the last line "The best choice is {id}", where id is the integer id of the choice.
 {choices}

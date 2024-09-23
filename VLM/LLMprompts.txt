@@ -1,0 +1,71 @@
+You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest whose state can be changed, a set of existing operators, and a goal state, propose up to 2 non-existing operators for interacting with the novel object(s) that would help you reach the goal state. Write each new operator in the following format and separate them with newlines:
+(:action operator_name
+    :parameters (param1 param2 ...)
+)
+Problem:
+```
+Current state (unmentioned atoms are assumed false): 
+can-contain(coffee-pod-holder1,coffee-pod1), can-hold(coffee-pod1), can-hold(mug1), can-open(coffee-pod-holder1), can-open(drawer1), free(gripper1), in(coffee-pod1,drawer1), on-table(mug1,table1)
+Goal state:
+(in(coffee-pod1,coffee-pod-holder1) and (not open(coffee-pod-holder1)) and under(mug1,coffee-pod-holder1))
+Relevant objects: 
+table1, gripper1, coffee-machine-lid1, coffee-pod1, mug1, coffee-pod-holder1, drawer1
+Novel object(s) of interest: 
+drawer1
+Object types: 
+object, mug, coffee-pod, coffee-pod-holder, coffee-machine-lid, drawer, table, gripper
+Existing operators:
+(:action pick-up-tabletop
+        :parameters (?obj - object ?table - table ?gripper - gripper) 
+    )
+(:action open-coffee-pod-holder
+        :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
+    )
+(:action close-coffee-pod-holder
+        :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
+    )
+(:action place-pod-in-holder
+        :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
+    )
+(:action place-mug-under-holder
+        :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
+    )
+```
+Answer:
+
+
+You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, complete the preconditions and effects of the operator. The preconditions must be satisfied in the current state. Output the operator in the following format:
+(:action operator_name
+    :parameters (param1 param2 ...)
+    :precondition (and (precondition1 precondition2 ...))
+    :effect (and (effect1 effect2 ...))
+)
+Problem:
+```
+Current state (unmentioned atoms are assumed false): 
+can-contain(coffee-pod-holder1,coffee-pod1), can-hold(coffee-pod1), can-open(drawer1), in(coffee-pod1,drawer1), not(open(drawer1)), not(free(gripper1)), not(holding )
+Operator:
+(:action take-out-coffee-pod
+    :parameters (?pod - coffee-pod ?drawer - drawer ?gripper - gripper)
+)
+```
+Answer:
+
+You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, its preconditions, and the current states of parameter objects, fill in the effects of the operator. Output the operator in the following format:
+(:action operator_name
+    :parameters (param1 param2 ...)
+    :precondition (and (precondition1 precondition2 ...))
+    :effect (and (effect1 effect2 ...))
+)
+Problem:
+```
+Current state (unmentioned predicates are false): 
+can-contain(drawer1, coffee-pod1), can-hold(coffee-pod1), can-open(drawer1), in(coffee-pod1,drawer1), on-table(drawer1), not(can-contain(drawer1, gripper1)), not(con-hold(drawer1)), not(can-open(coffee-pod1)), not(in(drawer1, coffee-pod1)), not(on-table(coffee-pod1)), not(free(gripper1))
+Operator:
+(:action take-out-coffee-pod
+    :parameters (?pod - coffee-pod ?drawer - drawer ?gripper - gripper)
+    :precondition (and (in ?pod ?drawer) (can-hold ?pod) (can-open ?drawer))
+)
+```
+Answer:
+

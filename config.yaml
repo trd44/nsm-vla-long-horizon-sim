@@ -3,7 +3,7 @@
 vlm_agent:
   api_key: "your_api_key"
   model: "gpt-4o"
-  temperature: 0
+  temperature: 0.7
 # seting for image observation
 image_path: "images/agent_view.jpg"
 # setting for testing PDDL. Uncoment when testing.
@@ -13,7 +13,7 @@ init_planning_domain: "coffee_domain.pddl" # the initial domain file
 modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
 novel_objects: ["drawer1"]
-max_new_operators_branching_factor: 1
+max_new_operators_branching_factor: 2
 max_depth: 100
 
 # setting for testing HDDL. Uncoment when testing.
