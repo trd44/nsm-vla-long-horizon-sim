@@ -28,7 +28,7 @@
     (:action pick-up-tabletop
         :parameters (?obj - object ?table - table ?gripper - gripper) 
         :precondition (and (on-table ?obj ?table) (can-reach ?obj) (can-hold ?obj) (free ?gripper)) 
-        :effect (and (reached ?obj) (holding ?obj) (not (on-table ?obj ?table)) (not (free ?gripper))) 
+        :effect (and (reached ?obj) (holding ?obj) (occupying-gripper ?obj) (not (on-table ?obj ?table)) (not (free ?gripper))) 
     )
     
     (:action open-coffee-pod-holder
@@ -41,7 +41,7 @@
     (:action close-coffee-pod-holder
         :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
         :precondition (and (open ?holder) (can-reach ?lid) (can-flip ?lid) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (reached ?lid) (occupying-gripperb ?lid) (not (open ?holder)) (not (free ?gripper)))
+        :effect (and (reached ?lid) (occupying-gripper ?lid) (not (open ?holder)) (not (free ?gripper)))
     )
 
     (:action free-gripper
@@ -60,7 +60,7 @@
 
     (:action place-mug-under-holder
         :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
-        :precondition (and (holding ?mug) (not (free ?gripper)) (can-reach ?holder))
+        :precondition (and (holding ?mug) (occupying-gripper ?mug) (not (free ?gripper)) (can-reach ?holder))
         :effect (and (under ?mug ?holder) (not (holding ?mug)) (free ?gripper))
     )
 

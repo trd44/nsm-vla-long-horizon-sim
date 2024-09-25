@@ -1,4 +1,4 @@
-propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest whose state can be changed, a set of existing operators, and a goal state, propose 1 non-existing operator for interacting with the novel object(s) that would help you reach the goal state. Output `no operator` if no new operator should be proposed. Otherwise, output the operator's name and parameters in the following format:
+propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator involving the novel object(s) that is executable in the current state (not in the future) and would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise, output the operator's name and parameters in the following format:
 ```
 (:action operator_name
     :parameters (param1 param2 ...)
@@ -14,6 +14,10 @@ Relevant objects:
 {relevant_objects}
 Novel object(s) of interest: 
 {novel_objects}
+Specifically, here are things that are true about the novel object(s):
+{true_atoms_novel_obj}
+Here are things that are false about the novel object(s):
+{false_atoms_novel_obj}
 Object types: 
 {object_types}
 Existing operators:
@@ -25,9 +29,10 @@ Answer: Let's think step by step.
 # prompt asking the LLM to define the precondition for the new operator
 define_precondition_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, fill in the preconditions of the operator by selecting a relevant subset of atoms in the `Current state` section. The preconditions must ALREADY be satisfied in the current state. Output the operator in the following format:
 (:action operator_name
-    :parameters (param1 param2 ...)
-    :precondition (and (precondition1 precondition2 ...))
+    :parameters (?param1 - param1-type ?param2 - param2-type ...)
+    :precondition (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
 )
+and (holding ?mug) (occupying-gripper ?mug) (not (free ?gripper)) (can-reach ?holder))
 Problem:
 ```
 Current state: 
@@ -41,9 +46,9 @@ Answer: Let's think step by step.
 # prompt asking the LLM to define the effect for the new operator
 define_effect_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, output the resulting state after applying the operator in the current state. Fill the effects of the operator based on the resulting state in the following format:
 (:action operator_name
-    :parameters (param1 param2 ...)
-    :precondition (and (precondition1 precondition2 ...))
-    :effect (and (effect1 effect2 ...))
+    :parameters (?param1 - param1-type ?param2 - param2-type ...)
+    :precondition (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
+    :effect (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
 )
 Problem:
 ```
