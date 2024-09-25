@@ -1,0 +1,10 @@
+version: '3'
+services:
+  oplearn:
+    build:
+      context: .
+    volumes:
+      - .:/home/user/oplearn
+    working_dir: /home/user/app
+    stdin_open: true
+    tty: true
