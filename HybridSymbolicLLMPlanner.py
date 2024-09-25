@@ -265,8 +265,6 @@ class HybridSymbolicLLMPlanner:
             existing_operators.append(op_w_params)
         existing_operators_str:str = '\n'.join(existing_operators)
         
-        # get the full state description of novel objects
-        true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
 
         def extract_operator_from_llm_output(out:str) -> str:
             """parse the `(:action)` section from llm's output
@@ -296,6 +294,9 @@ class HybridSymbolicLLMPlanner:
             Returns:
                 str: the operator name and parameters
             """
+            # get the full state description of novel objects
+             
+            true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
             prompt = propose_operator_prompt.format(
                 current_state = current_state,
                 goal_state = g_str,
@@ -309,31 +310,35 @@ class HybridSymbolicLLMPlanner:
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
             return extract_operator_from_llm_output(out.content), extract_constants_from_llm_output(out.content)
         
-        def prompt_llm_for_operator_precondition(proposed_operator_str:str, constants:List[str]):
+        def prompt_llm_for_operator_precondition(proposed_operator_str:str, param_constants:List[str]):
             """prompt the LLM for the operator precondition
             Args:
                 proposed_operator_str (str): the proposed operator string
-                constants (List[str]): the list of constants
+                param_constants (List[str]): the list of constants. In this case the parameter objects.
             Returns:
                 str: the operator precondition
             """
-            true_atoms, false_atoms = self.full_state_description(state, constants)
-            full_relevant_state_atoms = ', '.join(true_atoms.extend(false_atoms))
+            true_atoms, false_atoms = self.full_state_description(state, param_constants)
+            full_param_obj_atoms = ', '.join(true_atoms.extend(false_atoms))
             prompt = define_precondition_prompt.format(
-                full_relevant_state_atoms = full_relevant_state_atoms,
+                full_param_obj_atoms = full_param_obj_atoms,
                 proposed_operator=proposed_operator_str
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
             return extract_operator_from_llm_output(out.content)
             
-        def prompt_llm_for_operator_effects(proposed_operator_w_precond_str:str):
+        def prompt_llm_for_operator_effects(proposed_operator_w_precond_str:str, param_constants:List[str]):
             """prompt the LLM for the operator effects
-
+            Args:
+                proposed_operator_w_precond_str (str): the proposed operator with precondition string
+                param_constants (List[str]): the list of constants. In this case the parameter objects.
             Returns:
                 str: the operator effects
             """
+            true_atoms, false_atoms = self.full_state_description(state, param_constants)
+            full_param_obj_atoms = ', '.join(true_atoms.extend(false_atoms))
             prompt = define_effect_prompt.format(
-                full_current_state_atoms = current_state,
+                full_param_obj_atoms = full_param_obj_atoms,
                 proposed_operator_with_precondition=proposed_operator_w_precond_str
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
@@ -376,7 +381,7 @@ class HybridSymbolicLLMPlanner:
         # query LLM for the effects of the operator
         op_effect_count = {}
         for _ in range(self.config['num_effect_candidates']):
-            proposed_operator_w_precond_effects_str = prompt_llm_for_operator_effects(proposed_operator_w_precond_str)
+            proposed_operator_w_precond_effects_str = prompt_llm_for_operator_effects(proposed_operator_w_precond_str, grounded_params)
             proposed_op = self.parse_operators(proposed_operator_w_precond_effects_str)
             name = list(proposed_op.keys())[0]
             params = proposed_op[name]['parameters']

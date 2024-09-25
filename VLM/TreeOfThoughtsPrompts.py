@@ -41,7 +41,7 @@ define_precondition_prompt = """You are a robot capable of understanding the Pla
 Problem:
 ```
 Current state: 
-{full_current_state_atoms}
+{full_param_obj_atoms}
 Operator:
 {proposed_operator}
 ```
@@ -60,7 +60,7 @@ define_effect_prompt = """You are a robot capable of understanding the Planning 
 Problem:
 ```
 Current state: 
-{full_current_state_atoms}
+{full_param_obj_atoms}
 Operator:
 {proposed_operator_with_precondition}
 ```
