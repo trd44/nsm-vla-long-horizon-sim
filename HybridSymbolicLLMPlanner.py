@@ -268,7 +268,7 @@ class HybridSymbolicLLMPlanner:
         # get the full state description of novel objects
         true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
 
-        def extract_operator_from_llm_output(out:str):
+        def extract_operator_from_llm_output(out:str) -> str:
             """parse the `(:action)` section from llm's output
 
             Args:
@@ -278,6 +278,17 @@ class HybridSymbolicLLMPlanner:
             proposed_operator_parentheses:tuple = self._find_parentheses(out[proposed_operator_start:])
             proposed_operator_str:str = out[proposed_operator_start + proposed_operator_parentheses[0] - 1:proposed_operator_start + proposed_operator_parentheses[1]+1] # include the parantheses
             return proposed_operator_str
+        
+        def extract_constants_from_llm_output(out:str) -> List[str]:
+            """parse the constants from llm's output
+
+            Args:
+                out (str): llm output string
+            """
+            constants_start:int = out.find('ground objects: ') + len('ground objects: ')
+            constants_end = out[constants_start:].find('```')
+            constants_str:str = out[constants_start:constants_start + constants_end]
+            return constants_str.split(', ')
         
         def prompt_llm_for_operator_name_params():
             """prompt the LLM for the operator name and parameters
@@ -296,18 +307,16 @@ class HybridSymbolicLLMPlanner:
                 existing_operators = existing_operators_str,
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
-            return extract_operator_from_llm_output(out.content)
+            return extract_operator_from_llm_output(out.content), extract_constants_from_llm_output(out.content)
         
-        def prompt_llm_for_operator_precondition(proposed_operator_str:str):
+        def prompt_llm_for_operator_precondition(proposed_operator_str:str, constants:List[str]):
             """prompt the LLM for the operator precondition
-
+            Args:
+                proposed_operator_str (str): the proposed operator string
+                constants (List[str]): the list of constants
             Returns:
                 str: the operator precondition
             """
-            ops = self.parse_operators(proposed_operator_str)
-            op_name = list(ops.keys())[0]
-            params = ops[op_name]['parameters']
-            constants = [p.split(' - ')[0] for p in params]
             true_atoms, false_atoms = self.full_state_description(state, constants)
             full_relevant_state_atoms = ', '.join(true_atoms.extend(false_atoms))
             prompt = define_precondition_prompt.format(
@@ -334,21 +343,24 @@ class HybridSymbolicLLMPlanner:
         proposed_op_name_params_count = {}
         # query LLM for the name and parameters of the operator
         for _ in range(self.config['num_op_candidates']):
-            proposed_operator_str = prompt_llm_for_operator_name_params()
+            proposed_operator_str, grounded_params = prompt_llm_for_operator_name_params()
             proposed_op = self.parse_operators(proposed_operator_str)
             name = list(proposed_op.keys())[0]
             params = proposed_op[name]['parameters']
             name_params = \
             f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n)"
-            proposed_op_name_params_count[name_params] = proposed_op_name_params_count.get(name_params, 0) + 1
+            proposed_op_name_params_count[name_params] = proposed_op_name_params_count.get(name_params, {})['grounded_params'] = grounded_params
+            proposed_op_name_params_count[name_params] = proposed_op_name_params_count.get(name_params, {}).get('count', 0) + 1
             if proposed_op_name_params_count[name_params] > self.config['num_op_candidates'] // 2: #already found majority candidate
                 break
-        # find the operator with the highest count
-        proposed_operator_str = max(proposed_op_name_params_count, key=proposed_op_name_params_count.get)
+        # find the operator with the highest `count`
+        proposed_operator_str = max(proposed_op_name_params_count, key=lambda x: proposed_op_name_params_count[x]['count'])
+        grounded_params = proposed_op_name_params_count[proposed_operator_str]['grounded_params']
+
         op_precond_count = {}
         # query LLM for the precondition of the operator
         for _ in range(self.config['num_precond_candidates']):
-            proposed_operator_w_precond_str = prompt_llm_for_operator_precondition(proposed_operator_str)
+            proposed_operator_w_precond_str = prompt_llm_for_operator_precondition(proposed_operator_str, grounded_params)
             proposed_op = self.parse_operators(proposed_operator_w_precond_str)
             name = list(proposed_op.keys())[0]
             params = proposed_op[name]['parameters']

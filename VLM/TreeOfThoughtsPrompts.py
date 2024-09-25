@@ -4,6 +4,10 @@ propose_operator_prompt = """You are a robot capable of understanding the Planni
     :parameters (param1 param2 ...)
 )
 ```
+Output the grounded objects that should be passed into the new operator as parameters in the following format:
+```
+ground objects: object1, object2, ...
+```
 Problem:
 ```
 Current state (unmentioned atoms are assumed false): 
@@ -28,11 +32,12 @@ Answer: Let's think step by step.
 
 # prompt asking the LLM to define the precondition for the new operator
 define_precondition_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, fill in the preconditions of the operator by selecting a relevant subset of atoms in the `Current state` section. The preconditions must ALREADY be satisfied in the current state. Output the operator in the following format:
+```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)
     :precondition (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
 )
-and (holding ?mug) (occupying-gripper ?mug) (not (free ?gripper)) (can-reach ?holder))
+```
 Problem:
 ```
 Current state: 
@@ -45,11 +50,13 @@ Answer: Let's think step by step.
 
 # prompt asking the LLM to define the effect for the new operator
 define_effect_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, output the resulting state after applying the operator in the current state. Fill the effects of the operator based on the resulting state in the following format:
+```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)
     :precondition (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
     :effect (and (predicate1(param(s)...)) (predicate2(param(s)...))...)
 )
+```
 Problem:
 ```
 Current state: 
