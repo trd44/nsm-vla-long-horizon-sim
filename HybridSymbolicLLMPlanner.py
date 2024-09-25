@@ -361,7 +361,11 @@ class HybridSymbolicLLMPlanner:
         # find the operator with the highest `count`
         proposed_operator_str = max(proposed_op_name_params_count, key=lambda x: proposed_op_name_params_count[x]['count'])
         grounded_params = proposed_op_name_params_count[proposed_operator_str]['grounded_params']
-
+        # check if no operator was proposed
+        if not proposed_operator_str or proposed_operator_str == '':
+            return ''
+        
+        # otherwise, count different proposals of preconditions
         op_precond_count = {}
         # query LLM for the precondition of the operator
         for _ in range(self.config['num_precond_candidates']):
@@ -426,14 +430,14 @@ class HybridSymbolicLLMPlanner:
             num_votes = - priority # priority is negative of the number of votes as we want to prioritize the node with the highest number of votes
 
             # ask the llm for new operators and update model's operators
-            new_operators_str = self.prompt_llm_for_new_operator(problem, node.state)
             problem_w_added_ops = copy.deepcopy(problem)
-            new_ops = self.update_operators(problem_w_added_ops, new_operators_str, new_ops_added)
-            model_w_added_ops = GroundForwardSearchModel(problem_w_added_ops, ground_problem_schemas_into_plain_operators(problem_w_added_ops))
-            new_ops_added.update(new_ops)
+            for _ in range(self.max_new_operators_branching_factor): # prompt the LLM to invent up to `max_new_operators_branching_factor` new operators
+                new_operators_str = self.prompt_llm_for_new_operator(problem_w_added_ops, node.state)
+                new_ops = self.update_operators(problem_w_added_ops, new_operators_str, new_ops_added)
+                new_ops_added.update(new_ops)
             search_ahead_plans = self.search_ahead(problem_w_added_ops, node, self.max_depth, space, stats)
             plans.extend(search_ahead_plans)
-
+            model_w_added_ops = GroundForwardSearchModel(problem_w_added_ops, ground_problem_schemas_into_plain_operators(problem_w_added_ops))
 
             if 0 <= self.max_depth <= node.depth: # reached max depth
                 logging.info(f"Max. operator proposal expansions reached on one branch at {node}. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
@@ -441,7 +445,7 @@ class HybridSymbolicLLMPlanner:
             else: # expand the node and add its children to the open list
                 for operator, successor_state in model_w_added_ops.successors(node.state):
                     if successor_state not in closed:
-                        num_votes_op = num_votes + 1 # assume one vote per candidate. Now effectively a BFS. TODO: implement voting mechanism
+                        num_votes_op = num_votes - 1 # assume one vote per candidate. Now effectively a BFS. TODO: implement voting mechanism. Currently it's effectively a BFS.
                         if problem.has_action(operator): # check if the operator is in the problem
                             heapq.heappush(open_list, (-num_votes_op, make_child_node(node, operator, successor_state), problem))
                         elif problem_w_added_ops.has_action(operator): # check if the operator is newly added 
@@ -616,20 +620,20 @@ def make_child_node(parent_node, action, state):
     return SearchNode(state, parent_node, action, parent_node.depth + 1)
 
 def reverse_engineer_plan(node:SearchNode) -> list:
-            """Reverse engineer the plan from the goal node back to the root node
+    """Reverse engineer the plan from the goal node back to the root node
 
-            Args:
-                node (SearchNode): the goal node with a parent node
+    Args:
+        node (SearchNode): the goal node with a parent node
 
-            Returns:
-                list: the plan from the root node to the goal node
-            """
-            plan = []
-            while node.parent is not None:
-                plan.append(node.action)
-                node = node.parent
-            plan.reverse()
-            return plan
+    Returns:
+        list: the plan from the root node to the goal node
+    """
+    plan = []
+    while node.parent is not None:
+        plan.append(node.action)
+        node = node.parent
+    plan.reverse()
+    return plan
 
     
 if __name__ == '__main__':
