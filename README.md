@@ -46,21 +46,10 @@ Clone RoboSuite in /OpLearn
 gh repo clone https://github.com/ARISE-Initiative/robosuite.git
 ```
 
-Install MimicGen Dependencies
-```bash
-pip install -e mimicgen
-```
-
-Install RobotSuite Dependencies
-```bash
-pip install -e robosuite
-```
-
 Install tarski - coming soon
 
 ## Run Demo
 You can test your mujoco installation first with 
-
 ```bash
 python test_mujoco.py
 ```
@@ -70,5 +59,7 @@ You can test your Robosuite installation with
 python robosuite/robosuite/demos/demo_random_action.py
 ```
 
-Test mimicgen install??
-./mimicgen/mimicgen/scripts/demo_random_action.py
+You can test your MimicGen installation with 
+```bash
+python mimicgen/mimicgen/scripts/demo_random_action.py
+```
