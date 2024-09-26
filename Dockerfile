@@ -1,11 +1,8 @@
 # Base image with Python 3.8
-FROM --platform=linux/amd64 python:3.8-slim-buster
+FROM python:3.8-slim-buster
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-
-# Create a non-root user
-RUN useradd -ms /bin/bash op
 
 # Install system dependencies (you may need to tweak this based on MimicGen's specific requirements)
 RUN apt-get update && apt-get install -y \
@@ -15,33 +12,62 @@ RUN apt-get update && apt-get install -y \
     libgl1-mesa-dev \
     libegl1-mesa-dev \
     libgles2-mesa-dev \
+    libgl1-mesa-glx \
+    libgl1-mesa-dri \
+    libglu1-mesa-dev \
+    libglfw3-dev \
+    libglew-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libosmesa6-dev \
+    libsm6 \
+    libxinerama-dev \
+    libxcursor-dev \
+    libxi-dev \
+    libxrandr-dev \
+    libxxf86vm-dev \
+    libxrender-dev \
+    libxfixes-dev \
+    libxext-dev \
+    libx11-dev \
+    libxkbcommon-x11-0 \
+    libxkbcommon0 \
+    libxcb-xinerama0 \
+    libxcb-icccm4 \
+    libxcb-image0 \
+    libxcb-keysyms1 \
+    libxcb-render-util0 \
+    libxcb-xfixes0 \
+    libxcb-shape0 \
+    libxcb-randr0 \
+    libxcb-sync1 \
+    libxcb-xkb1 \
+    libx11-xcb1 \
+    libxi6 \
+    libxtst6 \
+    libxrender1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libxss1 \
+    mesa-utils \
     pkg-config \
     sudo \
+    x11-apps \
+    x11proto-core-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Add the 'op' user to the sudoers file to give it sudo privileges
-RUN echo "op ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# Create a non-root user
+RUN useradd -ms /bin/bash user
+
+# Add the 'user' user to the sudoers file to give it sudo privileges
+RUN echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to non-root user
-USER op
-WORKDIR /home/op
+USER user
+WORKDIR /home/user
 
 RUN pip install --upgrade pip
-
-# # Clone MimicGen repository
-# RUN git clone https://github.com/NVlabs/mimicgen.git /app/mimicgen
-
-# # Set up Python environment and install dependencies
-# RUN pip install --upgrade pip \
-#     && pip install -e /app/mimicgen
-
-# # Install additional dependencies (MuJoCo, robosuite, etc.)
-# RUN pip install mujoco==2.3.2
-# RUN git clone https://github.com/ARISE-Initiative/robosuite.git /app/robosuite \
-#     && pip install -e /app/robosuite
-
-# RUN git clone https://github.com/ARISE-Initiative/robomimic.git /app/robomimic \
-#     && pip install -e /app/robomimic
-
-# # Set entrypoint to run MimicGen scripts
-# CMD ["python", "/app/mimicgen/scripts/your_script.py"]
