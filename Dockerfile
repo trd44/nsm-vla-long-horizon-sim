@@ -67,9 +67,12 @@ RUN useradd -ms /bin/bash user
 RUN echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to non-root user
-USER user
-WORKDIR /home/user
+WORKDIR /home/user/oplearn
 
 RUN pip install --upgrade pip
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+COPY . .
+RUN pip install -e mimicgen
+RUN pip install -e robosuite
+
+USER user
+
