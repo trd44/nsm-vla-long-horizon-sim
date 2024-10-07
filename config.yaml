@@ -23,9 +23,9 @@ image_path: "images/agent_view.jpg"
 
 planning_dir: "Planning/PDDL/cleanup"
 init_planning_domain: "cleanup_domain.pddl" # the initial domain file
-modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
-planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
-novel_objects: ["drawer1"]
+modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file will be saved as this
+planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
+novel_objects: ["mug1"]
 num_op_candidates: 5
 num_precond_candidates: 3
 num_effect_candidates: 3
@@ -34,18 +34,18 @@ max_num_llm_calls: 33
 max_depth: 15 # maximum search depth
 min_plan_candidates: 1 # end search early if this many plans are found
 
-planning_dir: "Planning/PDDL/nut_assembly"
-init_planning_domain: "coffee_domain.pddl" # the initial domain file
-modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
-planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
-novel_objects: ["drawer1"]
-num_op_candidates: 5
-num_precond_candidates: 3
-num_effect_candidates: 3
-max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-max_num_llm_calls: 33
-max_depth: 15 # maximum search depth
-min_plan_candidates: 1 # end search early if this many plans are found
+# planning_dir: "Planning/PDDL/nut_assembly"
+# init_planning_domain: "coffee_domain.pddl" # the initial domain file
+# modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
+# planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+# novel_objects: ["drawer1"]
+# num_op_candidates: 5
+# num_precond_candidates: 3
+# num_effect_candidates: 3
+# max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+# max_num_llm_calls: 33
+# max_depth: 15 # maximum search depth
+# min_plan_candidates: 1 # end search early if this many plans are found
 
 
 logging: # TODO: enable this
