@@ -3,28 +3,50 @@
 vlm_agent:
   api_key: "your_api_key"
   model: "gpt-4o"
-  temperature: 0.2
+  temperature: 0.1
 # seting for image observation
 image_path: "images/agent_view.jpg"
 # setting for testing PDDL. Uncoment when testing.
 
-planning_dir: "Planning/PDDL"
+# planning_dir: "Planning/PDDL/coffee"
+# init_planning_domain: "coffee_domain.pddl" # the initial domain file
+# modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
+# planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+# novel_objects: ["drawer1"]
+# num_op_candidates: 5
+# num_precond_candidates: 3
+# num_effect_candidates: 3
+# max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+# max_num_llm_calls: 33
+# max_depth: 15 # maximum search depth
+# min_plan_candidates: 1 # end search early if this many plans are found
+
+planning_dir: "Planning/PDDL/cleanup"
+init_planning_domain: "cleanup_domain.pddl" # the initial domain file
+modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
+planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+novel_objects: ["drawer1"]
+num_op_candidates: 5
+num_precond_candidates: 3
+num_effect_candidates: 3
+max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+max_num_llm_calls: 33
+max_depth: 15 # maximum search depth
+min_plan_candidates: 1 # end search early if this many plans are found
+
+planning_dir: "Planning/PDDL/nut_assembly"
 init_planning_domain: "coffee_domain.pddl" # the initial domain file
 modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
 novel_objects: ["drawer1"]
-num_op_candidates: 9
-num_precond_candidates: 5
-num_effect_candidates: 5
-max_new_operators_branching_factor: 2
-max_depth: 10
+num_op_candidates: 5
+num_precond_candidates: 3
+num_effect_candidates: 3
+max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+max_num_llm_calls: 33
+max_depth: 15 # maximum search depth
+min_plan_candidates: 1 # end search early if this many plans are found
 
-# setting for testing HDDL. Uncoment when testing.
-# init_planning_domain: "tabletop_domain.hddl" # the initial domain file
-# modified_planning_domain: "modified_tabletop_domain.hddl" # final domain file will be saved as this
-# planning_problem: "tabletop_problem.hddl" # the partially defined planning problem file
-# max_new_operators_branching_factor: 2
-# max_depth: 10
 
 logging: # TODO: enable this
   level: "INFO"

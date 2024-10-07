@@ -3,65 +3,64 @@
 (define (domain coffee)
     (:requirements :strips :typing)
     (:types
-        mug coffee-pod coffee-pod-holder coffee-machine-lid drawer table gripper - object
+        gripper table tabletop-object - object
+        coffee-pod coffee-machine-lid container - tabletop-object
+        mug coffee-pod-holder drawer - container
     )
 
     ;; Define predicates
     (:predicates
-        (can-reach ?obj - object)
-        (can-hold ?obj - object)
-        (can-open ?obj - object)
-        (can-contain ?container - object ?obj - object)
-        (can-flip ?lid - object)
-        (on-table ?obj - object ?table - table)
-        (holding ?obj - object) ; whether the gripper is holding an object. If true, `free gripper` should be false.
-        (occupying-gripper ?obj - object) ; whether the object is occupying the gripper. If true, `free gripper` should be false.
-        (reached ?obj - object) ; whether the gripper is within 1 unit of the object. If true, `can-reach` should be true.
-        (attached ?obj1 - object ?obj2 - object) ; whether obj1 is attached to obj2. 
-        (in ?obj - object ?container - object)
-        (open ?container - object)
-        (free ?gripper - gripper) ; whether the gripper is not holding anything. If true, `holding` should be false.
-        (under ?bottom - object ?top - object)
+        (can-pick-up ?tabletop-object - tabletop-object) ; whether the object can be picked up.
+        (can-contain ?container - container ?tabletop-object - tabletop-object)
+        (can-flip-up ?lid - coffee-machine-lid) ; whether the lid can be flipped up.
+        (can-flip-down ?lid - coffee-machine-lid) ; whether the lid can be flipped down. 
+        (on-table ?tabletop-object - tabletop-object ?table - table) ; whether the object is on the table directly making contact with the table.
+        (occupying-gripper ?tabletop-object - tabletop-object ?gripper - gripper) ; whether the object is occupying the gripper. If true, `free gripper` should be false.
+        (attached ?lid - coffee-machine-lid ?holder - coffee-pod-holder) ; whether obj1 is attached to obj2. 
+        (in ?tabletop-object - tabletop-object ?container - container) ; whether the object is in the container.
+        (open ?container - container) ; whether the container is open.
+        (free ?gripper - gripper) ; whether the gripper is not occupied by anything. If true, there should be no true `occupying-gripper` atoms.
+        (under ?mug - mug ?holder - coffee-pod-holder) ; whether the bottom tabletop object is under the top tabletop object.
     )
     
     ;; Define actions using the predicates given
     (:action pick-up-tabletop
-        :parameters (?obj - object ?table - table ?gripper - gripper) 
-        :precondition (and (on-table ?obj ?table) (can-reach ?obj) (can-hold ?obj) (free ?gripper)) 
-        :effect (and (reached ?obj) (holding ?obj) (occupying-gripper ?obj) (not (on-table ?obj ?table)) (not (free ?gripper))) 
+        :parameters (?tabletop-object - tabletop-object ?table - table ?gripper - gripper) 
+        :precondition (and (on-table ?tabletop-object ?table) (can-pick-up ?tabletop-object) (free ?gripper)) 
+        :effect (and (occupying-gripper ?tabletop-object ?gripper) (not (on-table ?tabletop-object ?table)) (not (free ?gripper))) 
     )
     
     (:action open-coffee-pod-holder
         :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
-        :precondition (and (not (open ?holder)) (can-reach ?lid) (can-flip ?lid) (can-open ?holder) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (reached ?lid) (occupying-gripper ?lid) (open ?holder) (not (free ?gripper)))
+        :precondition (and (not (open ?holder)) (can-flip-up ?lid) (attached ?lid ?holder) (free ?gripper))
+        :effect (and (occupying-gripper ?lid ?gripper) (can-flip-down ?lid) (open ?holder) (not (free ?gripper)))
     )
 
 
     (:action close-coffee-pod-holder
         :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
-        :precondition (and (open ?holder) (can-reach ?lid) (can-flip ?lid) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (reached ?lid) (occupying-gripper ?lid) (not (open ?holder)) (not (free ?gripper)))
+        :precondition (and (open ?holder) (can-flip-down ?lid) (attached ?lid ?holder) (free ?gripper))
+        :effect (and (occupying-gripper ?lid ?gripper) (not (open ?holder)) (not (free ?gripper)))
     )
 
     (:action free-gripper
-        :parameters (?gripper - gripper)
-        :precondition (and (not (free ?gripper)))
-        :effect (and (free ?gripper))
+        :parameters (?tabletop-object - tabletop-object ?gripper - gripper)
+        :precondition (and (not (can-pick-up ?tabletop-object)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
+        :effect (and (not (occupying-gripper ?tabletop-object ?gripper)) (free ?gripper))
     )
     
 
     (:action place-pod-in-holder
         :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
-        :precondition (and (holding ?pod) (open ?holder) (can-contain ?holder ?pod) (can-reach ?pod)(not (free ?gripper)))
-        :effect (and (reached ?pod) (not (holding ?pod)) (in ?pod ?holder) (free ?gripper))
+        :precondition (and (occupying-gripper ?pod ?gripper) (open ?holder) (can-contain ?holder ?pod) (not (free ?gripper)))
+        :effect (and (not (occupying-gripper ?pod ?gripper)) (in ?pod ?holder) (free ?gripper))
     )
 
 
     (:action place-mug-under-holder
         :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
-        :precondition (and (holding ?mug) (occupying-gripper ?mug) (not (free ?gripper)) (can-reach ?holder))
-        :effect (and (under ?mug ?holder) (not (holding ?mug)) (free ?gripper))
+        :precondition (and (occupying-gripper ?mug ?gripper) (not (free ?gripper)))
+        :effect (and (under ?mug ?holder) (not (occupying-gripper ?mug ?gripper)) (free ?gripper))
     )
 
 )

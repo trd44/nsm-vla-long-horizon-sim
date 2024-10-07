@@ -10,11 +10,12 @@ from tarski.search.model import progress
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
 from tarski.io.fstrips import FstripsReader, FstripsWriter
 from tarski.syntax import land, neg, CompoundFormula
+from tarski.syntax.formulas import VariableBinding
 from tarski.syntax.builtins import *
 from tarski import fstrips as fs
 from tarski.evaluators.simple import evaluate
 from tarski.model import Model
-
+from tarski.syntax.builtins import BuiltinPredicateSymbol
 from VLM.TreeOfThoughts import *
 from VLM.TreeOfThoughtsPrompts import *
 from utils import *
@@ -26,7 +27,9 @@ class HybridSymbolicLLMPlanner:
         self.parse_domain()
         self.starting_problem = self.parse_problem()
         self.max_new_operators_branching_factor = self.config['max_new_operators_branching_factor']
+        self.llm_calls = 0
         self.max_depth = self.config['max_depth']
+        self.max_num_llm_calls = self.config['max_num_llm_calls']
         self.thought_generator = thought_generator
         self.state_evaluator = state_evaluator
         self.novel_objects = self.config['novel_objects']
@@ -180,33 +183,29 @@ class HybridSymbolicLLMPlanner:
         
 
         parse_parameters(parameters, params_dict)
-        params_list = list(params_dict.values())
+        params_varbinding = VariableBinding(list(params_dict.values()))
         precondition_formula:CompoundFormula = parse_precondition(precondition)
         effects_list:List[fs.SingleEffect] = parse_effects(effects)
         
         problem.action(
             name=operator_name,
-            parameters=params_list,
+            parameters=params_varbinding,
             precondition=precondition_formula,
             effects=effects_list
         )
         return operator_name
 
-    def update_operators(self, problem:fs.problem.Problem, operators:str, existing_operators:set) -> Dict[str, Dict[str, List[str]]]:
+    def update_operators(self, problem:fs.problem.Problem, operators:str) -> Dict[str, Dict[str, List[str]]]:
         """update the problem with the operators
 
         Args:
             problem (fs.problem.Problem): the problem to update
             operators (str): the operators string with operators separated by newlines
-            existing_operators (set): the set of original operators
         Returns:
             dict: the dictionary representation of the operators added
         """
         parsed_dict = self.parse_operators(operators)
         for operator_name, operator in parsed_dict.items():
-            if operator_name in existing_operators:
-                # operator already in robot's original domain. Don't overwrite it.
-                continue
             self.add_operator(
                 problem=problem,
                 operator_name=operator_name,
@@ -247,7 +246,10 @@ class HybridSymbolicLLMPlanner:
                 relevant_objects = ', '.join(s['domain']) # currently assumes all objects are relevant. TODO: for future versions, prompt the LLM to determine relevant objects
                 break
         novel_objects = ", ".join(self.novel_objects)
-        object_types = ", ".join([s['name'] for s in lang_dump['sorts']])
+        # the `(:objects...)` section of the domain text
+        types_start = self.reader.domain_text.find('(:types')
+        parentheses = self._find_parentheses(self.reader.domain_text[types_start:])
+        object_types = self.reader.domain_text[types_start:types_start+parentheses[1]]
 
         # predicates are in the section `:predicates` of domain text
         preds_start = self.reader.domain_text.find('(:predicates')
@@ -258,13 +260,25 @@ class HybridSymbolicLLMPlanner:
         available_predicates = '\n'.join(self._split_by_parentheses(preds, type='predicates'))
 
         # get existing operators
-        existing_operators = []
+        existing_op_params = []
+        existing_op_params_precond = []
+        existing_op_params_precond_effect = []
         for existing_op_name, existing_op in problem.actions.items():
             op_w_params = \
-            f"(:action {existing_op_name}\n\t:parameters ({existing_op.parameters.pddl_repr()})\n)"
-            existing_operators.append(op_w_params)
-        existing_operators_str:str = '\n'.join(existing_operators)
+            f"(:action {existing_op_name}\n\t:parameters ({existing_op.parameters.pddl_repr()})"
+            op_w_param_precond = \
+            f"{op_w_params}\n\t:precondition ({existing_op.precondition.pddl_repr()})"
+            effects_str = ' '.join(['('+ e.pddl_repr() + ')' for e in existing_op.effects])
+            op_w_param_precond_effect = \
+            f"{op_w_param_precond}\n\t:effect (and {effects_str})"
+            existing_op_params.append(op_w_params+'\n)')
+            existing_op_params_precond.append(op_w_param_precond+'\n)')
+            existing_op_params_precond_effect.append(op_w_param_precond_effect+'\n)')
+        existing_op_params_str = '\n'.join(existing_op_params)
+        existing_op_params_precond_str = '\n'.join(existing_op_params_precond)
+        existing_op_params_precond_effect_str = '\n'.join(existing_op_params_precond_effect)
         
+        true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
 
         def extract_operator_from_llm_output(out:str) -> str:
             """parse the `(:action)` section from llm's output
@@ -273,6 +287,8 @@ class HybridSymbolicLLMPlanner:
                 out (str): llm output string
             """
             proposed_operator_start:int = out.find('(:action')
+            if proposed_operator_start == -1:
+                return ''
             proposed_operator_parentheses:tuple = self._find_parentheses(out[proposed_operator_start:])
             proposed_operator_str:str = out[proposed_operator_start + proposed_operator_parentheses[0] - 1:proposed_operator_start + proposed_operator_parentheses[1]+1] # include the parantheses
             return proposed_operator_str
@@ -283,10 +299,13 @@ class HybridSymbolicLLMPlanner:
             Args:
                 out (str): llm output string
             """
-            constants_start:int = out.find('ground objects: ') + len('ground objects: ')
+            constants_start:int = out.find('ground objects: ')
+            if constants_start == -1:
+                return []
+            constants_start += len('ground objects: ')
             constants_end = out[constants_start:].find('```')
             constants_str:str = out[constants_start:constants_start + constants_end]
-            return constants_str.split(', ')
+            return constants_str.replace('\n','').replace(' ','').split(',')
         
         def prompt_llm_for_operator_name_params():
             """prompt the LLM for the operator name and parameters
@@ -296,7 +315,6 @@ class HybridSymbolicLLMPlanner:
             """
             # get the full state description of novel objects
              
-            true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
             prompt = propose_operator_prompt.format(
                 current_state = current_state,
                 goal_state = g_str,
@@ -305,9 +323,10 @@ class HybridSymbolicLLMPlanner:
                 true_atoms_novel_obj = ', '.join(true_atoms),
                 false_atoms_novel_obj = ', '.join(false_atoms),
                 object_types = object_types,
-                existing_operators = existing_operators_str,
+                existing_operators = existing_op_params_str,
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
+            self.llm_calls += 1
             return extract_operator_from_llm_output(out.content), extract_constants_from_llm_output(out.content)
         
         def prompt_llm_for_operator_precondition(proposed_operator_str:str, param_constants:List[str]):
@@ -319,12 +338,14 @@ class HybridSymbolicLLMPlanner:
                 str: the operator precondition
             """
             true_atoms, false_atoms = self.full_state_description(state, param_constants)
-            full_param_obj_atoms = ', '.join(true_atoms.extend(false_atoms))
+            full_param_obj_atoms = ', '.join(true_atoms) + ', ' + ', '.join(false_atoms)
             prompt = define_precondition_prompt.format(
                 full_param_obj_atoms = full_param_obj_atoms,
+                example_operators=existing_op_params_precond_str,
                 proposed_operator=proposed_operator_str
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
+            self.llm_calls += 1
             return extract_operator_from_llm_output(out.content)
             
         def prompt_llm_for_operator_effects(proposed_operator_w_precond_str:str, param_constants:List[str]):
@@ -336,12 +357,14 @@ class HybridSymbolicLLMPlanner:
                 str: the operator effects
             """
             true_atoms, false_atoms = self.full_state_description(state, param_constants)
-            full_param_obj_atoms = ', '.join(true_atoms.extend(false_atoms))
+            full_param_obj_atoms = ', '.join(true_atoms) + ', ' + ', '.join(false_atoms)
             prompt = define_effect_prompt.format(
                 full_param_obj_atoms = full_param_obj_atoms,
+                example_operators=existing_op_params_precond_effect_str,
                 proposed_operator_with_precondition=proposed_operator_w_precond_str
             ) 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
+            self.llm_calls += 1
             return extract_operator_from_llm_output(out.content)
         
         # prompt the LLM for `num_self_consistency_candiates` number of operators
@@ -349,14 +372,19 @@ class HybridSymbolicLLMPlanner:
         # query LLM for the name and parameters of the operator
         for _ in range(self.config['num_op_candidates']):
             proposed_operator_str, grounded_params = prompt_llm_for_operator_name_params()
-            proposed_op = self.parse_operators(proposed_operator_str)
-            name = list(proposed_op.keys())[0]
-            params = proposed_op[name]['parameters']
-            name_params = \
-            f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n)"
-            proposed_op_name_params_count[name_params] = proposed_op_name_params_count.get(name_params, {})['grounded_params'] = grounded_params
-            proposed_op_name_params_count[name_params] = proposed_op_name_params_count.get(name_params, {}).get('count', 0) + 1
-            if proposed_op_name_params_count[name_params] > self.config['num_op_candidates'] // 2: #already found majority candidate
+            if len(grounded_params) == 0 or proposed_operator_str == '':
+                name_params = ''
+            else:
+                proposed_op = self.parse_operators(proposed_operator_str)
+                name = list(proposed_op.keys())[0]
+                params = proposed_op[name]['parameters']
+                name_params = \
+                f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n)"
+            proposed_op:dict = proposed_op_name_params_count.get(name_params, {})
+            proposed_op['grounded_params'] = grounded_params
+            proposed_op['count'] = proposed_op.get('count', 0) + 1
+            proposed_op_name_params_count[name_params] = proposed_op
+            if proposed_op_name_params_count[name_params]['count'] > self.config['num_op_candidates'] // 2: #already found majority candidate
                 break
         # find the operator with the highest `count`
         proposed_operator_str = max(proposed_op_name_params_count, key=lambda x: proposed_op_name_params_count[x]['count'])
@@ -416,7 +444,6 @@ class HybridSymbolicLLMPlanner:
         plans = []
 
         start_model = GroundForwardSearchModel(self.starting_problem, ground_problem_schemas_into_plain_operators(self.starting_problem))
-        new_ops_added = {} # keep record of all operators added
 
         open_list = []  # stack storing the nodes which are next to explore in a priority queue
         root = start_model.init()
@@ -427,16 +454,27 @@ class HybridSymbolicLLMPlanner:
             # logging.debug("dfs: Iteration {}, #unexplored={}".format(iteration, len(open_)))
 
             priority, node, problem = heapq.heappop(open_list)
-            num_votes = - priority # priority is negative of the number of votes as we want to prioritize the node with the highest number of votes
+            num_votes = - priority # priority is negative of the number of votes as we want to prioritize the node with the highest number of votes. Python heapq treats smaller number as higher priority.
 
-            # ask the llm for new operators and update model's operators
             problem_w_added_ops = copy.deepcopy(problem)
-            for _ in range(self.max_new_operators_branching_factor): # prompt the LLM to invent up to `max_new_operators_branching_factor` new operators
-                new_operators_str = self.prompt_llm_for_new_operator(problem_w_added_ops, node.state)
-                new_ops = self.update_operators(problem_w_added_ops, new_operators_str, new_ops_added)
-                new_ops_added.update(new_ops)
-            search_ahead_plans = self.search_ahead(problem_w_added_ops, node, self.max_depth, space, stats)
-            plans.extend(search_ahead_plans)
+            # check if the number of llm calls has reached the maximum
+            if self.llm_calls >= self.max_num_llm_calls:
+                logging.info(f"Max. number of LLM calls reached. # calls {self.llm_calls}, # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
+                break
+            else: # ask the llm for new operators and update model's operators
+                for _ in range(self.max_new_operators_branching_factor): # prompt the LLM to invent up to `max_new_operators_branching_factor` new operators
+                    new_operators_str = self.prompt_llm_for_new_operator(problem_w_added_ops, node.state)
+                    _ = self.update_operators(problem_w_added_ops, new_operators_str)
+                search_ahead_plan = self.search_ahead(problem_w_added_ops, node, self.max_depth)
+                # add the plan to the list of plans if it is not None
+                if search_ahead_plan:
+                    plans.append(search_ahead_plan)
+                if len(plans) >= self.config['min_plan_candidates']:
+                    logging.info(f"Minimum number of plans found. # plans: {len(plans)}, # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
+                    return plans
+            
+            model = GroundForwardSearchModel(problem, ground_problem_schemas_into_plain_operators(problem))
+            
             model_w_added_ops = GroundForwardSearchModel(problem_w_added_ops, ground_problem_schemas_into_plain_operators(problem_w_added_ops))
 
             if 0 <= self.max_depth <= node.depth: # reached max depth
@@ -446,9 +484,9 @@ class HybridSymbolicLLMPlanner:
                 for operator, successor_state in model_w_added_ops.successors(node.state):
                     if successor_state not in closed:
                         num_votes_op = num_votes - 1 # assume one vote per candidate. Now effectively a BFS. TODO: implement voting mechanism. Currently it's effectively a BFS.
-                        if problem.has_action(operator): # check if the operator is in the problem
+                        if model.has_operator(operator): # check if the operator is in the original problem
                             heapq.heappush(open_list, (-num_votes_op, make_child_node(node, operator, successor_state), problem))
-                        elif problem_w_added_ops.has_action(operator): # check if the operator is newly added 
+                        elif model_w_added_ops.has_operator(operator): # check if the operator is newly added 
                             heapq.heappush(open_list, (-num_votes_op, make_child_node(node, operator, successor_state), problem_w_added_ops))
                         else:
                             raise ValueError(f"Operator {operator} not found in the problem.")
@@ -458,7 +496,7 @@ class HybridSymbolicLLMPlanner:
         space.complete = True
         return space, stats, plans
     
-    def search_ahead(self, problem:fs.problem.Problem, start_node, max_depth:int, space, stats) -> List[List[fs.Action]]:
+    def search_ahead(self, problem:fs.problem.Problem, start_node, max_depth:int) -> List[List[fs.Action]]:
         """BFS ahead from the current node for a solution to the problem's goal
 
         Args:
@@ -472,11 +510,12 @@ class HybridSymbolicLLMPlanner:
             List[List[fs.Action]]: _description_
         """
         # create obj to track state space
+        space = SearchSpace()
+        stats = SearchStats()
         model = GroundForwardSearchModel(problem, ground_problem_schemas_into_plain_operators(problem))
         open_list = deque()
         open_list.append(start_node)
         closed = {start_node}
-        plans = []
         while open_list:
             stats.iterations += 1
             # logging.debug("dfs: Iteration {}, #unexplored={}".format(iteration, len(open_)))
@@ -485,7 +524,6 @@ class HybridSymbolicLLMPlanner:
             if model.is_goal(node.state): # found a plan
                 stats.num_goals += 1
                 plan = reverse_engineer_plan(node)
-                plans.append(plan)
                 logging.info(f"Goal found after {stats.nexpansions} expansions from node {start_node}. {stats.num_goals} goal states found.")
 
                 # write the operators that resulted in a plan to a file
@@ -494,6 +532,7 @@ class HybridSymbolicLLMPlanner:
                 domain_file_name = domain_file_name[:domain_file_name.find('.pddl')] + f'_{stats.num_goals}.pddl'
                 
                 self.write_domain(problem, domain_file_name)
+                return plan # early return if a plan is found since we only care about plan with the shortest length
 
 
             if 0 <= max_depth <= node.depth: # reached max depth
@@ -508,9 +547,9 @@ class HybridSymbolicLLMPlanner:
 
         logging.info(f"Search space exhausted. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
         space.complete = True
-        return plans
+        return None
 
-    def full_state_description(self, state:Model, obj_constants:List[str]) -> Tuple[List[str], List[str]]:
+    def full_state_description(self, state:Model, obj_constants:List[str]) -> Tuple[Set[str], Set[str]]:
         """returns the a description of the objects in the state in the form of true grounded atoms and negated grounded atoms
 
         Args:
@@ -525,15 +564,34 @@ class HybridSymbolicLLMPlanner:
         true_atoms = []
         false_atoms = []
         for pred_dict in preds:
-            pred = state.language.get_predicate(pred_dict['name'])
-            applicable_constants = [set(obj_constants).intersection(set(sort.domain())) for sort in pred.sort]
-            # generate combinations of constants
-            comb = itertools.product(*applicable_constants)
-            # add all grounded predicates that evaluate to True to true_atoms
-            true_atoms.extend([f"{pred.name}({', '.join(c)})" for c in comb if evaluate(pred(*comb), state)])
-            # add all grounded predicates that evaluate to False to false_atoms
-            false_atoms.extend([f"not({pred.name}({', '.join(c)})" for c in comb if not evaluate(pred(*comb), state)])
-        return true_atoms, false_atoms
+            if isinstance(pred_dict['symbol'], BuiltinPredicateSymbol): # ignore the builtin predicates
+                continue
+            pred = state.language.get_predicate(pred_dict['symbol'])
+            param_constants = []
+            for param_sort in pred.sort:
+                sort_constants = set(c.name for c in param_sort.domain())
+                param_constants.append(sort_constants)
+            # generate combinations of the sets of constants
+            comb = []
+            for i, param_constant_set in enumerate(param_constants):
+                # temporarily replace param_constant_set with the intersection of param_constant_set and obj_constants
+                param_constants[i] = param_constant_set.intersection(obj_constants)
+                # add combinations of the sets of constants
+                comb.extend(list(itertools.product(*param_constants)))
+                # revert param_constant_set back to its original value
+                param_constants[i] = param_constant_set
+            
+            # categorize grounded predicates
+            for one_comb in comb:
+                if len(set(one_comb)) < len(one_comb): # skip if more than one constants in the combination are the same
+                    continue
+                comb_string = f"{pred.name}({', '.join(one_comb)})"
+                negated_comb_string = f"not({comb_string})"
+                if evaluate(pred(*(state.language.get_constant(c) for c in one_comb)), state): # add all that evaluate to True to true_atoms
+                    true_atoms.append(comb_string)
+                else: # add all that evaluate to False to false_atoms
+                    false_atoms.append(negated_comb_string)
+        return set(true_atoms), set(false_atoms)
 
 
     def _find_parentheses(self, s:str) -> Tuple[int, int]:
@@ -590,6 +648,15 @@ class SearchNode:
         self.depth = 0 if parent is None else parent.depth + 1
         if depth:
             self.depth = depth
+    
+    # add support for comparator
+    def __lt__(self, other):
+        if self.depth == other.depth:
+            # uses the state as the tiebreaker
+            # turn state into string and compare
+            return str(self.state) < str(other.state)
+        return self.depth < other.depth
+        
 
 
 class SearchSpace:
