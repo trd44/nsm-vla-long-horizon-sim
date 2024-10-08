@@ -24,7 +24,7 @@
     )
     
     ;; Define actions using the predicates given
-    (:action pick-up-tabletop
+    (:action pick-up-from-tabletop
         :parameters (?tabletop-object - tabletop-object ?table - table ?gripper - gripper) 
         :precondition (and (on-table ?tabletop-object ?table) (can-pick-up ?tabletop-object) (free ?gripper)) 
         :effect (and (occupying-gripper ?tabletop-object ?gripper) (not (on-table ?tabletop-object ?table)) (not (free ?gripper))) 

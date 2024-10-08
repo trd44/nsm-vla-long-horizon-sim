@@ -11,13 +11,12 @@
 
     (:init
         (free gripper1)
-        (can-hold block1)
-        (can-hold mug1)
-        (can-open drawer1)
+        (can-pick-up mug1)
+        (can-pick-up block1)
         (can-contain drawer1 block1)
         (can-contain drawer1 mug1)
         (can-contain mug1 block1)
-        (on-table block1 table1)
+        (in block1 mug1)
         (on-table mug1 table1)
         (on-table drawer1 table1)
     )

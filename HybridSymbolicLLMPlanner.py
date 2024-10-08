@@ -161,7 +161,7 @@ class HybridSymbolicLLMPlanner:
                     pred_list.append(neg(pred(*args_list)))
                 else:
                     pred_list.append(pred(*args_list))
-            return land(*pred_list)
+            return land(*pred_list, flat=True)
 
         def parse_effects(predicates:List[str]) -> List[fs.SingleEffect]:
             """parse the effects into a list of SingleEffect
@@ -237,7 +237,10 @@ class HybridSymbolicLLMPlanner:
         """
         lang_dump = problem.language.dump()
         current_state = ", ".join(sorted(map(str, state.as_atoms())))
-        g_str = ", ".join(g.replace('(not ', 'not(') for g in sorted(map(str, problem.goal.subformulas)))
+        if hasattr(problem.goal, 'subformulas'):
+            g_str = ", ".join(g.replace('(not ', 'not(') for g in sorted(map(str, problem.goal.subformulas)))
+        else:
+            g_str = str(problem.goal)
         
         # find the dict in lang_dump['sorts'] that has the name 'object' and get the domain
         relevant_objects = "object"
