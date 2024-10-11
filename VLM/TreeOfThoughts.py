@@ -1,6 +1,7 @@
 import base64
 from HybridSymbolicLLMPlanner import *
 from utils import *
+from langchain_openai import OpenAI
 from langchain_core.messages import *
 from langchain_openai import ChatOpenAI
 from langchain.agents.output_parsers.openai_tools import OpenAIToolsAgentOutputParser
@@ -8,8 +9,27 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.agents.format_scratchpad.openai_tools import format_to_openai_tool_messages
 from langchain.agents import AgentExecutor
 
-thought_generator = ChatOpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
 
+from openai import OpenAI
+client = OpenAI()
+
+def generate_thought(prompt:str) -> str:
+    """Generate a thought based on the given prompt.
+
+    Args:
+        prompt (str): prompt to the LLM
+    """
+    # gpt-o1 does not support setting the temperature parameter
+    completion = client.chat.completions.create(
+        model=config['vlm_agent']['model'],
+        messages=[
+            {"role": "user", "content": prompt},
+        ]
+    )
+    return completion.choices[0].message.content
+
+#thought_generator = ChatOpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
+#thought_generator = OpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
 # parser = ChatOpenAI(model=config['vlm_agent']['model'], temperature=config['vlm_agent']['temperature'])
 # parser_with_tool = parser.bind_tools([planner.add_operator])
 # parser_prompt = [

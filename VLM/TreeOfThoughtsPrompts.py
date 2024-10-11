@@ -1,4 +1,4 @@
-propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state , a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator(s) involving the novel object(s) that can be executed in the current state (not in the future) that would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise,  output the proposed operator's name(s) and parameters by imitating the style of the existing operators in the following format:
+propose_operator_prompt = """You are a robot arm with a gripper that uses the gripper to manipulate tabletop objects. You are capable of understanding the Planning Domain Definition Language (PDDL). Given the current state , a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator involving the novel object(s) that can be executed in the current state (not in the future) that would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise, output the proposed operator's name(s) and parameters by imitating the style of the existing operators in the following format. Avoid quantifiers and conditional effects.:
 ```
 (:action proposed_non_existing_operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...?paramN - paramN-type)
@@ -7,7 +7,7 @@ propose_operator_prompt = """You are a robot capable of understanding the Planni
 ```
 Output the ground parameter objects for each proposed operator in the following format:
 ```
-ground objects for proposed_non_existing_operator_name: object1, object2, object3 ...objectN
+ground objects: object1, object2, object3 ...objectN
 ...
 ```
 Problem:
@@ -51,7 +51,7 @@ Answer: Let's think step by step.
 """
 
 # prompt asking the LLM to define the effect for the new operator
-define_effect_prompt = """ You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, and an image of the current state, define the resulting state after applying the operator in the current state. The effects MUST ONLY involve objects in `The operator`'s parameters. Fill the effects of `The operator` based on the resulting state in the following format:
+define_effect_prompt = """ You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, and an image of the current state, define the resulting state after applying the operator in the current state. The effects MUST ONLY involve objects in `The operator`'s parameters. Avoid quantifiers and conditional effects. Fill the effects of `The operator` based on the resulting state in the following format:
 ```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)

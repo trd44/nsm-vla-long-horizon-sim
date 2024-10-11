@@ -11,9 +11,9 @@
 
     (:init
         (free gripper1)
-        (small-enough-to-pick-up mug1)
-        (small-enough-to-pick-up block1)
-        (large-enough-for-gripper-to-reach-inside drawer1)
+        (small-enough-for-gripper-to-pick-up mug1 gripper1)
+        (small-enough-for-gripper-to-pick-up block1 gripper1)
+        (large-enough-for-gripper-to-reach-inside drawer1 gripper1)
         (open mug1)
         (in block1 mug1)
         (directly-on-table mug1 table1)

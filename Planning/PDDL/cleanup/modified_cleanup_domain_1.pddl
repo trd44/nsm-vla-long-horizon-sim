@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain cleanup)
-    (:requirements :equality :typing)
+    (:requirements :typing :equality)
     (:types
         gripper - object
         table - object
@@ -22,9 +22,9 @@
     )
 
     (:predicates
-        (can-pick-up ?x1 - tabletop-object)
-        (can-contain ?x1 - container ?x2 - tabletop-object)
-        (on-table ?x1 - tabletop-object ?x2 - table)
+        (small-enough-for-gripper-to-pick-up ?x1 - tabletop-object ?x2 - gripper)
+        (directly-on-table ?x1 - tabletop-object ?x2 - table)
+        (large-enough-for-gripper-to-reach-inside ?x1 - container ?x2 - gripper)
         (occupying-gripper ?x1 - tabletop-object ?x2 - gripper)
         (in ?x1 - tabletop-object ?x2 - container)
         (open ?x1 - container)
@@ -38,19 +38,19 @@
     
 
     
-    (:action pick-up-tabletop
+    (:action pick-up-from-tabletop
      :parameters (?tabletop-object - tabletop-object ?table - table ?gripper - gripper)
-     :precondition (and (on-table ?tabletop-object ?table) (can-pick-up ?tabletop-object) (free ?gripper))
+     :precondition (and (directly-on-table ?tabletop-object ?table) (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper) (free ?gripper))
      :effect (and
         (occupying-gripper ?tabletop-object ?gripper)
-        (not (on-table ?tabletop-object ?table))
+        (not (directly-on-table ?tabletop-object ?table))
         (not (free ?gripper)))
     )
 
 
     (:action free-gripper
      :parameters (?tabletop-object - tabletop-object ?gripper - gripper)
-     :precondition (and (not (can-pick-up ?tabletop-object)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
+     :precondition (and (not (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
      :effect (and
         (not (occupying-gripper ?tabletop-object ?gripper))
         (free ?gripper))
@@ -77,9 +77,9 @@
     )
 
 
-    (:action put-in-drawer
+    (:action place-in-drawer-from-gripper
      :parameters (?drawer - drawer ?tabletop-object - tabletop-object ?gripper - gripper)
-     :precondition (and (open ?drawer) (can-contain ?drawer ?tabletop-object) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
+     :precondition (and (open ?drawer) (large-enough-for-gripper-to-reach-inside ?drawer ?gripper) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
      :effect (and
         (in ?tabletop-object ?drawer)
         (not (occupying-gripper ?tabletop-object ?gripper))
@@ -87,13 +87,12 @@
     )
 
 
-    (:action remove-from-mug
-     :parameters (?block - block ?gripper - gripper ?mug - mug)
-     :precondition (and (can-pick-up ?block) (and (free ?gripper) (and (in ?block ?mug) (open ?mug))))
+    (:action empty-container-onto-tabletop
+     :parameters (?block - block ?mug - mug ?table - table)
+     :precondition (and (directly-on-table ?mug ?table) (in ?block ?mug) (not (directly-on-table ?block ?table)) (open ?mug))
      :effect (and
-        (not (free ?gripper))
-        (not (in ?block ?mug))
-        (occupying-gripper ?block ?gripper))
+        (directly-on-table ?block ?table)
+        (not (in ?block ?mug)))
     )
 
 )
