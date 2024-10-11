@@ -68,9 +68,8 @@ RUN echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to non-root user
 WORKDIR /home/user/oplearn
-
-RUN pip install --upgrade pip
 COPY . .
+RUN pip install --upgrade pip
 RUN pip install -e mimicgen
 RUN pip install -e robosuite
 

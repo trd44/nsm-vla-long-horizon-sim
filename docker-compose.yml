@@ -9,6 +9,7 @@ services:
       - /tmp/.docker.xauth:/tmp/.docker.xauth
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
+      - ./volume/vscode-server:$HOME/.vscode-server
     environment:
       - DISPLAY=${DISPLAY}
       - XAUTHORITY=/tmp/.docker.xauth

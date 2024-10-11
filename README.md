@@ -11,18 +11,18 @@ https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install
 
 Building
 ```bash
-docker-compose build
+docker compose build
 ```
 
 Running
 ```bash
-docker-compose up
+docker compose up
 ```
 
 Closing runaway containers. If you get an error on a subsequent docker build. It's likely because part of the container is still running in the background. You can use this command to stop it.
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ### Connecting to VS Code (Optional)
