@@ -1,17 +1,21 @@
-propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator involving the novel object(s) that is executable in the current state (not in the future) and would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise,  output the proposed operator's name and parameters by imitating the style of the existing operators in the following format:
+propose_operator_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given the current state , a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator(s) involving the novel object(s) that can be executed in the current state (not in the future) that would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise,  output the proposed operator's name(s) and parameters by imitating the style of the existing operators in the following format:
 ```
-(:action operator_name
-    :parameters (?param1 - param1-type ?param2 - param2-type ...)
+(:action proposed_non_existing_operator_name
+    :parameters (?param1 - param1-type ?param2 - param2-type ...?paramN - paramN-type)
 )
+...
 ```
-Output the grounded objects that should be passed into the new operator as parameters in the following format:
+Output the ground parameter objects for each proposed operator in the following format:
 ```
-ground objects: object1, object2, ...
+ground objects for proposed_non_existing_operator_name: object1, object2, object3 ...objectN
+...
 ```
 Problem:
 ```
 Current state (unmentioned atoms are assumed false): 
 {current_state}
+{true_atoms_novel_obj}
+{false_atoms_novel_obj}
 Goal state:
 {goal_state}
 Relevant objects: 
@@ -20,10 +24,6 @@ Object types:
 {object_types}
 Novel object(s) of interest: 
 {novel_objects}
-Specifically, here are things that are true about the novel object(s):
-{true_atoms_novel_obj}
-Here are things that are false about the novel object(s):
-{false_atoms_novel_obj}
 Existing operators with parameters:
 {existing_operators}
 ```
@@ -31,7 +31,7 @@ Answer: Let's think step by step.
 """
 
 # prompt asking the LLM to define the precondition for the new operator
-define_precondition_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, fill in the preconditions of `The Operator` by selecting a relevant subset of atoms in the `Current state` section. The preconditions must ALREADY be satisfied in the current state. The preconditions MUST ONLY involve objects in `The Operator`'s parameters. Output the operator in the following format:
+define_precondition_prompt = """You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the current states of parameter objects, and an image of the current state, fill in the preconditions of `The Operator` by selecting a relevant subset of atoms in the `Current state` section. The preconditions must ALREADY be satisfied in the current state. The preconditions MUST ONLY involve objects in `The Operator`'s parameters. Output the operator in the following format:
 ```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)
@@ -51,7 +51,7 @@ Answer: Let's think step by step.
 """
 
 # prompt asking the LLM to define the effect for the new operator
-define_effect_prompt = """ You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, define the resulting state after applying the operator in the current state. The effects MUST ONLY involve objects in `The operator`'s parameters. Fill the effects of `The operator` based on the resulting state in the following format:
+define_effect_prompt = """ You are a robot capable of understanding the Planning Domain Definition Language (PDDL). Given an operator's name, its parameter objects, the preconditions that are satisfied in the current state, and an image of the current state, define the resulting state after applying the operator in the current state. The effects MUST ONLY involve objects in `The operator`'s parameters. Fill the effects of `The operator` based on the resulting state in the following format:
 ```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)

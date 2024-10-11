@@ -9,7 +9,7 @@ from tarski.search import GroundForwardSearchModel
 from tarski.search.model import progress
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
 from tarski.io.fstrips import FstripsReader, FstripsWriter
-from tarski.syntax import land, neg, CompoundFormula
+from tarski.syntax import land, neg, CompoundFormula, Sort, Constant, Atom
 from tarski.syntax.formulas import VariableBinding
 from tarski.syntax.builtins import *
 from tarski import fstrips as fs
@@ -302,10 +302,10 @@ class HybridSymbolicLLMPlanner:
             Args:
                 out (str): llm output string
             """
-            constants_start:int = out.find('ground objects: ')
+            constants_start:int = out.find('ground objects')
             if constants_start == -1:
                 return []
-            constants_start += len('ground objects: ')
+            constants_start = out[constants_start:].find(':') + constants_start
             constants_end = out[constants_start:].find('```')
             constants_str:str = out[constants_start:constants_start + constants_end]
             return constants_str.replace('\n','').replace(' ','').split(',')
@@ -319,6 +319,7 @@ class HybridSymbolicLLMPlanner:
             # get the full state description of novel objects
              
             prompt = propose_operator_prompt.format(
+                num_operators = self.config['num_proposed_operators_in_sequence'],
                 current_state = current_state,
                 goal_state = g_str,
                 relevant_objects = relevant_objects,
@@ -326,11 +327,28 @@ class HybridSymbolicLLMPlanner:
                 true_atoms_novel_obj = ', '.join(true_atoms),
                 false_atoms_novel_obj = ', '.join(false_atoms),
                 object_types = object_types,
-                existing_operators = existing_op_params_str,
-            ) 
+                existing_operators = existing_op_params_precond_effect_str,
+            )
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
             self.llm_calls += 1
             return extract_operator_from_llm_output(out.content), extract_constants_from_llm_output(out.content)
+        
+        def from_grounded_constants_to_lifted(constants:List[str]) -> Dict[str, Sort]:
+            """converts the grounded constants to lifted constants
+
+            Args:
+                constants (List[str]): the grounded constants
+
+            Returns:
+                List[str]: the lifted constants
+            """
+            constants_to_lifted_mapping = {c: problem.language.get_constant(c).sort for c in constants}
+            return constants_to_lifted_mapping
+
+        def fill_operator_precondition(proposed_operator_str:str, param_constants:List[str]):
+            """fill the operator precondition with the true and false atoms of the state"""
+            #TODO: implement this if necessary
+
         
         def prompt_llm_for_operator_precondition(proposed_operator_str:str, param_constants:List[str]):
             """prompt the LLM for the operator precondition
@@ -347,6 +365,7 @@ class HybridSymbolicLLMPlanner:
                 example_operators=existing_op_params_precond_str,
                 proposed_operator=proposed_operator_str
             ) 
+    
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
             self.llm_calls += 1
             return extract_operator_from_llm_output(out.content)
@@ -365,7 +384,8 @@ class HybridSymbolicLLMPlanner:
                 full_param_obj_atoms = full_param_obj_atoms,
                 example_operators=existing_op_params_precond_effect_str,
                 proposed_operator_with_precondition=proposed_operator_w_precond_str
-            ) 
+            )
+ 
             out = self.thought_generator.invoke([SystemMessage(content=prompt)])
             self.llm_calls += 1
             return extract_operator_from_llm_output(out.content)
@@ -379,10 +399,11 @@ class HybridSymbolicLLMPlanner:
                 name_params = ''
             else:
                 proposed_op = self.parse_operators(proposed_operator_str)
+                params = from_grounded_constants_to_lifted(grounded_params)
+                lifted_params = [f"?{params[c].name} - {params[c].name}" for c in grounded_params]
                 name = list(proposed_op.keys())[0]
-                params = proposed_op[name]['parameters']
                 name_params = \
-                f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n)"
+                f"(:action {name}\n\t:parameters ({' '.join(sorted(lifted_params))})\n)"
             proposed_op:dict = proposed_op_name_params_count.get(name_params, {})
             proposed_op['grounded_params'] = grounded_params
             proposed_op['count'] = proposed_op.get('count', 0) + 1
@@ -396,22 +417,23 @@ class HybridSymbolicLLMPlanner:
         if not proposed_operator_str or proposed_operator_str == '':
             return ''
         
+        true_relevant_atoms, false_relevant_atoms = self.relevant_objs_only_state_description(state, grounded_params)
         # otherwise, count different proposals of preconditions
         op_precond_count = {}
         # query LLM for the precondition of the operator
-        for _ in range(self.config['num_precond_candidates']):
-            proposed_operator_w_precond_str = prompt_llm_for_operator_precondition(proposed_operator_str, grounded_params)
-            proposed_op = self.parse_operators(proposed_operator_w_precond_str)
-            name = list(proposed_op.keys())[0]
-            params = proposed_op[name]['parameters']
-            precond = [f"({p})" for p in proposed_op[name]['precondition']]
-            name_params_precond = \
-            f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n\t:precondition (and {' '.join(sorted(precond))})\n)"
-            op_precond_count[name_params_precond] = op_precond_count.get(name_params_precond, 0) + 1
-            if op_precond_count[name_params_precond] > self.config['num_precond_candidates'] // 2: # already found the majority candidate
-                break
-        # find the precondition with the highest count
-        proposed_operator_w_precond_str = max(op_precond_count, key=op_precond_count.get)
+        # for _ in range(self.config['num_precond_candidates']):
+        #     proposed_operator_w_precond_str = prompt_llm_for_operator_precondition(proposed_operator_str, grounded_params)
+        #     proposed_op = self.parse_operators(proposed_operator_w_precond_str)
+        #     name = list(proposed_op.keys())[0]
+        #     params = proposed_op[name]['parameters']
+        #     precond = [f"({p})" for p in proposed_op[name]['precondition']]
+        #     name_params_precond = \
+        #     f"(:action {name}\n\t:parameters ({' '.join(sorted(params))})\n\t:precondition (and {' '.join(sorted(precond))})\n)"
+        #     op_precond_count[name_params_precond] = op_precond_count.get(name_params_precond, 0) + 1
+        #     if op_precond_count[name_params_precond] > self.config['num_precond_candidates'] // 2: # already found the majority candidate
+        #         break
+        # # find the precondition with the highest count
+        # proposed_operator_w_precond_str = max(op_precond_count, key=op_precond_count.get)
 
         # query LLM for the effects of the operator
         op_effect_count = {}
@@ -551,6 +573,45 @@ class HybridSymbolicLLMPlanner:
         logging.info(f"Search space exhausted. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
         space.complete = True
         return None
+
+    def relevant_objs_only_state_description(self, state:Model, obj_constants:List[str], grounded=False) -> Tuple[Set[str], Set[str]]:
+        """returns the a description of only the relevant objects in the state in the form of true grounded atoms and negated grounded atoms
+
+        Args:
+            state (Model): the state
+            obj_constants (List[str]): the list of objects
+            grounded (bool): whether to return the grounded atoms or the lifted atoms
+
+        Returns:
+            Tuple[List[str], List[str]]: the list of true grounded atoms and the list of negated grounded atoms
+        """
+        dump:dict = state.language.dump()
+        preds:list = dump['predicates']
+        true_atoms = []
+        false_atoms = []
+        for pred_dict in preds:
+            if isinstance(pred_dict['symbol'], BuiltinPredicateSymbol):
+                continue #ignore the built-in predicates
+            pred = state.language.get_predicate(pred_dict['symbol'])
+            param_constants = []
+            for param_sort in pred.sort:
+                sort_constants = set(c.name for c in param_sort.domain())
+                param_constants.append(sort_constants.intersection(obj_constants))
+            # generate combinations of the sets of constants
+            comb = list(itertools.product(*param_constants))
+            
+            # categorize grounded predicates
+            for one_comb in comb:
+                if len(set(one_comb)) < len(one_comb): # skip if more than one constants in the combination are the same
+                    continue
+                
+                comb_string = f"{pred.name}({', '.join(one_comb)})"
+                negated_comb_string = f"not({comb_string})"   
+                if evaluate(pred(*(state.language.get_constant(c) for c in one_comb)), state): # add all that evaluate to True to true_atoms
+                    true_atoms.append(comb_string)
+                else: # add all that evaluate to False to false_atoms
+                    false_atoms.append(negated_comb_string)
+        return set(true_atoms), set(false_atoms)
 
     def full_state_description(self, state:Model, obj_constants:List[str]) -> Tuple[Set[str], Set[str]]:
         """returns the a description of the objects in the state in the form of true grounded atoms and negated grounded atoms

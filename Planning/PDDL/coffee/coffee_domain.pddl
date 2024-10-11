@@ -10,8 +10,7 @@
 
     ;; Define predicates
     (:predicates
-        (can-pick-up ?tabletop-object - tabletop-object) ; whether the object can be picked up.
-        (can-contain ?container - container ?tabletop-object - tabletop-object)
+        (not-attached-and-small-enough-to-pick-up ?tabletop-object - tabletop-object); whether the object can be picked up.
         (can-flip-up ?lid - coffee-machine-lid) ; whether the lid can be flipped up.
         (can-flip-down ?lid - coffee-machine-lid) ; whether the lid can be flipped down. 
         (on-table ?tabletop-object - tabletop-object ?table - table) ; whether the object is on the table directly making contact with the table.
@@ -26,7 +25,7 @@
     ;; Define actions using the predicates given
     (:action pick-up-from-tabletop
         :parameters (?tabletop-object - tabletop-object ?table - table ?gripper - gripper) 
-        :precondition (and (on-table ?tabletop-object ?table) (can-pick-up ?tabletop-object) (free ?gripper)) 
+        :precondition (and (on-table ?tabletop-object ?table) (not-attached-and-small-enough-to-pick-up ?tabletop-object) (free ?gripper)) 
         :effect (and (occupying-gripper ?tabletop-object ?gripper) (not (on-table ?tabletop-object ?table)) (not (free ?gripper))) 
     )
     
@@ -45,19 +44,19 @@
 
     (:action free-gripper
         :parameters (?tabletop-object - tabletop-object ?gripper - gripper)
-        :precondition (and (not (can-pick-up ?tabletop-object)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
+        :precondition (and (not (not-attached-and-small-enough-to-pick-up ?tabletop-object)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
         :effect (and (not (occupying-gripper ?tabletop-object ?gripper)) (free ?gripper))
     )
     
 
-    (:action place-pod-in-holder
+    (:action place-pod-in-holder-from-gripper
         :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
-        :precondition (and (occupying-gripper ?pod ?gripper) (open ?holder) (can-contain ?holder ?pod) (not (free ?gripper)))
+        :precondition (and (occupying-gripper ?pod ?gripper) (open ?holder) (not (free ?gripper)))
         :effect (and (not (occupying-gripper ?pod ?gripper)) (in ?pod ?holder) (free ?gripper))
     )
 
 
-    (:action place-mug-under-holder
+    (:action place-mug-under-holder-from-gripper
         :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
         :precondition (and (occupying-gripper ?mug ?gripper) (not (free ?gripper)))
         :effect (and (under ?mug ?holder) (not (occupying-gripper ?mug ?gripper)) (free ?gripper))
