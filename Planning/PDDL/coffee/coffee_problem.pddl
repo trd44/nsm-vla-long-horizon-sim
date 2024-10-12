@@ -14,13 +14,13 @@
   (:init
     (attached coffee-machine-lid1 coffee-pod-holder1)
     (can-flip-up coffee-machine-lid1)
-    (not-attached-and-small-enough-to-pick-up coffee-pod1)
-    (not-attached-and-small-enough-to-pick-up mug1)
+    (small-enough-for-gripper-to-pick-up coffee-pod1 gripper1)
+    (small-enough-for-gripper-to-pick-up mug1 gripper1)
     (free gripper1)
     (in coffee-pod1 drawer1)
     (open mug1)
-    (on-table mug1 table1)
-    (on-table drawer1 table1)
+    (directly-on-table mug1 table1)
+    (directly-on-table drawer1 table1)
   )
 
   (:goal 

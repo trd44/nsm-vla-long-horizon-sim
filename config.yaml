@@ -12,12 +12,9 @@ image_path: "images/agent_view.jpg"
 # modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 # planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
 # novel_objects: ["drawer1"]
-# num_op_candidates: 7
-# num_precond_candidates: 3
-# num_effect_candidates: 3
-# num_proposed_operators_in_sequence: 2
+# num_op_candidates: 5
 # max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-# max_num_llm_calls: 33
+# max_num_llm_calls: 60
 # max_depth: 15 # maximum search depth
 # min_plan_candidates: 1 # end search early if this many plans are found
 
@@ -27,7 +24,6 @@ modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file wil
 planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
 novel_objects: ["mug1"]
 num_op_candidates: 5
-num_proposed_operators_in_sequence: 1
 max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
 max_num_llm_calls: 30
 max_depth: 15 # maximum search depth
@@ -37,13 +33,11 @@ min_plan_candidates: 1 # end search early if this many plans are found
 # init_planning_domain: "nut_assembly_domain.pddl" # the initial domain file
 # modified_planning_domain: "modified_nut_assembly_domain.pddl" # final domain file will be saved as this
 # planning_problem: "nut_assembly_problem.pddl" # the partially defined planning problem file
-# novel_objects: ["round_peg1"]
+# novel_objects: ["round-peg1"]
 # num_op_candidates: 5
-# num_precond_candidates: 3
-# num_effect_candidates: 3
 # max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-# max_num_llm_calls: 33
-# max_depth: 15 # maximum search depth
+# max_num_llm_calls: 30
+# max_depth: 4 # maximum search depth
 # min_plan_candidates: 1 # end search early if this many plans are found
 
 

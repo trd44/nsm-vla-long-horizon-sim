@@ -24,11 +24,11 @@
     )
 
     (:predicates
-        (can-pick-up ?x1 - tabletop-object)
-        (on-table ?x1 - tabletop-object ?x2 - table)
-        (on ?x1 - nut ?x2 - peg)
-        (occupying-gripper ?x1 - tabletop-object ?x2 - gripper)
-        (match ?x1 - nut ?x2 - peg)
+        (small-enough-for-gripper-to-pick-up ?x1 - tabletop-object ?x2 - gripper)
+        (directly-on-table ?x1 - tabletop-object ?x2 - table)
+        (on-peg ?x1 - nut ?x2 - peg)
+        (exclusively-occupying-gripper ?x1 - tabletop-object ?x2 - gripper)
+        (shapes-match ?x1 - nut ?x2 - peg)
         (free ?x1 - gripper)
     )
 
@@ -41,40 +41,31 @@
     
     (:action pick-up-nut-from-tabletop
      :parameters (?nut - nut ?table - table ?gripper - gripper)
-     :precondition (and (on-table ?nut ?table) (can-pick-up ?nut) (free ?gripper))
+     :precondition (and (directly-on-table ?nut ?table) (small-enough-for-gripper-to-pick-up ?nut ?gripper) (free ?gripper))
      :effect (and
-        (occupying-gripper ?nut ?gripper)
-        (not (on-table ?nut ?table))
+        (exclusively-occupying-gripper ?nut ?gripper)
+        (not (directly-on-table ?nut ?table))
         (not (free ?gripper)))
-    )
-
-
-    (:action free-gripper
-     :parameters (?tabletop-object - tabletop-object ?gripper - gripper)
-     :precondition (and (not (can-pick-up ?tabletop-object)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
-     :effect (and
-        (not (occupying-gripper ?tabletop-object ?gripper))
-        (free ?gripper))
     )
 
 
     (:action put-nut-on-peg
      :parameters (?nut - nut ?peg - peg ?gripper - gripper)
-     :precondition (and (match ?nut ?peg) (occupying-gripper ?nut ?gripper) (not (free ?gripper)))
+     :precondition (and (shapes-match ?nut ?peg) (exclusively-occupying-gripper ?nut ?gripper) (not (free ?gripper)))
      :effect (and
-        (on ?nut ?peg)
-        (not (occupying-gripper ?nut ?gripper))
+        (on-peg ?nut ?peg)
+        (not (exclusively-occupying-gripper ?nut ?gripper))
         (free ?gripper))
     )
 
 
-    (:action remove-nut-from-peg
-     :parameters (?gripper - gripper ?nut - nut ?peg - peg)
-     :precondition (and (free ?gripper) (on ?nut ?peg))
+    (:action pick-up-nut-from-peg
+     :parameters (?gripper - gripper ?round-peg - round-peg ?square-nut - square-nut)
+     :precondition (and (free ?gripper) (not (exclusively-occupying-gripper ?round-peg ?gripper)) (not (exclusively-occupying-gripper ?square-nut ?gripper)) (not (shapes-match ?square-nut ?round-peg)) (not (small-enough-for-gripper-to-pick-up ?round-peg ?gripper)) (on-peg ?square-nut ?round-peg) (small-enough-for-gripper-to-pick-up ?square-nut ?gripper))
      :effect (and
+        (exclusively-occupying-gripper ?square-nut ?gripper)
         (not (free ?gripper))
-        (not (on ?nut ?peg))
-        (occupying-gripper ?nut ?gripper))
+        (not (on-peg ?square-nut ?round-peg)))
     )
 
 )

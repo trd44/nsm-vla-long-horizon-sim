@@ -15,7 +15,8 @@
         (in ?tabletop-object - tabletop-object ?container - container) ; whether the object is in the container.
         (open ?container - container) ; whether the container is open.
         (free ?gripper - gripper) ; whether the gripper is not occupied by anything. If true, there should be no true `occupying-gripper` atoms.
-    )
+        (small-enough-to-fit-in-container ?tabletop-object - tabletop-object ?container - container) ; whether the object can fit inside the container.
+        )
     
     ;; Define actions using the predicates given
     (:action pick-up-from-tabletop
@@ -24,7 +25,7 @@
         :effect (and (occupying-gripper ?tabletop-object ?gripper) (not (directly-on-table ?tabletop-object ?table)) (not (free ?gripper))) 
     )
 
-    (:action free-gripper
+    (:action free-gripper-from-large-object
         :parameters (?tabletop-object - tabletop-object ?gripper - gripper)
         :precondition (and (not (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper)) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
         :effect (and (not (occupying-gripper ?tabletop-object ?gripper)) (free ?gripper))
@@ -44,7 +45,7 @@
 
     (:action place-in-drawer-from-gripper
         :parameters (?drawer - drawer ?tabletop-object - tabletop-object ?gripper - gripper)
-        :precondition (and (open ?drawer) (large-enough-for-gripper-to-reach-inside ?drawer ?gripper) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
+        :precondition (and (open ?drawer) (small-enough-to-fit-in-container ?tabletop-object ?drawer) (large-enough-for-gripper-to-reach-inside ?drawer ?gripper) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
         :effect (and (in ?tabletop-object ?drawer) (not (occupying-gripper ?tabletop-object ?gripper)) (free ?gripper))
     )
     
