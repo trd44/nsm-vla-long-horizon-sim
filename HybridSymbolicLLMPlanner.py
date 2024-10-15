@@ -54,7 +54,7 @@ class HybridSymbolicLLMPlanner:
         """parse the operators string into a dictionary
 
         Args:
-            operators (str): the operators string with operators separated by newlines
+            operator (str): the operators string with operator separated by newlines
 
         Returns:
             the parsed OperatorCandidate
@@ -392,9 +392,6 @@ class HybridSymbolicLLMPlanner:
 
     def search(self) -> List[List[fs.Action]]:
         """performs search. Calls the LLM agent to create new operators while searching for a plan. 
-        
-        Args:
-            starting_problem (fs.problem.Problem): the starting problem with the original operators
 
         Returns:
             list: the list of plans
@@ -465,7 +462,7 @@ class HybridSymbolicLLMPlanner:
             node (SearchNode): the current node
             max_depth (int): the maximum depth to search
             space (SearchSpace): the search space
-            stats (SearchStats): the search stats
+            stats (SearchStats): the search stats used for keeping track of expansions
 
         Returns:
             List[List[fs.Action]]: _description_
