@@ -103,7 +103,7 @@
     )
 
 
-    (:action open-drawer
+    (:action open-drawer ; LLM added
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (open ?drawer)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)))
      :effect (and
@@ -113,7 +113,7 @@
     )
 
 
-    (:action pick-up-from-open-drawer
+    (:action pick-up-from-open-drawer ; LLM added
      :parameters (?coffee-pod - coffee-pod ?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (in ?coffee-pod ?drawer) (not (exclusively-occupying-gripper ?coffee-pod ?gripper)) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)) (open ?drawer) (small-enough-for-gripper-to-pick-up ?coffee-pod ?gripper))
      :effect (and
