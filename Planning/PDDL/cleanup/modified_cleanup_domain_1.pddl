@@ -88,7 +88,7 @@
     )
 
 
-    (:action empty-container-onto-table
+    (:action empty-container-onto-table ; LLM added
      :parameters (?block - block ?gripper - gripper ?mug - mug ?table - table)
      :precondition (and (directly-on-table ?mug ?table) (free ?gripper) (in ?block ?mug) (not (directly-on-table ?block ?table)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (not (occupying-gripper ?block ?gripper)) (not (occupying-gripper ?mug ?gripper)) (not (small-enough-to-fit-in-container ?block ?mug)) (open ?mug) (small-enough-for-gripper-to-pick-up ?block ?gripper) (small-enough-for-gripper-to-pick-up ?mug ?gripper))
      :effect (and

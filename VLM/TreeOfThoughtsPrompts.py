@@ -69,8 +69,4 @@ Answer: Let's think step by step.
 """
 
 
-vote_prompt = """Given a set of operators, several choices of world states and the goal state, decide which state is the most promising at reaching the goal state. Analyze each choice in detail, then conclude in the last line "The best choice is {id}", where id is the integer id of the choice.
-{choices}
-"""
-
     

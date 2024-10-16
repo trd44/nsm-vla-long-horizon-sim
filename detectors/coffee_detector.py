@@ -144,7 +144,7 @@ class Coffee_Detector:
         """
         assert container in self.object_types['container']
         if container == 'coffee_pod_holder':
-            return self.can_flip_up('coffee_machine_lid') and self.attached('coffee_machine_lid', 'coffee_pod_holder')
+            return self.can_flip_down('coffee_machine_lid') and self.attached('coffee_machine_lid', 'coffee_pod_holder') # lid is currently up and attached to the coffee pod holder
         elif container == 'drawer':
             #TODO: detect whether the drawer is open
             pass
@@ -162,7 +162,10 @@ class Coffee_Detector:
         Returns:
             bool: True if the gripper is free
         """
-        pass
+        for obj in self.object_types['tabletop_object']:
+            if self.exclusively_occupying_gripper(obj, gripper):
+                return False
+        return True
 
     def under(self, mug, coffee_pod_holder) -> bool:
         """Returns True if the mug is under the coffee pod holder.
@@ -174,7 +177,8 @@ class Coffee_Detector:
         Returns:
             bool: True if the mug is under the coffee pod holder
         """
-        pass
+        assert mug == 'mug' and coffee_pod_holder == 'coffee_pod_holder'
+        return self.env.check_mug_placement()
 
     def get_groundings(self, as_dict=False, binary_to_float=False) -> dict:
         """Returns the groundings for the coffee detector.

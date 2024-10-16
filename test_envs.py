@@ -9,7 +9,6 @@ Similar to the demo_random_action.py script from robosuite.
 from utils import *
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-import mimicgen
 
 
 def choose_mimicgen_environment():
@@ -33,7 +32,7 @@ def choose_mimicgen_environment():
     import mimicgen
     all_envs = set(suite.ALL_ENVIRONMENTS)
 
-    # get only mimicgen envs
+    # get only mimicgen envsπ
     only_mimicgen = sorted(all_envs - robosuite_envs)
 
     # keep only envs that correspond to the different reset distributions from the paper
@@ -67,10 +66,10 @@ if __name__ == "__main__":
     }
 
     # Choose environment
-    # options["env_name"] = choose_mimicgen_environment()
+    options["env_name"] = choose_mimicgen_environment()
 
     # Choose robot
-    # options["robots"] = choose_robots(exclude_bimanual=True)
+    options["robots"] = choose_robots(exclude_bimanual=True)
 
     # Load the desired controller
     # options["controller_configs"] = load_controller_config(default_controller="OSC_POSE")
