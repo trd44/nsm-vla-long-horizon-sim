@@ -12,6 +12,7 @@ from robosuite.wrappers import VisualizationWrapper
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 from detectors.coffee_detector import Coffee_Detector
+from detectors.cleanup_detector import Cleanup_Detector
 import numpy as np
 
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     # Set the new camera position (x, y, z)
     env.sim.model.cam_pos[camera_id] = np.array([0, 0, 2])  # Modify these values to set the desired position
     env.sim.model.cam_quat[camera_id] = np.array([0.0, 0, 0, 1])  # Example quaternion
-    #detector = Coffee_Detector(env)
+    detector = Cleanup_Detector(env)
 
     while True:
         # Reset the environment
@@ -158,6 +159,7 @@ if __name__ == "__main__":
 
             # Step through the simulation and render
             obs, reward, done, info = env.step(action)
+            detector.get_groundings()
             env.render()
 
     # Get action limits
