@@ -109,7 +109,16 @@ if __name__ == "__main__":
     # Set the new camera position (x, y, z)
     env.sim.model.cam_pos[camera_id] = np.array([0, 0, 2])  # Modify these values to set the desired position
     env.sim.model.cam_quat[camera_id] = np.array([0.0, 0, 0, 1])  # Example quaternion
-    detector = Cleanup_Detector(env)
+    
+    # If options["env_name"] starts with "Co", use the Coffee_Detector
+    if options["env_name"][:2] == "Co":
+        detector = Coffee_Detector(env)
+    elif options["env_name"][:2] == "Cu":
+        detector = Cleanup_Detector(env)
+    elif options["env_name"][:2] == "Nu":
+        pass
+    else:
+        raise ValueError("Unrecognized environment name: {}".format(options["env_name"]))
 
     while True:
         # Reset the environment
