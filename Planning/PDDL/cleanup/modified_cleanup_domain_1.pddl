@@ -26,7 +26,7 @@
         (directly-on-table ?x1 - tabletop-object ?x2 - table)
         (large-enough-for-gripper-to-reach-inside ?x1 - container ?x2 - gripper)
         (occupying-gripper ?x1 - tabletop-object ?x2 - gripper)
-        (in ?x1 - tabletop-object ?x2 - container)
+        (inside ?x1 - tabletop-object ?x2 - container)
         (open ?x1 - container)
         (free ?x1 - gripper)
         (small-enough-to-fit-in-container ?x1 - tabletop-object ?x2 - container)
@@ -82,7 +82,7 @@
      :parameters (?drawer - drawer ?tabletop-object - tabletop-object ?gripper - gripper)
      :precondition (and (open ?drawer) (small-enough-to-fit-in-container ?tabletop-object ?drawer) (large-enough-for-gripper-to-reach-inside ?drawer ?gripper) (occupying-gripper ?tabletop-object ?gripper) (not (free ?gripper)))
      :effect (and
-        (in ?tabletop-object ?drawer)
+        (inside ?tabletop-object ?drawer)
         (not (occupying-gripper ?tabletop-object ?gripper))
         (free ?gripper))
     )
@@ -93,7 +93,7 @@
      :precondition (and (directly-on-table ?mug ?table) (free ?gripper) (in ?block ?mug) (not (directly-on-table ?block ?table)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (not (occupying-gripper ?block ?gripper)) (not (occupying-gripper ?mug ?gripper)) (not (small-enough-to-fit-in-container ?block ?mug)) (open ?mug) (small-enough-for-gripper-to-pick-up ?block ?gripper) (small-enough-for-gripper-to-pick-up ?mug ?gripper))
      :effect (and
         (directly-on-table ?block ?table)
-        (not (in ?block ?mug)))
+        (not (inside ?block ?mug)))
     )
 
 )
