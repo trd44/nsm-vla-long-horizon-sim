@@ -69,6 +69,8 @@ class Coffee_Detector:
         # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
         self.grounded_object_to_pddl_object = {'mug':'mug1', 'coffee_machine_lid':'coffee_machine_lid1', 'coffee_pod_holder':'coffee_pod_holder1', 'drawer':'drawer1', 'coffee_pod':'coffee_pod1', 'table':'table1', 'gripper':'gripper1'}
 
+        self.grounded_tabletop_object_to_coffee_class_object = {'mug':self.env.mug, 'coffee_machine_lid':self.env.coffee_machine.lid, 'coffee_pod_holder':self.env.coffee_machine.pod_holder, 'drawer':self.env.cabinet_object, 'coffee_pod':self.env.coffee_pod, 'gripper':self.env.robots[0].gripper}
+
     
     def update_obs(self, obs=None):
         """update the observation
@@ -118,7 +120,7 @@ class Coffee_Detector:
         assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
         return not self.can_flip_up(coffee_machine_lid)
 
-    def directly_on_table(self, tabletop_obj:str, table='table1') -> bool:
+    def directly_on_table(self, tabletop_obj:str, table='table') -> bool:
         """Returns True if the object is directly on the table.
 
         Args:
@@ -134,7 +136,7 @@ class Coffee_Detector:
         return self.env.check_directly_on_table(tabletop_obj)
 
 
-    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper1') -> bool:
+    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
         """Returns True if the object is exclusively occupying the gripper.
 
         Args:
@@ -145,8 +147,8 @@ class Coffee_Detector:
             bool: True if the object is exclusively occupying the gripper
         """
         assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(gripper, 'gripper')
-        gripper = self.env.robots[0].gripper
-        tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
+        gripper = self.grounded_tabletop_object_to_coffee_class_object[gripper]
+        tabletop_obj_contact_geoms = self.grounded_tabletop_object_to_coffee_class_object[tabletop_obj].contact_geoms
         return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
 
     def attached(self, coffee_machine_lid:str, coffee_pod_holder:str) -> bool:
@@ -160,7 +162,7 @@ class Coffee_Detector:
             bool: True if the coffee machine lid is attached to the coffee pod holder
         """
         # hardcoding the coffee machine lid to be attached to the coffee pod holder since we are only dealing with one coffee machine lid and one coffee pod holder that are always attached
-        assert coffee_machine_lid == 'coffee_machine_lid1' and coffee_pod_holder == 'coffee_pod_holder1'
+        assert coffee_machine_lid == 'coffee_machine_lid' and coffee_pod_holder == 'coffee_pod_holder'
         return True
     
     def inside(self, tabletop_obj:str, container:str) -> bool:
