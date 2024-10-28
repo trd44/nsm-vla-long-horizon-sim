@@ -13,6 +13,7 @@ from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 from detectors.coffee_detector import Coffee_Detector
 from detectors.cleanup_detector import Cleanup_Detector
+from detectors.nut_assembly_detector import NutAssemblyDetector
 import numpy as np
 
 
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     elif options["env_name"][:2] == "Cu":
         detector = Cleanup_Detector(env)
     elif options["env_name"][:2] == "Nu":
-        pass
+        detector = NutAssemblyDetector(env)
     else:
         raise ValueError("Unrecognized environment name: {}".format(options["env_name"]))
 

@@ -111,25 +111,6 @@ class Cleanup_Detector:
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
         gripper = self.env.robots[0].gripper
-        if tabletop_obj == 'mug':
-            tabletop_obj = 'cleanup_object'
-        tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
-        return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
-
-    def occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
-        """Returns True if the object is exclusively occupying the gripper.
-
-        Args:
-            tabletop_obj (str): the tabletop object
-            gripper (str): the gripper object
-
-        Returns:
-            bool: True if the object is exclusively occupying the gripper
-        """
-        assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
-        gripper = self.env.robots[0].gripper
-        # if tabletop_obj == 'mug':
-        #     tabletop_obj = 'cleanup_object'
         tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
         return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
     

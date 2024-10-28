@@ -1,5 +1,19 @@
 # OpLearn
 
+## Dependencies
+
+Clone MimicGen in /OpLearn
+```bash
+gh repo clone https://github.com/helenlu66/mimicgen
+```
+
+Clone RoboSuite in /OpLearn
+```bash
+gh repo clone https://github.com/ARISE-Initiative/robosuite.git
+```
+
+Install tarski - coming soon
+
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 
@@ -33,20 +47,6 @@ While the container is up, press F1 in VS Code and type in the command pallete "
 Select the running container. In my case it says "/oplearn_oplearn_1"
 
 Open the /home/user/oplearn directory to start working on the files from within the container.
-
-## Dependencies
-
-Clone MimicGen in /OpLearn
-```bash
-gh repo clone https://github.com/helenlu66/mimicgen
-```
-
-Clone RoboSuite in /OpLearn
-```bash
-gh repo clone https://github.com/ARISE-Initiative/robosuite.git
-```
-
-Install tarski - coming soon
 
 ## Run Demo
 You can test your mujoco installation first with 
