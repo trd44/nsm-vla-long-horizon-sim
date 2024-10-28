@@ -23,7 +23,7 @@ class Coffee_Detector:
              },
             'can-flip-down': {
                 'func': self.can_flip_down,
-                'params':['coffee-machine-lid']
+                'params':['coffee_machine_lid']
             },
             'directly-on-table': {
                 'func':self.directly_on_table,
@@ -55,8 +55,20 @@ class Coffee_Detector:
             }
         }
         # mapping from relevant object types to objects in the environment
-        self.object_types = {'tabletop_object':['coffee_pod', 'coffee_machine_lid', 'coffee_pod_holder', 'mug', 'drawer'], 'container':['coffee_pod_holder', 'drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'coffee_machine_lid':['coffee_machine_lid'], 'coffee_pod_holder':['coffee_pod_holder'], 'drawer':['drawer'], 'coffee_pod':['coffee_pod'], 'table':['table']}
-        self.grounded_objects = {'mug':['mug1'], 'coffee_pod':['coffee_pod1'], 'coffee_machine_lid':['coffee_machine_lid1'], 'coffee_pod_holder':['coffee_pod_holder1'], 'drawer':['drawer1'], 'table':['table1'], 'gripper':['gripper1']}
+        self.object_types = {
+            'tabletop_object':['coffee_pod', 'coffee_machine_lid', 'coffee_pod_holder', 'mug', 'drawer'], 
+            'container':['coffee_pod_holder', 'drawer', 'mug'], 'gripper':['gripper'], 
+            'mug':['mug'], 
+            'coffee_machine_lid':['coffee_machine_lid'], 
+            'coffee_pod_holder':['coffee_pod_holder'], 
+            'drawer':['drawer'], 
+            'coffee_pod':['coffee_pod'], 
+            'table':['table']
+        }
+
+        # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
+        self.grounded_object_to_pddl_object = {'mug':'mug1', 'coffee_machine_lid':'coffee_machine_lid1', 'coffee_pod_holder':'coffee_pod_holder1', 'drawer':'drawer1', 'coffee_pod':'coffee_pod1', 'table':'table1', 'gripper':'gripper1'}
+
     
     def update_obs(self, obs=None):
         """update the observation
@@ -77,7 +89,7 @@ class Coffee_Detector:
         Returns True if the object is small enough for the gripper to pick up.
         """
         #hardcoding mug and pod to be small enough to pick up
-        if tabletop_obj == 'mug' or tabletop_obj == 'coffee_pod':
+        if 'mug' in tabletop_obj or 'coffee_pod' in tabletop_obj:
             return True
         return False
     
@@ -90,7 +102,7 @@ class Coffee_Detector:
         Returns:
             bool: True if the coffee pod lid can be flipped up
         """
-        assert coffee_machine_lid == 'coffee_machine_lid'
+        assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
         return self.env.check_can_flip_up_lid()
         
 
@@ -103,10 +115,10 @@ class Coffee_Detector:
         Returns:
             bool: True if the coffee pod lid can be flipped down
         """
-        assert coffee_machine_lid == 'coffee_machine_lid'
+        assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
         return not self.can_flip_up(coffee_machine_lid)
 
-    def directly_on_table(self, tabletop_obj:str, table='table') -> bool:
+    def directly_on_table(self, tabletop_obj:str, table='table1') -> bool:
         """Returns True if the object is directly on the table.
 
         Args:
@@ -115,11 +127,14 @@ class Coffee_Detector:
         Returns:
             bool: True if the object is directly on the table
         """
-        assert tabletop_obj in self.object_types['tabletop_object']
+        assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(table, 'table')
+        # hardcoding coffee_machine_lid to not be directly on table
+        if self._is_type(tabletop_obj, 'coffee_machine_lid'):
+            return False
         return self.env.check_directly_on_table(tabletop_obj)
 
 
-    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
+    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper1') -> bool:
         """Returns True if the object is exclusively occupying the gripper.
 
         Args:
@@ -129,7 +144,7 @@ class Coffee_Detector:
         Returns:
             bool: True if the object is exclusively occupying the gripper
         """
-        assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
+        assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(gripper, 'gripper')
         gripper = self.env.robots[0].gripper
         tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
         return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
@@ -145,7 +160,7 @@ class Coffee_Detector:
             bool: True if the coffee machine lid is attached to the coffee pod holder
         """
         # hardcoding the coffee machine lid to be attached to the coffee pod holder since we are only dealing with one coffee machine lid and one coffee pod holder that are always attached
-        assert coffee_machine_lid == 'coffee_machine_lid' and coffee_pod_holder == 'coffee_pod_holder'
+        assert coffee_machine_lid == 'coffee_machine_lid1' and coffee_pod_holder == 'coffee_pod_holder1'
         return True
     
     def inside(self, tabletop_obj:str, container:str) -> bool:
@@ -158,7 +173,7 @@ class Coffee_Detector:
         Returns:
             bool: True if the object is inside the container
         """
-        assert tabletop_obj in self.object_types['tabletop_object'] and container in self.object_types['container']
+        assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(container, 'container')
         if container == 'coffee_pod_holder':
             if tabletop_obj == 'coffee_pod':
                 return self.env.check_pod()
@@ -185,12 +200,12 @@ class Coffee_Detector:
         Returns:
             bool: True if the container is open
         """
-        assert container in self.object_types['container']
-        if container == 'coffee_pod_holder':
+        assert self._is_type(container, 'container')
+        if self._is_type(container, 'coffee_pod_holder'):
             return self.can_flip_down('coffee_machine_lid') and self.attached('coffee_machine_lid', 'coffee_pod_holder') # lid is currently up and attached to the coffee pod holder
-        elif container == 'drawer':
+        elif self._is_type(container, 'drawer'):
             return self.env.check_drawer_open()
-        elif container == 'mug':
+        elif self._is_type(container, 'mug'):
             return True # mugs are always open
 
     def free(self, gripper) -> bool:
@@ -216,7 +231,7 @@ class Coffee_Detector:
         Returns:
             bool: True if the mug is upright
         """
-        assert mug == 'mug'
+        assert self._is_type(mug, 'mug')
         return self.env.check_mug_upright()
 
     def under(self, mug, coffee_pod_holder) -> bool:
@@ -229,15 +244,11 @@ class Coffee_Detector:
         Returns:
             bool: True if the mug is under the coffee pod holder
         """
-        assert mug == 'mug' and coffee_pod_holder == 'coffee_pod_holder'
+        assert self._is_type(mug, 'mug') and self._is_type(coffee_pod_holder, 'coffee_pod_holder')
         return self.env.check_mug_under_pod_holder()
 
-    def get_groundings(self, as_dict=False, binary_to_float=False) -> dict:
+    def get_groundings(self) -> dict:
         """Returns the groundings for the coffee detector.
-
-        Args:
-            as_dict (bool, optional): whether to return the groundings as a dictionary. Defaults to False.
-            binary_to_float (bool, optional): whether to convert binary values to float. Defaults to False.
 
         Returns:
             dict: the groundings for the coffee detector
@@ -246,14 +257,40 @@ class Coffee_Detector:
         for predicate_name, predicate in self.predicates.items():
             groundings[predicate_name] = {}
             param_list = []
+            # e.g. for predicate_name = 'inside', predicate['params'] = ['tabletop_object', 'container']
             for param_type in predicate['params']:
+                # e.g. for predicate_name = 'inside', param_list = [['coffee_pod', 'coffee_machine_lid', 'coffee_pod_holder', 'mug', 'drawer'], ['coffee_pod_holder', 'drawer', 'mug']]
                 param_list.append(self.object_types[param_type])
+            # e.g param_combinations = [('coffee_pod', 'coffee_pod_holder'), ('coffee_pod', 'drawer'), ('coffee_pod', 'mug'), ('coffee_machine_lid', 'coffee_pod_holder'), ('coffee_machine_lid', 'drawer'), ('coffee_machine_lid', 'mug'), ('coffee_pod_holder', 'coffee_pod_holder'), ('coffee_pod_holder', 'drawer'), ('coffee_pod_holder', 'mug'), ('mug', 'coffee_pod_holder'), ('mug', 'drawer'), ('mug', 'mug'), ('drawer', 'coffee_pod_holder'), ('drawer', 'drawer'), ('drawer', 'mug')]
             param_combinations = list(itertools.product(*param_list))
             callable_func = predicate['func']
             for comb in param_combinations:
                 truth_value = callable_func(*comb)
-                predicate_str = f'{predicate_name}({",".join([self.grounded_objects[param] for param in comb])})'
+                predicate_str = f'{predicate_name}({",".join(self._to_pddl_format(comb))})'
                 groundings[predicate_str] = truth_value
         return groundings
+    
+    def _is_type(self, obj, obj_type):
+        """Returns True if the object is of the specified type.
+
+        Args:
+            obj (str): the object
+            obj_type (str): the object type
+
+        Returns:
+            bool: True if the object is of the specified type
+        """
+        return obj in self.object_types[obj_type]
+    
+    def _to_pddl_format(self, objs):
+        """Converts the grounded object to their pddl format.
+
+        Args:
+            objs (List[str]): the grounded objects
+
+        Returns:
+            List[str]: the pddl objects
+        """
+        return [self.grounded_object_to_pddl_object[obj] for obj in objs]
                 
         
