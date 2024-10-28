@@ -15,7 +15,7 @@ class Cleanup_Detector:
         self.predicates = {
             'small-enough-for-gripper-to-pick-up': {
                 'func':self.small_enough_for_gripper_to_pick_up,
-                'params':['tabletop_object']
+                'params':['tabletop_object','gripper']
                 }, 
             'directly-on-table': {
                 'func':self.directly_on_table,
@@ -23,8 +23,12 @@ class Cleanup_Detector:
             }, 
             'large-enough-for-gripper-to-reach-inside': {
                 'func':self.large_enough_for_gripper_to_reach_inside,
-                'params':['tabletop_object']
-            }, 
+                'params':['container','gripper']
+            },
+            'occupying-gripper': {
+                'func':self.occupying_gripper,
+                'params':['tabletop_object', 'gripper']
+            },
             'inside': {
                 'func':self.inside,
                 'params':['tabletop_object', 'container']
@@ -43,8 +47,8 @@ class Cleanup_Detector:
             }
         }
         # mapping from relevant object types to objects in the environment
-        self.object_types = {'tabletop_object':['block', 'mug', 'drawer'], 'container':['drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'drawer':['drawer'], 'table':['table']}
-        self.grounded_objects = {'mug':['mug1'], 'block':['block1'], 'drawer':['drawer1'], 'table':['table1'], 'gripper':['gripper1']}
+        self.object_types = {'tabletop_object':['cube', 'mug', 'drawer'], 'container':['drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'drawer':['drawer'], 'table':['table']}
+        self.grounded_objects = {'mug':['mug1'], 'cube':['cube1'], 'drawer':['drawer1'], 'table':['table1'], 'gripper':['gripper1']}
     
     def update_obs(self, obs=None):
         """update the observation
@@ -60,12 +64,12 @@ class Cleanup_Detector:
     def r_int(self, value):
         return int(value) if self.return_int else value
     
-    def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str) -> bool:
+    def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str, gripper:str) -> bool:
         """
         Returns True if the object is small enough for the gripper to pick up.
         """
         #hardcoding mug and pod to be small enough to pick up
-        if tabletop_obj == 'mug' or tabletop_obj == 'block':
+        if tabletop_obj == 'mug' or tabletop_obj == 'cube':
             return True
         return False
 
@@ -81,7 +85,7 @@ class Cleanup_Detector:
         assert tabletop_obj in self.object_types['tabletop_object']
         return self.env.check_directly_on_table(tabletop_obj)
 
-    def large_enough_for_gripper_to_reach_inside(self, container:str) -> bool:
+    def large_enough_for_gripper_to_reach_inside(self, container:str, gripper:str) -> bool:
         """Returns True if the container is large enough for the gripper to reach inside.
 
         Args:
@@ -107,6 +111,25 @@ class Cleanup_Detector:
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
         gripper = self.env.robots[0].gripper
+        if tabletop_obj == 'mug':
+            tabletop_obj = 'cleanup_object'
+        tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
+        return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
+
+    def occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
+        """Returns True if the object is exclusively occupying the gripper.
+
+        Args:
+            tabletop_obj (str): the tabletop object
+            gripper (str): the gripper object
+
+        Returns:
+            bool: True if the object is exclusively occupying the gripper
+        """
+        assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
+        gripper = self.env.robots[0].gripper
+        # if tabletop_obj == 'mug':
+        #     tabletop_obj = 'cleanup_object'
         tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
         return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
     
@@ -122,15 +145,15 @@ class Cleanup_Detector:
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and container in self.object_types['container']
         if container == 'drawer':
-            if tabletop_obj in ('mug', 'block'):
+            if tabletop_obj in ('mug', 'cube'):
                 return self.env.check_in_drawer(tabletop_obj)
             else:
-                return False # only mugs and blocks can be inside the drawer
+                return False # only mugs and cubes can be inside the drawer
         elif container == 'mug':
-            if tabletop_obj == 'block':
+            if tabletop_obj == 'cube':
                 return self.env.check_in_mug(tabletop_obj)
             else:
-                return False # only blocks can be inside the mug
+                return False # only cubes can be inside the mug
         else:  # only drawers and mugs can contain objects
             return False
 
@@ -176,10 +199,10 @@ class Cleanup_Detector:
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and container in self.object_types['container']
         if container == 'drawer':
-            if tabletop_obj in ('mug', 'block'):
+            if tabletop_obj in ('mug', 'cube'):
                 return True
         elif container == 'mug':
-            if tabletop_obj == 'block':
+            if tabletop_obj == 'cube':
                 return True
         return False
 
@@ -203,7 +226,9 @@ class Cleanup_Detector:
             callable_func = predicate['func']
             for comb in param_combinations:
                 truth_value = callable_func(*comb)
-                predicate_str = f'{predicate_name}({",".join([self.grounded_objects[param] for param in comb])})'
+                param_strs = [str(self.grounded_objects[param]) for param in comb]
+                predicate_str = f'{predicate_name}({",".join(param_strs)})'
+                # predicate_str = f'{predicate_name}({",".join([self.grounded_objects[param] for param in comb])})'
                 groundings[predicate_str] = truth_value
         return groundings
                 
