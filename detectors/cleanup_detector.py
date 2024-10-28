@@ -48,7 +48,9 @@ class Cleanup_Detector:
         }
         # mapping from relevant object types to objects in the environment
         self.object_types = {'tabletop_object':['cube', 'mug', 'drawer'], 'container':['drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'drawer':['drawer'], 'table':['table']}
-        self.grounded_objects = {'mug':['mug1'], 'cube':['cube1'], 'drawer':['drawer1'], 'table':['table1'], 'gripper':['gripper1']}
+
+        # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
+        self.grounded_object_to_pddl_object = {'mug':'mug1', 'cube':'cube1', 'drawer':'drawer1', 'table':'table1', 'gripper':'gripper1'}
     
     def update_obs(self, obs=None):
         """update the observation
@@ -206,12 +208,8 @@ class Cleanup_Detector:
                 return True
         return False
 
-    def get_groundings(self, as_dict=False, binary_to_float=False) -> dict:
+    def get_groundings(self) -> dict:
         """Returns the groundings for the coffee detector.
-
-        Args:
-            as_dict (bool, optional): whether to return the groundings as a dictionary. Defaults to False.
-            binary_to_float (bool, optional): whether to convert binary values to float. Defaults to False.
 
         Returns:
             dict: the groundings for the coffee detector
@@ -220,15 +218,16 @@ class Cleanup_Detector:
         for predicate_name, predicate in self.predicates.items():
             groundings[predicate_name] = {}
             param_list = []
+            # e.g. for predicate_name = 'inside', predicate['params'] = ['tabletop_object', 'container']
             for param_type in predicate['params']:
+                # e.g. for predicate_name = 'inside', param_list = [['mug', 'cube'], ['drawer', 'mug']]
                 param_list.append(self.object_types[param_type])
+            # e.g param_combinations = [('mug', 'drawer'), ('mug', 'mug'), ('cube', 'drawer'), ('cube', 'mug')]
             param_combinations = list(itertools.product(*param_list))
             callable_func = predicate['func']
             for comb in param_combinations:
                 truth_value = callable_func(*comb)
-                param_strs = [str(self.grounded_objects[param]) for param in comb]
-                predicate_str = f'{predicate_name}({",".join(param_strs)})'
-                # predicate_str = f'{predicate_name}({",".join([self.grounded_objects[param] for param in comb])})'
+                predicate_str = f'{predicate_name}({",".join(self._to_pddl_format(comb))})'
                 groundings[predicate_str] = truth_value
         return groundings
                 
