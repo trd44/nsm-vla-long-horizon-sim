@@ -1,3 +1,5 @@
+import pickle
+import os
 from typing import *
 
 class OperatorCandidate:
@@ -157,3 +159,20 @@ def reverse_engineer_plan(node:SearchNode) -> list:
         node = node.parent
     plan.reverse()
     return plan
+
+def unpickle_goal_node(goal_node_path: Union[os.PathLike, str]) -> SearchNode:
+    """Unpickle the goal node from the pickled string
+
+    Args:
+        goal_node (os.PathLike|str): the pickled string of the goal node
+
+    Returns:
+        SearchNode: the goal node
+    """
+    with open(goal_node_path, 'rb') as f:
+        goal_file = f.read()
+        node = pickle.loads(goal_file)
+    return node
+
+if __name__=="__main__":
+    node = unpickle_goal_node('Planning/PDDL/coffee/goal_node_1.pkl')

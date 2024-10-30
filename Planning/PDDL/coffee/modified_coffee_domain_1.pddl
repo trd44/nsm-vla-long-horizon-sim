@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain coffee)
-    (:requirements :equality :typing)
+    (:requirements :typing :equality)
     (:types
         gripper - object
         table - object
@@ -34,6 +34,7 @@
         (open ?x1 - container)
         (free ?x1 - gripper)
         (under ?x1 - mug ?x2 - coffee-pod-holder)
+        (upright ?x1 - mug)
     )
 
     (:functions
@@ -98,12 +99,13 @@
      :precondition (and (exclusively-occupying-gripper ?mug ?gripper) (not (free ?gripper)))
      :effect (and
         (under ?mug ?holder)
+        (upright ?mug)
         (not (exclusively-occupying-gripper ?mug ?gripper))
         (free ?gripper))
     )
 
 
-    (:action open-drawer ; LLM added
+    (:action open-drawer
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (open ?drawer)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)))
      :effect (and
@@ -113,7 +115,7 @@
     )
 
 
-    (:action pick-up-from-open-drawer ; LLM added
+    (:action pick-up-from-open-container
      :parameters (?coffee-pod - coffee-pod ?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (in ?coffee-pod ?drawer) (not (exclusively-occupying-gripper ?coffee-pod ?gripper)) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)) (open ?drawer) (small-enough-for-gripper-to-pick-up ?coffee-pod ?gripper))
      :effect (and

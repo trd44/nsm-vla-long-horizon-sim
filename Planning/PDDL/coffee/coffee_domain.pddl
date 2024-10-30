@@ -20,6 +20,7 @@
         (open ?container - container) ; whether the container is open.
         (free ?gripper - gripper) ; whether the gripper is not occupied by anything. If true, there should be no true `exclusively-occupying-gripper` atoms.
         (under ?mug - mug ?holder - coffee-pod-holder) ; whether the bottom tabletop object is under the top tabletop object.
+        (upright ?mug - mug) ; whether the mug is upright.
     )
     
     ;; Define actions using the predicates given
@@ -59,7 +60,7 @@
     (:action place-mug-under-holder-from-gripper
         :parameters (?mug - mug ?holder - coffee-pod-holder ?gripper - gripper)
         :precondition (and (exclusively-occupying-gripper ?mug ?gripper) (not (free ?gripper)))
-        :effect (and (under ?mug ?holder) (not (exclusively-occupying-gripper ?mug ?gripper)) (free ?gripper))
+        :effect (and (under ?mug ?holder) (upright ?mug) (not (exclusively-occupying-gripper ?mug ?gripper)) (free ?gripper))
     )
 
 )

@@ -8,7 +8,6 @@ from collections import deque
 
 from Planning.PlanningUtils import OperatorCandidate, OperatorCandidateCounter, make_root_node, make_child_node, reverse_engineer_plan, SearchSpace, SearchStats
 from tarski.search import GroundForwardSearchModel
-from tarski.search.model import progress
 from tarski.model import Model
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
 from tarski.io.fstrips import FstripsReader, FstripsWriter
@@ -257,7 +256,6 @@ class HybridSymbolicLLMPlanner:
             existing_op_params_precond.append(op_w_param_precond+'\n)')
             existing_op_params_precond_effect.append(op_w_param_precond_effect+'\n)')
 
-        existing_op_params_precond_str = '\n'.join(existing_op_params_precond)
         existing_op_params_precond_effect_str = '\n'.join(existing_op_params_precond_effect)
         
         true_atoms, false_atoms = self.full_state_description(state, self.novel_objects)
@@ -318,26 +316,6 @@ class HybridSymbolicLLMPlanner:
             proposed_op.set_precondition(list(true_relevant_atoms)+list(false_relevant_atoms))
             return proposed_op
 
-        
-        def prompt_llm_for_operator_precondition(proposed_operator_str:str, param_constants:List[str]):
-            """prompt the LLM for the operator precondition
-            Args:
-                proposed_operator_str (str): the proposed operator string
-                param_constants (List[str]): the list of constants. In this case the parameter objects.
-            Returns:
-                str: the operator precondition
-            """
-            true_atoms, false_atoms = self.full_state_description(state, param_constants)
-            full_param_obj_atoms = ', '.join(true_atoms) + ', ' + ', '.join(false_atoms)
-            prompt = define_precondition_prompt.format(
-                full_param_obj_atoms = full_param_obj_atoms,
-                example_operators=existing_op_params_precond_str,
-                proposed_operator=proposed_operator_str
-            ) 
-    
-            out = generate_thought(prompt)
-            self.llm_calls += 1
-            return extract_operator_from_llm_output(out)
             
         def prompt_llm_for_operator_effects(proposed_operator_w_precond_str:str, param_constants:List[str]):
             """prompt the LLM for the operator effects
@@ -454,7 +432,7 @@ class HybridSymbolicLLMPlanner:
         space.complete = True
         return space, stats, plans
     
-    def search_ahead(self, problem:fs.problem.Problem, start_node, max_depth:int) -> List[List[fs.Action]]:
+    def search_ahead(self, problem:fs.problem.Problem, start_node, max_depth:int) -> List[fs.Action]:
         """BFS ahead from the current node for a solution to the problem's goal
 
         Args:
@@ -465,7 +443,7 @@ class HybridSymbolicLLMPlanner:
             stats (SearchStats): the search stats used for keeping track of expansions
 
         Returns:
-            List[List[fs.Action]]: _description_
+            List[fs.Action]: the plan found if any
         """
         # create obj to track state space
         space = SearchSpace()
