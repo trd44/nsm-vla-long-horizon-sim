@@ -7,7 +7,7 @@ vlm_agent:
 image_path: "images/agent_view.jpg"
 # setting for testing PDDL. Uncoment when testing.
 
-planning_dir: "Planning/PDDL/coffee"
+planning_dir: "planning/PDDL/coffee"
 init_planning_domain: "coffee_domain.pddl" # the initial domain file
 modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
@@ -18,7 +18,7 @@ max_num_llm_calls: 60
 max_depth: 15 # maximum search depth
 min_plan_candidates: 1 # end search early if this many plans are found
 
-# planning_dir: "Planning/PDDL/cleanup"
+# planning_dir: "planning/PDDL/cleanup"
 # init_planning_domain: "cleanup_domain.pddl" # the initial domain file
 # modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file will be saved as this
 # planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
@@ -29,7 +29,7 @@ min_plan_candidates: 1 # end search early if this many plans are found
 # max_depth: 15 # maximum search depth
 # min_plan_candidates: 1 # end search early if this many plans are found
 
-# planning_dir: "Planning/PDDL/nut_assembly"
+# planning_dir: "planning/PDDL/nut_assembly"
 # init_planning_domain: "nut_assembly_domain.pddl" # the initial domain file
 # modified_planning_domain: "modified_nut_assembly_domain.pddl" # final domain file will be saved as this
 # planning_problem: "nut_assembly_problem.pddl" # the partially defined planning problem file
