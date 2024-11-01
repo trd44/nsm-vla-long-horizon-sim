@@ -1,5 +1,5 @@
 import base64
-from planning.HybridSymbolicLLMPlanner import *
+from planning.hybrid_symbolic_llm_planner import *
 from utils import *
 from langchain_openai import OpenAI
 from langchain_core.messages import *

@@ -6,7 +6,7 @@ import itertools
 import dill
 from collections import deque
 
-from planning.PlanningUtils import OperatorCandidate, OperatorCandidateCounter, make_root_node, make_child_node, reverse_engineer_plan, SearchSpace, SearchStats
+from planning.planning_utils import OperatorCandidate, OperatorCandidateCounter, make_root_node, make_child_node, reverse_engineer_plan, SearchSpace, SearchStats
 from tarski.search import GroundForwardSearchModel
 from tarski.model import Model
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
