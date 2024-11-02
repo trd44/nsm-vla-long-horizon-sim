@@ -1,9 +1,6 @@
 from detection.detector import Detector
 from typing import *
 from scipy.spatial.transform import Rotation as R
-from robosuite.models.base import MujocoModel
-from robosuite.models.grippers import GripperModel
-from robosuite.utils.mjcf_utils import find_elements
 
 class Cleanup_Detector(Detector):
     def __init__(self, env, return_int=False):

@@ -5,9 +5,14 @@ vlm_agent:
   temperature: 0.5
 # seting for image observation
 image_path: "images/agent_view.jpg"
+
+execution_dir: "execution"
+learning_dir: "learning"
+detection_dir: "detection"
 # setting for testing PDDL. Uncoment when testing.
 
 planning_dir: "planning/PDDL/coffee"
+domain: "coffee"
 init_planning_domain: "coffee_domain.pddl" # the initial domain file
 modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
@@ -19,6 +24,7 @@ max_depth: 15 # maximum search depth
 min_plan_candidates: 1 # end search early if this many plans are found
 
 # planning_dir: "planning/PDDL/cleanup"
+# domain: "cleanup"
 # init_planning_domain: "cleanup_domain.pddl" # the initial domain file
 # modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file will be saved as this
 # planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
@@ -30,6 +36,7 @@ min_plan_candidates: 1 # end search early if this many plans are found
 # min_plan_candidates: 1 # end search early if this many plans are found
 
 # planning_dir: "planning/PDDL/nut_assembly"
+# domain: "nut_assembly"
 # init_planning_domain: "nut_assembly_domain.pddl" # the initial domain file
 # modified_planning_domain: "modified_nut_assembly_domain.pddl" # final domain file will be saved as this
 # planning_problem: "nut_assembly_problem.pddl" # the partially defined planning problem file

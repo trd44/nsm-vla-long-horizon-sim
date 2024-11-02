@@ -33,7 +33,6 @@ class HybridSymbolicLLMPlanner:
         self.llm_calls = 0
         self.max_depth = self.config['max_depth']
         self.max_num_llm_calls = self.config['max_num_llm_calls']
-        self.state_evaluator = state_evaluator
         self.novel_objects = self.config['novel_objects']
     
     def parse_domain(self):
