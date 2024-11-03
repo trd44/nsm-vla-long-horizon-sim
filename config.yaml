@@ -16,6 +16,7 @@ domain: "coffee"
 init_planning_domain: "coffee_domain.pddl" # the initial domain file
 modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
 planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+planning_goal_node: "goal_node" # the pickled file name for the goal node
 novel_objects: ["drawer1"]
 num_op_candidates: 5
 max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator

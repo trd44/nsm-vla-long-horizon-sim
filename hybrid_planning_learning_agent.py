@@ -1,22 +1,62 @@
 import os
 import importlib
 import planning
-import detection
 import execution
 import learning
+import mimicgen
 import planning.hybrid_symbolic_llm_planner
+import planning.planning_utils
 from utils import *
 from robosuite.controllers import load_controller_config
-
-import mimicgen
+from tarski import fstrips as fs
 
 class HybridPlanningLearningAgent:
     def __init__(self, config_file='config.yaml'):
         self.config:dict = load_config(config_file)
         self.domain:str = self.config['domain'].split('_domain.')[0]
-        self.planner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(config_file)
+        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(config_file)
         self.env = self._load_env()
         self.detector = self._load_detector()
+    
+    def plan(self) -> List[List[fs.Action]]:
+        """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file
+
+        Returns:
+            List[fs.Action]: a list a sequence of actions to achieve the goal a.k.a the plans
+        """
+        _, _, plans = self.planner.search()
+        # for this project, we just care about the first plan
+        if len(plans) > 0:
+            return plans[0]
+        raise Exception("No plan found")
+
+    def _load_plan(self):
+        """If the plan has been generated and saved, load the plan from the 
+        """
+        # search the `planning_dir` for the latest goal node pkl file i.e. the one with the largest number
+        def find_file_with_largest_number(directory):
+            largest_file = None
+            largest_number = None
+
+            for filename in os.listdir(directory):
+                if self.config['planning_goal_node'] not in filename:
+                    continue
+                # Extract number at the end of the file name (e.g., file123)
+                match = re.search(r'(\d+)(?=\.\w+$)', filename)
+                if match:
+                    number = int(match.group(1))
+                    # Update largest file and number if this one is larger
+                    if largest_number is None or number > largest_number:
+                        largest_number = number
+                        largest_file = filename
+
+            return largest_file, largest_number
+        
+        goal_node_pkl, _ = find_file_with_largest_number(self.config['planning_dir'])
+        goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
+        plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
+        return plan
+        
     
     def _load_env(self):
         """load the simulation environment based on the problem domain specified in the config file
@@ -47,6 +87,7 @@ class HybridPlanningLearningAgent:
         """load the detector based on the problem domain specified in the config file
         """
         detector_module = importlib.import_module(self.config['detection_dir']+'.'+self.domain+'_detector')
+
         detector = getattr(detector_module, self.domain.capitalize()+'_Detector')
         return detector(self.env)
 

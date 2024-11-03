@@ -175,4 +175,5 @@ def unpickle_goal_node(goal_node_path: Union[os.PathLike, str]) -> SearchNode:
     return node
 
 if __name__=="__main__":
+    # testing
     node = unpickle_goal_node('Planning/PDDL/coffee/goal_node_1.pkl')

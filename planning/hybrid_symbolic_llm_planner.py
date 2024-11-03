@@ -367,11 +367,11 @@ class HybridSymbolicLLMPlanner:
         return counter.get_max_operator_candidate()
         
 
-    def search(self) -> List[List[fs.Action]]:
+    def search(self) -> Tuple[SearchSpace, SearchStats, List[List[fs.Action]]]:
         """performs search. Calls the LLM agent to create new operators while searching for a plan. 
 
         Returns:
-            list: the list of plans
+            tuple: tje search space, the search stats, and the plans found
         """
         # create obj to track state space
         space = SearchSpace()
@@ -406,7 +406,7 @@ class HybridSymbolicLLMPlanner:
                     plans.append(search_ahead_plan)
                 if len(plans) >= self.config['min_plan_candidates']:
                     logging.info(f"Minimum number of plans found. # plans: {len(plans)}, # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
-                    return plans
+                    return space, stats, plans
             
             model = GroundForwardSearchModel(problem, ground_problem_schemas_into_plain_operators(problem))
             
@@ -469,7 +469,7 @@ class HybridSymbolicLLMPlanner:
                 self.write_domain(problem, domain_file_name)
 
                 # pickle the SearchNode that resulted in a plan
-                with open(self.config['planning_dir'] + os.sep + f'goal_node_{stats.num_goals}.pkl', 'wb') as f:
+                with open(self.config['planning_dir'] + os.sep + f'{self.config['planning_goal_node']}_{stats.num_goals}.pkl', 'wb') as f:
                     dill.dump(node, f)
                 return plan # early return if a plan is found since we only care about plan with the shortest length
 
@@ -641,5 +641,6 @@ class HybridSymbolicLLMPlanner:
 
     
 if __name__ == '__main__':
+    # testing
     planner = HybridSymbolicLLMPlanner()
     planner.search()
