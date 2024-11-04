@@ -1,4 +1,4 @@
-import pickle
+import dill
 import os
 from typing import *
 
@@ -171,9 +171,9 @@ def unpickle_goal_node(goal_node_path: Union[os.PathLike, str]) -> SearchNode:
     """
     with open(goal_node_path, 'rb') as f:
         goal_file = f.read()
-        node = pickle.loads(goal_file)
+        node = dill.loads(goal_file)
     return node
 
 if __name__=="__main__":
     # testing
-    node = unpickle_goal_node('Planning/PDDL/coffee/goal_node_1.pkl')
+    node = unpickle_goal_node('planning/PDDL/coffee/goal_node_1.pkl')

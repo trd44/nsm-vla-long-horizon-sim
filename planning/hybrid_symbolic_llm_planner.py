@@ -469,7 +469,7 @@ class HybridSymbolicLLMPlanner:
                 self.write_domain(problem, domain_file_name)
 
                 # pickle the SearchNode that resulted in a plan
-                with open(self.config['planning_dir'] + os.sep + f'{self.config['planning_goal_node']}_{stats.num_goals}.pkl', 'wb') as f:
+                with open(self.config['planning_dir'] + os.sep + f"{self.config['planning_goal_node']}_{stats.num_goals}.pkl", 'wb') as f:
                     dill.dump(node, f)
                 return plan # early return if a plan is found since we only care about plan with the shortest length
 

@@ -115,7 +115,7 @@
     )
 
 
-    (:action pick-up-from-open-container
+    (:action pick-up-object-from-open-container
      :parameters (?coffee-pod - coffee-pod ?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (in ?coffee-pod ?drawer) (not (exclusively-occupying-gripper ?coffee-pod ?gripper)) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)) (open ?drawer) (small-enough-for-gripper-to-pick-up ?coffee-pod ?gripper))
      :effect (and

@@ -6,7 +6,15 @@ class Detector:
         self.env = env
         self.obs = self.env.viewer._get_observations() if self.env.viewer_get_obs else self.env._get_observations() # detect objects' state using the observation
         self.return_int = return_int
+
+        self.grounded_object_to_pddl_object = {}
+
+    def get_env(self):
+        return self.env
     
+    def get_obs(self):
+        return self.obs
+
     def update_obs(self, obs=None):
         """update the observation
 
@@ -65,7 +73,7 @@ class Detector:
         Returns:
             List[str]: the pddl objects
         """
-        return [self.grounded_object_to_pddl_object[obj] for obj in objs]
+        return [self.grounded_object_to_pddl_object.get(obj) for obj in objs]
                 
         
     

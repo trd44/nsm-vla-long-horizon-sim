@@ -29,6 +29,24 @@ class HybridPlanningLearningAgent:
         if len(plans) > 0:
             return plans[0]
         raise Exception("No plan found")
+    
+    def execute_operator(self, operator:fs.Action):
+        """execute the operator in the simulation environment
+
+        Args:
+            operator (fs.Action): the operator to execute
+        """
+        executor = execution.Executor(self.env, operator)
+        executor.execute()
+        
+    def learn_operator(self, operator:fs.Action):
+        """Train an RL agent to learn the operator.
+
+        Args:
+            operator (fs.Action): the operator to learn
+        """
+        learner = learning.Learner(self.env, self.domain, operator)
+        return learner.learn()
 
     def _load_plan(self):
         """If the plan has been generated and saved, load the plan from the 
