@@ -1,9 +1,11 @@
 # This file implements the executors used in the paper. Reference: https://github.com/lorangpi/HyGOAL/blob/main/executor.py
+import logging
 from detection.detector import Detector
 from tarski import fstrips as fs
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
-from planning.planning_utils import unpickle_goal_node
+from planning.planning_utils import *
+from utils import *
 
 set_random_seed(0, using_cuda=True)
 
@@ -59,27 +61,71 @@ class Executor_RL(Executor):
 				env.render()
 		return obs, success
 	
-	def check_precondition(self, detector:Detector) -> bool:
+	def check_precondition(self, detector:Detector) -> Tuple[bool, Set[str]]:
 		"""check that the precondition of the operator holds in the current state
 
 		Args:
 			detector (Detector): the detector
 		Returns;
-			bool: True if the precondition holds in the current state
+			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the precondition holds and a set of unsatisfied preconditions
 		"""
 		groundings = detector.get_groundings()
 		precondition = self.operator.precondition
-		unsatisfied_conditions = []
+		unsatisfied_conditions = set()
 		for precond in precondition.subformulas: # assume precondition is a conjunction of literals
 			# account for the fact that some preconditions are negated e.g. `not(free(gripper1))`
 			# negated formula has the form `(not ...)` e.g. `(not free(gripper1))`
-			if precond.is_negation:
-				precond = precond.subformulas[0]
-				if precond not in groundings or not groundings[precond]:
-					continue
-		return True
+			if precond.connective.name == 'Not':
+				literal:str = precond.pddl_repr().replace('not ', '')
+				literal = split_by_parentheses(literal)[0] # remove the parentheses
+				if groundings[literal]: # if the literal is true in groundings, then the precondition is not satisfied
+					unsatisfied_conditions.add(f'not {literal}')
+			else: # positive literal
+				literal:str = precond.pddl_repr()
+				literal = split_by_parentheses(literal)[0]
+				if not groundings[literal]: # if the literal is false in groundings, then the precondition is not satisfied
+					unsatisfied_conditions.add(literal)
+		if len(unsatisfied_conditions) > 0:
+			logging.warning(f"Unsatisfied preconditions: {unsatisfied_conditions}")
+			return False, unsatisfied_conditions
+		return True, []
+	
+	def check_effects(self, detector:Detector) -> Tuple[bool, Set[str]]:
+		"""check that the effects of the operator hold in the current state
+
+		Args:
+			detector (Detector): the detector
+		Returns;
+			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the effects hold and a set of unintended effects
+		"""
+		effects:set = set(effect.pddl_repr() for effect in self.operator.effects)
+		precond_satisfied, unsatisfied_preconditions = self.check_precondition(detector)
+		# check whether there are elements in unsatisfied_preconditions that are not in effects
+		unintended_effects = unsatisfied_preconditions - effects
+		if len(unintended_effects) > 0:
+			logging.info(f"Unintended effects: {unintended_effects}")
+			return False, list(unintended_effects)
+		# There are no unintended effects. Check if all intended effects are satisfied
+		groundings = detector.get_groundings()
+		unsatisfied_effects = set()
+		for effect in effects:
+			# check if effect is negated
+			if isinstance(effect, fs.DelEffect): # effect is negated
+				literal:str = effect.pddl_repr().replace('not ', '')
+				literal = split_by_parentheses(literal)[0] # remove the parentheses
+				if groundings[literal]: # if the literal is true in groundings, then the precondition is not satisfied
+					unsatisfied_effects.add(f'not {literal}')
+			else: # positive literal
+				literal:str = effect.pddl_repr()
+				literal = split_by_parentheses(literal)[0]
+				if not groundings[literal]: # if the literal is false in groundings, then the precondition is not satisfied
+					unsatisfied_effects.add(literal)
+		if len(unsatisfied_effects) > 0:
+			logging.warning(f"Unsatisfied effects: {unsatisfied_effects}")
+			return False, unsatisfied_effects
+		return True, []
 	
 if __name__	== "__main__":
 	# testing the executor
-	plans = unpickle_goal_node('planning/PDDL/coffee/goal_node_1.pkl')
-	print(plans)
+	plan = reverse_engineer_plan(unpickle_goal_node('planning/PDDL/coffee/goal_node_1.pkl'))
+	print(plan)

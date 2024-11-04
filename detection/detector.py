@@ -45,7 +45,7 @@ class Detector:
             callable_func = predicate['func']
             for comb in param_combinations:
                 truth_value = callable_func(*comb)
-                predicate_str = f'{predicate_name}({",".join(self._to_pddl_format(comb))})'
+                predicate_str = f'{predicate_name} {" ".join(self._to_pddl_format(comb))}'
                 groundings[predicate_str] = truth_value
         return groundings
     

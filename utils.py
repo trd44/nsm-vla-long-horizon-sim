@@ -18,7 +18,50 @@ def load_config(config_file):
         config = yaml.safe_load(file)
     return config
 
-config = load_config(config_file)
+def find_parentheses(self, s:str) -> Tuple[int, int]:
+        """returns the indices of the first opening and matching closing parentheses
+
+        Args:
+            s (str): the string to search
+
+        Returns:
+            Tuple[int, int]: the indices of the first opening and matching closing parentheses
+        """
+        count = 0
+        start = 0
+        for i, c in enumerate(s):
+            if c == '(':
+                if count == 0:
+                    start = i
+                count += 1
+            elif c == ')':
+                count -= 1
+                if count == 0:
+                    return start + 1, i
+        return -1, -1
+
+def split_by_parentheses(self, s:str, type='operator_predicates') -> List[str]:
+    """splits a string by parentheses
+
+    Args:
+        s (str): the string to split
+
+    Returns:
+        List[str]: the list of strings
+    """
+    if type=='operator_predicates':
+        if s.find('and') == -1:
+            return [s]
+    parts = []
+    start = 0
+    while start < len(s):
+        part_start, part_end = self._find_parentheses(s[start:])
+        if part_start == -1:
+            break
+        # add the part inside the parenthesis
+        parts.append(s[start + part_start:start + part_end])
+        start += part_end + 1
+    return parts
 
 @tool
 def verify_predicates_domain(old_domain:str, new_domain:str, structure="pddl"):

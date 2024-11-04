@@ -67,24 +67,24 @@ class HybridSymbolicLLMPlanner:
         # the string between `:parameters` and :precondition is the parameters
         param_start = operator.find(':parameter')
         param_end = operator.find(':precondition')
-        p = self._find_parentheses(operator[param_start:param_end])
+        p = find_parentheses(operator[param_start:param_end])
         parameters = operator[param_start+p[0]:param_start+p[1]]
         # split the parameters into a list of parameters at the space before the `?` but keep the `?`
         parameters = ['?' + param.strip() for param in parameters.split('?') if param]
         # the string between `:precondition` and :effects is the precondition
         precondition_start = operator.find(':precondition')
         precondition_end = operator.find(':effects')
-        p = self._find_parentheses(operator[precondition_start:precondition_end])
+        p = find_parentheses(operator[precondition_start:precondition_end])
         precondition = operator[precondition_start+p[0]:precondition_start+p[1]]
         # split the precondition into a list of predicates by matching parentheses
-        precondition = [f'({condition})' for condition in self._split_by_parentheses(precondition)]
+        precondition = [f'({condition})' for condition in split_by_parentheses(precondition)]
         # the string between `:effects` and the end of the operator is the effects
         effects_start = operator.find(':effect')
         effects_end = operator.find('\n)', effects_start)
-        p = self._find_parentheses(operator[effects_start:effects_end])
+        p = find_parentheses(operator[effects_start:effects_end])
         effects = operator[effects_start+p[0]:effects_start+p[1]]
         # split the effects into a list of predicates by matching parentheses
-        effects = [f'({condition})' for condition in self._split_by_parentheses(effects)]
+        effects = [f'({condition})' for condition in split_by_parentheses(effects)]
         return OperatorCandidate(operator_name, parameters, precondition, effects)
 
 
@@ -229,14 +229,14 @@ class HybridSymbolicLLMPlanner:
         novel_objects = ", ".join(self.novel_objects)
         # the `(:objects...)` section of the domain text
         types_start = self.reader.domain_text.find('(:types')
-        parentheses = self._find_parentheses(self.reader.domain_text[types_start:])
+        parentheses = find_parentheses(self.reader.domain_text[types_start:])
         object_types = self.reader.domain_text[types_start:types_start+parentheses[1]]
 
         # predicates are in the section `:predicates` of domain text
         preds_start = self.reader.domain_text.find('(:predicates')
         preds_end = self.reader.domain_text.find('(:action')
         preds_section = self.reader.domain_text[preds_start:preds_end]
-        parentheses = self._find_parentheses(preds_section)
+        parentheses = find_parentheses(preds_section)
         preds = preds_section[parentheses[0]:parentheses[1]]
 
         # get existing operators
@@ -268,7 +268,7 @@ class HybridSymbolicLLMPlanner:
             proposed_operator_start:int = out.find('(:action')
             if proposed_operator_start == -1:
                 return ''
-            proposed_operator_parentheses:tuple = self._find_parentheses(out[proposed_operator_start:])
+            proposed_operator_parentheses:tuple = find_parentheses(out[proposed_operator_start:])
             proposed_operator_str:str = out[proposed_operator_start + proposed_operator_parentheses[0] - 1:proposed_operator_start + proposed_operator_parentheses[1]+1] # include the parantheses
             return proposed_operator_str
         
@@ -592,52 +592,6 @@ class HybridSymbolicLLMPlanner:
                 else: # add all that evaluate to False to false_atoms
                     false_atoms.append(negated_comb_string)
         return set(true_atoms), set(false_atoms)
-
-
-    def _find_parentheses(self, s:str) -> Tuple[int, int]:
-            """returns the indices of the first opening and matching closing parentheses
-
-            Args:
-                s (str): the string to search
-
-            Returns:
-                Tuple[int, int]: the indices of the first opening and matching closing parentheses
-            """
-            count = 0
-            start = 0
-            for i, c in enumerate(s):
-                if c == '(':
-                    if count == 0:
-                        start = i
-                    count += 1
-                elif c == ')':
-                    count -= 1
-                    if count == 0:
-                        return start + 1, i
-            return -1, -1
-
-    def _split_by_parentheses(self, s:str, type='operator_predicates') -> List[str]:
-        """splits a string by parentheses
-
-        Args:
-            s (str): the string to split
-
-        Returns:
-            List[str]: the list of strings
-        """
-        if type=='operator_predicates':
-            if s.find('and') == -1:
-                return [s]
-        parts = []
-        start = 0
-        while start < len(s):
-            part_start, part_end = self._find_parentheses(s[start:])
-            if part_start == -1:
-                break
-            # add the part inside the parenthesis
-            parts.append(s[start + part_start:start + part_end])
-            start += part_end + 1
-        return parts
 
     
 if __name__ == '__main__':
