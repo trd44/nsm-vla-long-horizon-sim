@@ -54,7 +54,7 @@ class Executor_RL(Executor):
 			except:
 				obs, reward, done, info = env.step(action)
 			step_executor += 1
-			success = self.Termination(operator=operator, env=env)
+			success = self.check_effects(detector)
 			if step_executor > 500:
 				done = True
 			if render:
@@ -99,7 +99,7 @@ class Executor_RL(Executor):
 			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the effects hold and a set of unintended effects
 		"""
 		effects:set = set(effect.pddl_repr() for effect in self.operator.effects)
-		precond_satisfied, unsatisfied_preconditions = self.check_precondition(detector)
+		_, unsatisfied_preconditions = self.check_precondition(detector)
 		# check whether there are elements in unsatisfied_preconditions that are not in effects
 		unintended_effects = unsatisfied_preconditions - effects
 		if len(unintended_effects) > 0:
