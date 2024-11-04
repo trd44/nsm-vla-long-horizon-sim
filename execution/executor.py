@@ -54,7 +54,7 @@ class Executor_RL(Executor):
 			except:
 				obs, reward, done, info = env.step(action)
 			step_executor += 1
-			success = self.check_effects(detector)
+			success, _ = self.check_effects(detector)
 			if step_executor > 500:
 				done = True
 			if render:
