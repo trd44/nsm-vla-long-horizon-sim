@@ -20,7 +20,7 @@ class PickUpFromTabletopExecutor(Executor):
         obs = detector.get_obs()
         
         #TODO: code the execution of the pick-up-from-tabletop loop
-        raise NotImplementedError
+        
 
 class OpenCoffeePodHolder(Executor):
     def __init__(self):
@@ -41,7 +41,7 @@ class OpenCoffeePodHolder(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the open-coffee-pod-holder loop
-        raise NotImplementedError
+        
     
 class CloseCoffeePodHolder(Executor):
     def __init__(self):
@@ -62,7 +62,7 @@ class CloseCoffeePodHolder(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the close-coffee-pod-holder loop
-        raise NotImplementedError 
+         
 
 class FreeGripperFromLargeObject(Executor):
     def __init__(self):
@@ -83,7 +83,7 @@ class FreeGripperFromLargeObject(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the free-gripper-from-large-object loop
-        raise NotImplementedError
+        
     
 class PlacePodInHolderFromGripper(Executor):
     def __init__(self):
@@ -104,7 +104,7 @@ class PlacePodInHolderFromGripper(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the place-pod-in-holder-from-gripper loop
-        raise NotImplementedError
+        
 
 class PlaceMugUnderHolderFromGripper(Executor):
     def __init__(self):
@@ -125,7 +125,7 @@ class PlaceMugUnderHolderFromGripper(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the place-mug-under-holder-from-gripper loop
-        raise NotImplementedError
+        
     
 
 
