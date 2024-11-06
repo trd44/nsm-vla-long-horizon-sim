@@ -19,7 +19,7 @@ class PickUpNutFromTabletopExecutor(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the pick-up-nut-from-tabletop loop
-        raise NotImplementedError
+        
 
 class PutNutOnPeg(Executor):
     def __init__(self):
@@ -40,4 +40,4 @@ class PutNutOnPeg(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the pick-up-nut-from-tabletop loop
-        raise NotImplementedError
+        
