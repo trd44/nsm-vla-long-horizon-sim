@@ -24,13 +24,18 @@ class Executor():
 	def path_to_json(self):
 		return {self.name:self.policy}
 	
-	def execute(self):
+	def execute(self, detector:Detector, grounded_operator:fs.Action):
 		"""Execute the operator
 
-		Raises:
-			NotImplementedError: This method should be implemented by the subclass
+		Args:
+			detector (Detector): the detector
+			grounded_operator (fs.Action): the grounded operator to execute
 		"""
-		raise NotImplementedError
+		print("Executing operator")
+		grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+		assert grounded_operator_name == self.name, f"Expected operator {self.name} but got {grounded_operator_name}"
+		
+		raise NotImplementedError("The execute method must be implemented in the subclass")
 
 class Executor_RL(Executor):
 	def __init__(self, operator_name:str, alg:str, policy):

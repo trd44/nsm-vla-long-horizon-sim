@@ -1,4 +1,5 @@
 import os
+import dill
 import importlib
 import execution.executor
 import planning
@@ -18,6 +19,35 @@ class HybridPlanningLearningAgent:
         self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(config_file)
         self.env = self._load_env()
         self.detector = self._load_detector()
+    
+    def plan_learn_execute(self):
+        """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file, learn a policy for each of the newly defined operators and execute each operator in the plan
+        """
+        executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_detector')
+
+        EXECUTORS = getattr(executor_module, self.domain.upper()+'_EXECUTORS')
+        plan:List[fs.Action] = self.plan()
+        for grounded_operator in plan:
+            grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+            # unpickle the .pkl files in the domain executor directory
+            learned_executors = {}
+            for file in os.listdir(self.config['execution_dir']+'/'+self.domain):
+                if file.endswith(".pkl"):
+                    with open(file, 'rb') as f:
+                        learned_executor:execution.executor.Executor = dill.load(f)
+                        learned_executors[learned_executor.name] = learned_executor
+            
+            # check if the operator has an executor
+            if grounded_operator_name in EXECUTORS: # operator has an executor
+                executor:execution.executor.Executor = EXECUTORS[grounded_operator_name]
+                executor.execute(self.detector, grounded_operator)
+            elif grounded_operator_name in learned_executors: # operator has a learned executor
+                learned_executors[grounded_operator_name].execute(self.detector, grounded_operator)
+            else: # operator does not have an executor
+                # learn the operator
+                self.learn_operator(grounded_operator)
+
+
     
     def plan(self) -> List[List[fs.Action]]:
         """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file
