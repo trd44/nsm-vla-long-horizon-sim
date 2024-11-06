@@ -1,5 +1,6 @@
 import os
 import importlib
+import execution.executor
 import planning
 import execution
 import learning
@@ -36,8 +37,8 @@ class HybridPlanningLearningAgent:
         Args:
             operator (fs.Action): the operator to execute
         """
-        executor = execution.Executor(self.env, operator)
-        executor.execute()
+        executor = execution.executor.ExecutorRL(operator, "sac")
+        executor.execute(self.detector)
         
     def learn_operator(self, operator:fs.Action):
         """Train an RL agent to learn the operator.
@@ -111,6 +112,6 @@ class HybridPlanningLearningAgent:
 
 if __name__ == '__main__':
     agent = HybridPlanningLearningAgent()
-    print(agent.detector)
+    
 
     

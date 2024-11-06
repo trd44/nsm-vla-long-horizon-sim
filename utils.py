@@ -167,8 +167,20 @@ def write_file(file_path:str, content:str):
         with open(file_path, 'w') as file:
             file.write(content)
             return True
-    except e:
+    except Exception as e:
         return e
+
+def extract_name_params_from_grounded(grounded_operator:str):
+    """extract the name and parameters from a grounded operator such as `pick-up-from-tabletop(mug1, table1, gripper1)`
+
+    Args:
+        grounded_operator (str): the grounded operator
+    """
+    # extract the name
+    name = grounded_operator.split('(')[0]
+    # extract the parameters into a list
+    params = grounded_operator.split('(')[1].replace(')', '').split(', ')
+    return name, params
 
 
 def parse_pddl_types(pddl_content):

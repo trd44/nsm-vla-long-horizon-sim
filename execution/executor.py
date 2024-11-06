@@ -16,28 +16,37 @@ def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
     return model
 
 class Executor():
-	def __init__(self, mode, operator:fs.Action, policy):
-		super().__init__()
-		self.id = self.operator.name
+	def __init__(self, mode, operator_name:str, policy):
+		self.name = operator_name
 		self.mode = mode
-		self.operator = operator
 		self.policy = policy
 
 	def path_to_json(self):
-		return {self.id:self.policy}
+		return {self.name:self.policy}
+	
+	def execute(self):
+		"""Execute the operator
+
+		Raises:
+			NotImplementedError: This method should be implemented by the subclass
+		"""
+		raise NotImplementedError
 
 class Executor_RL(Executor):
-	def __init__(self, alg:str, operator:fs.Action, policy):
-		super().__init__("RL", operator, policy)
+	def __init__(self, operator_name:str, alg:str, policy):
+		super().__init__("RL", operator_name=operator_name, policy=policy)
 		self.alg = alg
 		self.model = None
 
-	def execute(self, detector:Detector, render=False):
+	def execute(self, detector:Detector, grounded_operator:fs.Action, render=False):
 		'''
 		This method is responsible for executing the policy on the given state. It takes a state as a parameter and returns the action 
 		produced by the policy on that state. 
 		'''
 		print("Loading policy {}".format(self.policy))
+		# check that the grounded operator is the same as the operator to be executed
+		grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+		assert grounded_operator_name == self.name, f"Expected operator {self.name} but got {grounded_operator_name}"
 		env = detector.get_env()
 		obs = detector.get_obs()
 		if self.model is None:
@@ -70,7 +79,7 @@ class Executor_RL(Executor):
 			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the precondition holds and a set of unsatisfied preconditions
 		"""
 		groundings = detector.get_groundings()
-		precondition = self.operator.precondition
+		precondition = self.grounded_operator.precondition
 		unsatisfied_conditions = set()
 		for precond in precondition.subformulas: # assume precondition is a conjunction of literals
 			# account for the fact that some preconditions are negated e.g. `not(free(gripper1))`
@@ -98,7 +107,7 @@ class Executor_RL(Executor):
 		Returns;
 			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the effects hold and a set of unintended effects
 		"""
-		effects:set = set(effect.pddl_repr() for effect in self.operator.effects)
+		effects:set = set(effect.pddl_repr() for effect in self.grounded_operator.effects)
 		_, unsatisfied_preconditions = self.check_precondition(detector)
 		# check whether there are elements in unsatisfied_preconditions that are not in effects
 		unintended_effects = unsatisfied_preconditions - effects
