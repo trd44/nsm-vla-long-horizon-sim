@@ -96,4 +96,11 @@ class PlaceInDrawerFromGripper(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the place-in-drawer-from-gripper loop
-    
+
+CLEANUP_EXECUTORS = {
+    "pick-up-from-tabletop": PickUpFromTabletop(),
+    "free-gripper-from-large-object": FreeGripperFromLargeObject(),
+    "open-drawer": OpenDrawer(),
+    "close-drawer": CloseDrawer(),
+    "place-in-drawer-from-gripper": PlaceInDrawerFromGripper()
+}
