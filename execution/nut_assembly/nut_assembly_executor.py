@@ -40,4 +40,9 @@ class PutNutOnPeg(Executor):
         obs = detector.get_obs()
 
         #TODO: code the execution of the pick-up-nut-from-tabletop loop
+
+NUT_ASSEMBLY_EXECUTORS = {
+    "pick-up-nut-from-tabletop": PickUpNutFromTabletopExecutor(),
+    "put-nut-on-peg": PutNutOnPeg()
+}
         
