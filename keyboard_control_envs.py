@@ -11,9 +11,9 @@ from robosuite.utils.input_utils import input2action
 from robosuite.wrappers import VisualizationWrapper
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-from detectors.coffee_detector import Coffee_Detector
-from detectors.cleanup_detector import Cleanup_Detector
-from detectors.nut_assembly_detector import NutAssemblyDetector
+from detection.coffee_detector import Coffee_Detector
+from detection.cleanup_detector import Cleanup_Detector
+from detection.nut_assembly_detector import NutAssemblyDetector
 import numpy as np
 
 
