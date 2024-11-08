@@ -24,56 +24,22 @@ class Executor():
 	def path_to_json(self):
 		return {self.name:self.policy}
 	
-	def execute(self, detector:Detector, grounded_operator:fs.Action):
+	def execute(self, detector:Detector, grounded_operator:fs.Action) -> bool:
 		"""Execute the operator
 
 		Args:
 			detector (Detector): the detector
 			grounded_operator (fs.Action): the grounded operator to execute
+		Returns:
+			bool: True if the operator was executed successfully
 		"""
 		print("Executing operator")
 		grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
 		assert grounded_operator_name == self.name, f"Expected operator {self.name} but got {grounded_operator_name}"
+		precond_satisfied, unsatisfied_preconditions = self.check_precondition(detector)
+		assert precond_satisfied, f"Unsatisfied preconditions: {unsatisfied_preconditions}"
 		
 		raise NotImplementedError("The execute method must be implemented in the subclass")
-
-class Executor_RL(Executor):
-	def __init__(self, operator_name:str, alg:str, policy):
-		super().__init__("RL", operator_name=operator_name, policy=policy)
-		self.alg = alg
-		self.model = None
-
-	def execute(self, detector:Detector, grounded_operator:fs.Action, render=False):
-		'''
-		This method is responsible for executing the policy on the given state. It takes a state as a parameter and returns the action 
-		produced by the policy on that state. 
-		'''
-		print("Loading policy {}".format(self.policy))
-		# check that the grounded operator is the same as the operator to be executed
-		grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
-		assert grounded_operator_name == self.name, f"Expected operator {self.name} but got {grounded_operator_name}"
-		env = detector.get_env()
-		obs = detector.get_obs()
-		if self.model is None:
-			self.model = load_policy(self.alg, env, self.policy, seed=0)
-		step_executor = 0
-		done = False
-		success = False
-		
-		while not done:
-			action, _states = self.model.predict(obs)
-			try: 
-				obs, reward, terminated, truncated, info = env.step(action)
-				done = terminated or truncated
-			except:
-				obs, reward, done, info = env.step(action)
-			step_executor += 1
-			success, _ = self.check_effects(detector)
-			if step_executor > 500:
-				done = True
-			if render:
-				env.render()
-		return obs, success
 	
 	def check_precondition(self, detector:Detector) -> Tuple[bool, Set[str]]:
 		"""check that the precondition of the operator holds in the current state
@@ -138,6 +104,45 @@ class Executor_RL(Executor):
 			logging.warning(f"Unsatisfied effects: {unsatisfied_effects}")
 			return False, unsatisfied_effects
 		return True, []
+
+class Executor_RL(Executor):
+	def __init__(self, operator_name:str, alg:str, policy):
+		super().__init__("RL", operator_name=operator_name, policy=policy)
+		self.alg = alg
+		self.model = None
+
+	def execute(self, detector:Detector, grounded_operator:fs.Action, render=False):
+		'''
+		This method is responsible for executing the policy on the given state. It takes a state as a parameter and returns the action 
+		produced by the policy on that state. 
+		'''
+		print("Loading policy {}".format(self.policy))
+		# check that the grounded operator is the same as the operator to be executed
+		grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+		assert grounded_operator_name == self.name, f"Expected operator {self.name} but got {grounded_operator_name}"
+		env = detector.get_env()
+		obs = detector.get_obs()
+		if self.model is None:
+			self.model = load_policy(self.alg, env, self.policy, seed=0)
+		step_executor = 0
+		done = False
+		success = False
+		
+		while not done:
+			action, _states = self.model.predict(obs)
+			try: 
+				obs, reward, terminated, truncated, info = env.step(action)
+				done = terminated or truncated
+			except:
+				obs, reward, done, info = env.step(action)
+			step_executor += 1
+			success, _ = self.check_effects(detector)
+			if step_executor > 500:
+				done = True
+			if render:
+				env.render()
+		return obs, success
+	
 	
 if __name__	== "__main__":
 	# testing the executor

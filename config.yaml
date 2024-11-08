@@ -10,6 +10,9 @@ execution_dir: "execution"
 learning_dir: "learning"
 detection_dir: "detection"
 
+plan_learn_execute:
+  max_iter: 100
+
 # parameters for RL
 learning:
   batch_size: 256 # default

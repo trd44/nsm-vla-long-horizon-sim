@@ -1,5 +1,4 @@
 import os
-import execution
 import execution.executor
 from tarski import fstrips as fs
 from robosuite.robosuite.wrappers import GymWrapper
@@ -19,6 +18,7 @@ class Learner:
         Returns:
             execution.executor.Executor_RL: an RL executor for the operator and executes the policy for the operator when called
         """
+        # TODO: add a customeval callback and pass it into `model.save`
         model = SAC(
             "MlpPolicy",
             env = self.env,
@@ -28,4 +28,5 @@ class Learner:
         model.learn(
             total_timesteps=self.config['timesteps'])
         model.save(f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model')
+        # TODO: create an Executor_RL object associated with the newly learned policy. Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
     
