@@ -16,7 +16,7 @@ class HybridPlanningLearningAgent:
     def __init__(self, config_file='config.yaml'):
         self.config:dict = load_config(config_file)
         self.domain:str = self.config['domain'].split('_domain.')[0]
-        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(config_file)
+        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config['planning'])
         self.env = self._load_env()
         self.detector = self._load_detector()
     
@@ -31,7 +31,6 @@ class HybridPlanningLearningAgent:
                 if not learning_successful:
                     raise Exception(f"Learning of operator {grounded_operator} failed")
                 self.execute_operator(grounded_operator)
-
 
     
     def plan(self) -> List[List[fs.Action]]:

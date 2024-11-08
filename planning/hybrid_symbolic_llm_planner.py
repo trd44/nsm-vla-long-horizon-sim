@@ -24,8 +24,8 @@ from utils import *
 
 
 class HybridSymbolicLLMPlanner:
-    def __init__(self, config_file='config.yaml'):
-        self.config = load_config(config_file)
+    def __init__(self, config:dict):
+        self.config = config
         self.reader = FstripsReader(raise_on_error=True)
         self.parse_domain()
         self.starting_problem = self.parse_problem()
