@@ -9,6 +9,20 @@ image_path: "images/agent_view.jpg"
 execution_dir: "execution"
 learning_dir: "learning"
 detection_dir: "detection"
+
+# parameters for RL
+learning:
+  batch_size: 256 # default
+  buffer_size: 1000000
+  learning_rate: 0.0003
+  learning_starts: 10000
+  policy_kwargs:
+    net_arch: [512, 512, 256]
+  seed: 0
+  tau: 0.005, # default
+  timesteps: 5000000
+  gamma: 0.99, # default
+  verbose: 1
 # setting for testing PDDL. Uncoment when testing.
 
 planning_dir: "planning/PDDL/coffee"
