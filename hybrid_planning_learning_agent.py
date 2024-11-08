@@ -40,6 +40,12 @@ class HybridPlanningLearningAgent:
         Returns:
             List[fs.Action]: a list a sequence of actions to achieve the goal a.k.a the plans
         """
+        # try loading the plan from the planning directory in case it has already been generated
+        plan = self._load_plan()
+        if plan is not None:
+            return plan
+        
+        # the plan has not been generated yet, so generate it
         _, _, plans = self.planner.search()
         # for this project, we just care about the first plan
         if len(plans) > 0:
@@ -73,13 +79,13 @@ class HybridPlanningLearningAgent:
         elif grounded_operator_name in learned_executors: # operator has a learned executor
             learned_executors[grounded_operator_name].execute(self.detector, grounded_operator)
         
-    def learn_operator(self, operator:fs.Action):
+    def learn_operator(self, grounded_operator:fs.Action):
         """Train an RL agent to learn the operator.
 
         Args:
-            operator (fs.Action): the operator to learn
+            grounded_operator (fs.Action): the grounded operator to learn such as open-drawer(drawer1)
         """
-        learner = learning.learner.Learner(self.env, self.domain, operator)
+        learner = learning.learner.Learner(self.env, self.domain, grounded_operator, self.config['learning'])
         return learner.learn()
 
     def _load_plan(self):
@@ -105,6 +111,8 @@ class HybridPlanningLearningAgent:
             return largest_file, largest_number
         
         goal_node_pkl, _ = find_file_with_largest_number(self.config['planning_dir'])
+        if goal_node_pkl is None:
+            return None
         goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
         plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
         return plan
