@@ -2,10 +2,10 @@ import os
 import dill
 import importlib
 import execution.executor
+import learning.learner
 import planning
 import execution
 import learning
-import mimicgen
 import planning.hybrid_symbolic_llm_planner
 import planning.planning_utils
 from utils import *
@@ -23,29 +23,14 @@ class HybridPlanningLearningAgent:
     def plan_learn_execute(self):
         """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file, learn a policy for each of the newly defined operators and execute each operator in the plan
         """
-        executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_detector')
-
-        EXECUTORS = getattr(executor_module, self.domain.upper()+'_EXECUTORS')
         plan:List[fs.Action] = self.plan()
         for grounded_operator in plan:
-            grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
-            # unpickle the .pkl files in the domain executor directory
-            learned_executors = {}
-            for file in os.listdir(self.config['execution_dir']+'/'+self.domain):
-                if file.endswith(".pkl"):
-                    with open(file, 'rb') as f:
-                        learned_executor:execution.executor.Executor = dill.load(f)
-                        learned_executors[learned_executor.name] = learned_executor
-            
-            # check if the operator has an executor
-            if grounded_operator_name in EXECUTORS: # operator has an executor
-                executor:execution.executor.Executor = EXECUTORS[grounded_operator_name]
-                executor.execute(self.detector, grounded_operator)
-            elif grounded_operator_name in learned_executors: # operator has a learned executor
-                learned_executors[grounded_operator_name].execute(self.detector, grounded_operator)
-            else: # operator does not have an executor
-                # learn the operator
-                self.learn_operator(grounded_operator)
+            execution_successful = self.execute_operator(grounded_operator)
+            if not execution_successful:
+                learning_successful = self.learn_operator(grounded_operator)
+                if not learning_successful:
+                    raise Exception(f"Learning of operator {grounded_operator} failed")
+                self.execute_operator(grounded_operator)
 
 
     
@@ -61,14 +46,32 @@ class HybridPlanningLearningAgent:
             return plans[0]
         raise Exception("No plan found")
     
-    def execute_operator(self, operator:fs.Action):
+    def execute_operator(self, grounded_operator:fs.Action) -> bool:
         """execute the operator in the simulation environment
 
         Args:
-            operator (fs.Action): the operator to execute
+            grounded_operator (fs.Action): the operator to execute
+        Returns:
+            bool: True if the operator was executed successfully
         """
-        executor = execution.executor.ExecutorRL(operator, "sac")
-        executor.execute(self.detector)
+        executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_detector')
+
+        EXECUTORS = getattr(executor_module, self.domain.upper()+'_EXECUTORS')
+        grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+        # unpickle the .pkl files in the domain executor directory
+        learned_executors = {}
+        for file in os.listdir(self.config['execution_dir']+'/'+self.domain):
+            if file.endswith(".pkl"):
+                with open(file, 'rb') as f:
+                    learned_executor:execution.executor.Executor = dill.load(f)
+                    learned_executors[learned_executor.name] = learned_executor
+        
+        # check if the operator has an executor
+        if grounded_operator_name in EXECUTORS: # operator has an executor
+            executor:execution.executor.Executor = EXECUTORS[grounded_operator_name]
+            executor.execute(self.detector, grounded_operator)
+        elif grounded_operator_name in learned_executors: # operator has a learned executor
+            learned_executors[grounded_operator_name].execute(self.detector, grounded_operator)
         
     def learn_operator(self, operator:fs.Action):
         """Train an RL agent to learn the operator.
@@ -76,7 +79,7 @@ class HybridPlanningLearningAgent:
         Args:
             operator (fs.Action): the operator to learn
         """
-        learner = learning.Learner(self.env, self.domain, operator)
+        learner = learning.learner.Learner(self.env, self.domain, operator)
         return learner.learn()
 
     def _load_plan(self):
