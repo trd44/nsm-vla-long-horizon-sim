@@ -18,7 +18,8 @@ class OperatorWrapper(gym.Wrapper):
         self.config = config
 
     def step(self, action):
-        pass
+        obs, reward, done, _ = self.env.step(action)
+        reward = self.compute_reward()
 
     def reset(self):
         reset_success = False
@@ -42,7 +43,7 @@ class OperatorWrapper(gym.Wrapper):
         return obs, info
 
 
-    def compute_reward(self, achieved_goal, desired_goal, info):
+    def compute_reward(self):
         pass
 
 

@@ -14,6 +14,9 @@ class Detector:
     
     def get_obs(self):
         return self.obs
+    
+    def set_env(self, env):
+        self.env = env
 
     def update_obs(self, obs=None):
         """update the observation

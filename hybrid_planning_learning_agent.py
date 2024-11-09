@@ -97,7 +97,11 @@ class HybridPlanningLearningAgent:
             grounded_operator (fs.Action): the grounded operator to learn such as open-drawer(drawer1)
             executed_operators (List[fs.Action], optional): a list of operators that have been executed before the grounded operator. Defaults to [].
         """
-        learner = learning.learner.Learner(copy.deepcopy(self.env), self.domain, self.detector, grounded_operator, executed_operators, self.config)
+        env_copy = copy.deepcopy(self.env)
+        detector_copy = copy.deepcopy(self.detector)
+        detector_copy.set_env(env_copy)
+
+        learner = learning.learner.Learner(env_copy, self.domain, detector_copy, grounded_operator, executed_operators, self.config)
         learner.learn()
 
     def _load_plan(self):
