@@ -1,3 +1,4 @@
+import copy
 import os
 import dill
 import importlib
@@ -25,16 +26,18 @@ class HybridPlanningLearningAgent:
         while iteration < self.config['plan_learn_execute']['max_iter'] and not goal_achieved:
             self.env.reset()
             plan:List[fs.Action] = self.plan()
+            executed_operators:Dict[fs.Action:execution.executor.Executor] = {}
             while len(plan) > 0:
                 grounded_operator = plan.pop(0)
-                executor_exists, execution_successful = self.execute_operator(grounded_operator)
+                executor_exists, execution_successful, executor = self.execute_operator(grounded_operator)
                 if not executor_exists:
-                    self.learn_operator(grounded_operator)
+                    self.learn_operator(grounded_operator, executed_operators)
                     # if not learning_successful:
                     #     raise Exception(f"Learning of operator {grounded_operator} failed")
-                    _, execution_successful = self.execute_operator(grounded_operator)
+                    _, execution_successful, executor = self.execute_operator(grounded_operator)
                 if not execution_successful: # restart the `plan_learn_execute` loop
                     break
+                executed_operators[grounded_operator] = executor
             iteration += 1
             goal_achieved = len(plan) == 0 and execution_successful
 
@@ -57,13 +60,13 @@ class HybridPlanningLearningAgent:
             return plans[0]
         raise Exception("No plan found")
     
-    def execute_operator(self, grounded_operator:fs.Action) -> Tuple[bool, bool]:
+    def execute_operator(self, grounded_operator:fs.Action) -> Tuple[bool, bool, execution.executor.Executor]:
         """execute the operator in the simulation environment
 
         Args:
             grounded_operator (fs.Action): the operator to execute
         Returns:
-            Tuple[bool, bool]: a tuple of a boolean value indicating whether the operator's executor exists and a boolean value indicating whether the operator was executed successfully
+            Tuple[bool, bool, execution.executor.Executor]: a tuple containing a boolean indicating whether the operator has an executor, a boolean indicating whether the operator was executed successfully, and the executor object of the operator.
         """
         executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_detector')
 
@@ -87,13 +90,14 @@ class HybridPlanningLearningAgent:
         execution_successful = executor.execute(self.detector, grounded_operator)
         return True, execution_successful
         
-    def learn_operator(self, grounded_operator:fs.Action):
+    def learn_operator(self, grounded_operator:fs.Action, executed_operators:List[fs.Action]=[]):
         """Train an RL agent to learn the operator.
 
         Args:
             grounded_operator (fs.Action): the grounded operator to learn such as open-drawer(drawer1)
+            executed_operators (List[fs.Action], optional): a list of operators that have been executed before the grounded operator. Defaults to [].
         """
-        learner = learning.learner.Learner(self.env, self.domain, grounded_operator, self.config['learning'])
+        learner = learning.learner.Learner(copy.deepcopy(self.env), self.domain, self.detector, grounded_operator, executed_operators, self.config)
         learner.learn()
 
     def _load_plan(self):
