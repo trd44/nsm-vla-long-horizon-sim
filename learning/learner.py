@@ -2,6 +2,7 @@ import os
 import detection.detector
 import execution.executor
 import gymnasium as gym
+import importlib
 from tarski import fstrips as fs
 from robosuite.robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC
@@ -18,8 +19,19 @@ class OperatorWrapper(gym.Wrapper):
         self.config = config
 
     def step(self, action):
-        obs, reward, done, _ = self.env.step(action)
-        reward = self.compute_reward()
+        try:
+            obs, reward, done, truncated, info = self.env.step(action)
+        except:
+            obs, reward, done, info = self.env.step(action)
+        truncated = truncated or self.env.done
+        self.detector.update_obs()
+        obs:dict = self.detector.get_obs()
+        binary_states_with_semantics:dict = self.detector.get_groundings()
+        # combine obs with binary_states_with_semantics
+        obs.update(binary_states_with_semantics)
+        reward = self.compute_reward(obs)
+        #TODO: may need to turn obs into a numpy array
+        return obs, reward, done, truncated, info
 
     def reset(self):
         reset_success = False
@@ -43,8 +55,20 @@ class OperatorWrapper(gym.Wrapper):
         return obs, info
 
 
-    def compute_reward(self):
-        pass
+    def compute_reward(self, obs:dict) -> float:
+        """compute the reward by calling a LLM generated reward function on an observation with semantics
+
+        Args:
+            obs (dict): the observation with semantics
+
+        Returns:
+            float: the reward
+        """
+        llm_reward_func_module = importlib.import_module(f'learning.reward_functions.{self.config['planning']['domain']}.{self.grounded_operator.name}')
+
+        llm_reward_func = getattr(llm_reward_func_module, 'reward')
+        reward = llm_reward_func(obs)
+        return reward
 
 
 class Learner:
