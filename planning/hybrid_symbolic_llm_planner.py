@@ -18,7 +18,7 @@ from tarski import fstrips as fs
 from tarski.evaluators.simple import evaluate
 from tarski.model import Model
 from tarski.syntax.builtins import BuiltinPredicateSymbol
-from VLM.TreeOfThoughts import *
+from VLM.LlmApi import *
 from VLM.TreeOfThoughtsPrompts import *
 from utils import *
 
@@ -304,7 +304,7 @@ class HybridSymbolicLLMPlanner:
                 object_types = object_types,
                 existing_operators = existing_op_params_precond_effect_str,
             )
-            out = generate_thought(prompt)
+            out = chat_completion(prompt)
             self.llm_calls += 1
             return extract_operator_from_llm_output(out), extract_constants_from_llm_output(out)
         
@@ -335,7 +335,7 @@ class HybridSymbolicLLMPlanner:
                 proposed_operator_with_precondition=proposed_operator_w_precond_str
             )
  
-            out = generate_thought(prompt)
+            out = chat_completion(prompt)
             self.llm_calls += 1
             return extract_operator_from_llm_output(out)
         

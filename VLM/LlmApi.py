@@ -13,7 +13,9 @@ from langchain.agents import AgentExecutor
 from openai import OpenAI
 client = OpenAI()
 
-def generate_thought(prompt:str) -> str:
+config = load_config('config.yaml')
+
+def chat_completion(prompt:str) -> str:
     """Generate a thought based on the given prompt.
 
     Args:
