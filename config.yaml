@@ -17,6 +17,12 @@ plan_learn_execute:
 learning:
   batch_size: 256 # default
   buffer_size: 1000000
+  eval:
+    eval_freq: 10000 # default
+    n_eval_episodes: 5
+    deterministic: True,
+    render: False, 
+    verbose: 1
   learning_rate: 0.0003
   learning_starts: 10000
   policy_kwargs:

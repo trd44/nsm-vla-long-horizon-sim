@@ -1,16 +1,118 @@
+import copy
 import os
 import detection.detector
 import execution.executor
 import gymnasium as gym
 import importlib
+import numpy as np
 from tarski import fstrips as fs
 from robosuite.robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import sync_envs_normalization
+from stable_baselines3.common.evaluation import evaluate_policy
 from typing import *
 from reward_functions.rewardFunctionPrompts import *
 from VLM.LlmApi import chat_completion
+
+class CustomEvalCallback(EvalCallback):
+    def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, verbose=1):
+        super(CustomEvalCallback, self).__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
+
+    def _on_step(self) -> bool:
+
+            continue_training = True
+
+            if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
+
+                # Sync training and eval env if there is VecNormalize
+                if self.model.get_vec_normalize_env() is not None:
+                    try:
+                        sync_envs_normalization(self.training_env, self.eval_env)
+                    except AttributeError as e:
+                        raise AssertionError(
+                            "Training and eval env are not wrapped the same way, "
+                            "see https://stable-baselines3.readthedocs.io/en/master/guide/callbacks.html#evalcallback "
+                            "and warning above."
+                        ) from e
+
+                # Reset success rate buffer
+                self._is_success_buffer = []
+
+                episode_rewards, episode_lengths = evaluate_policy(
+                    self.model,
+                    self.eval_env,
+                    n_eval_episodes=self.n_eval_episodes,
+                    render=self.render,
+                    deterministic=self.deterministic,
+                    return_episode_rewards=True,
+                    warn=self.warn,
+                    callback=self._log_success_callback,
+                )
+
+                if self.log_path is not None:
+                    self.evaluations_timesteps.append(self.num_timesteps)
+                    self.evaluations_results.append(episode_rewards)
+                    self.evaluations_length.append(episode_lengths)
+
+                    kwargs = {}
+                    # Save success log if present
+                    if len(self._is_success_buffer) > 0:
+                        self.evaluations_successes.append(self._is_success_buffer)
+                        kwargs = dict(successes=self.evaluations_successes)
+
+                    np.savez(
+                        self.log_path,
+                        timesteps=self.evaluations_timesteps,
+                        results=self.evaluations_results,
+                        ep_lengths=self.evaluations_length,
+                        **kwargs,
+                    )
+
+                mean_reward, std_reward = np.mean(episode_rewards), np.std(episode_rewards)
+                mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
+                self.last_mean_reward = mean_reward
+
+                if self.verbose > 0:
+                    print(f"Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                    print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                # Add to current Logger
+                self.logger.record("eval/mean_reward", float(mean_reward))
+                self.logger.record("eval/mean_ep_length", mean_ep_length)
+
+                if len(self._is_success_buffer) > 0:
+                    success_rate = np.mean(self._is_success_buffer)
+                    if self.verbose > 0:
+                        print(f"Success rate: {100 * success_rate:.2f}%")
+                    self.logger.record("eval/success_rate", success_rate)
+
+                # Dump log so the evaluation results are printed with the correct timestep
+                self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
+                self.logger.dump(self.num_timesteps)
+
+                if mean_reward > self.best_mean_reward:
+                    if self.verbose > 0:
+                        print("New best mean reward!")
+                    if self.best_model_save_path is not None:
+                        self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    self.best_mean_reward = mean_reward
+                    # Trigger callback on new best model, if needed
+                    if self.callback_on_new_best is not None:
+                        continue_training = self.callback_on_new_best.on_step()
+                
+                # Save the results in a csv file located in the second to last directory of log_path
+                # Split the log_path to get the second to last directory
+                csv_path = os.path.split(self.log_path)[0]
+                with open(os.path.join(csv_path, 'results_eval.csv'), 'a') as f:
+                    f.write("{},{},{},{}\n".format(self.num_timesteps, success_rate, mean_reward, mean_ep_length))
+                    f.close()
+
+                # Trigger callback after every evaluation, if needed
+                if self.callback is not None:
+                    continue_training = continue_training and self._on_event()
+
+            return continue_training
 
 class OperatorWrapper(gym.Wrapper):
     def __init__(self, env, detector:detection.detector.Detector, grounded_operator:fs.Action, executed_operators:Dict[fs.Action:execution.executor.Executor], config:dict):
@@ -136,6 +238,7 @@ class Learner:
         self.detector = detector
         self.domain = domain
         self.env = self._wrap_env(env)
+        self.eval_env = self._wrap_env(copy.deepcopy(env))
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self._llm_order_effects()
@@ -147,7 +250,18 @@ class Learner:
         Returns:
             execution.executor.Executor_RL: an RL executor for the operator and executes the policy for the operator when called
         """
-        # TODO: add a customeval callback and pass it into `model.save`
+        
+        eval_callback = CustomEvalCallback(
+            eval_env=self.eval_env,
+            best_model_save_path=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/best_model',
+            log_path=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/eval_logs',
+            eval_freq=self.config['learning']['eval']['eval_freq'],
+            n_eval_episodes=self.config['learning']['eval']['n_eval_episodes'],
+            deterministic=self.config['learning']['eval']['deterministic'],
+            render=self.config['learning']['eval']['render'],
+            verbose=self.config['learning']['eval']['verbose']
+        )
+
         model = SAC(
             "MlpPolicy",
             env = self.env,
@@ -155,8 +269,12 @@ class Learner:
             **self.config['learning']
         )
         model.learn(
-            total_timesteps=self.config['timesteps'])
-        model.save(f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model')
+            total_timesteps=self.config['timesteps'],
+            callback=eval_callback
+        )
+        model.save(
+            path = f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model'
+        )
         # TODO: create an Executor_RL object associated with the newly learned policy. Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
     
     def _llm_order_effects(self):
