@@ -10,21 +10,22 @@
     )
 
     (:init
-        (free gripper1)
-        (small-enough-for-gripper-to-pick-up mug1 gripper1)
-        (small-enough-for-gripper-to-pick-up block1 gripper1)
-        (small-enough-to-fit-in-container block1 drawer1)
-        (large-enough-for-gripper-to-reach-inside drawer1 gripper1)
-        (open mug1)
-        (in block1 mug1)
+        (closed drawer1)
         (directly-on-table mug1 table1)
         (directly-on-table drawer1 table1)
+        (free gripper1)
+        (inside block1 mug1)
+        (large-enough-for-gripper-to-reach-inside drawer1 gripper1)
+        (open-enough-to-fit-through mug1 block1)
+        (small-enough-for-gripper-to-pick-up mug1 gripper1)
+        (small-enough-for-gripper-to-pick-up block1 gripper1)
     )
 
     (:goal
         (and
-            (in block1 drawer1)
-            (not (open drawer1))
+            (inside block1 drawer1)
+            (not (inside mug1 drawer1))
+            (closed drawer1)
         )
     )
 )

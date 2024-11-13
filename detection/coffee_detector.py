@@ -228,3 +228,26 @@ class Coffee_Detector(Detector):
         """
         assert self._is_type(mug, 'mug') and self._is_type(coffee_pod_holder, 'coffee_pod_holder')
         return self.env.check_mug_under_pod_holder()
+    
+    def _is_type(self, obj, obj_type):
+        """Returns True if the object is of the specified type.
+
+        Args:
+            obj (str): the object
+            obj_type (str): the object type
+
+        Returns:
+            bool: True if the object is of the specified type
+        """
+        return obj in self.object_types[obj_type]
+    
+    def _to_pddl_format(self, objs):
+        """Converts the grounded object to their pddl format.
+
+        Args:
+            objs (List[str]): the grounded objects
+
+        Returns:
+            List[str]: the pddl objects
+        """
+        return [self.grounded_object_to_pddl_object.get(obj) for obj in objs]

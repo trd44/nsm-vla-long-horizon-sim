@@ -29,22 +29,22 @@ class HybridSymbolicLLMPlanner:
         self.reader = FstripsReader(raise_on_error=True)
         self.parse_domain()
         self.starting_problem = self.parse_problem()
-        self.max_new_operators_branching_factor = self.config['max_new_operators_branching_factor']
+        self.max_new_operators_branching_factor = self.config['planning']['max_new_operators_branching_factor']
         self.llm_calls = 0
-        self.max_depth = self.config['max_depth']
-        self.max_num_llm_calls = self.config['max_num_llm_calls']
-        self.novel_objects = self.config['novel_objects']
+        self.max_depth = self.config['planning']['max_depth']
+        self.max_num_llm_calls = self.config['planning']['max_num_llm_calls']
+        self.novel_objects = self.config['planning']['novel_objects']
     
     def parse_domain(self):
         """parses the initial domain file
         """
-        domain_file_path = self.config['planning_dir'] + os.sep + self.config['init_planning_domain']
+        domain_file_path = self.config['planning']['planning_dir'] + os.sep + self.config['planning']['init_planning_domain']
         self.reader.parse_domain(domain_file_path)
     
     def parse_problem(self):
         """parses the problem file
         """
-        problem_file_path = self.config['planning_dir'] + os.sep + self.config['planning_problem']
+        problem_file_path = self.config['planning']['planning_dir'] + os.sep + self.config['planning']['planning_problem']
         problem = self.reader.parse_instance(problem_file_path)
         return problem
     
@@ -342,7 +342,7 @@ class HybridSymbolicLLMPlanner:
         # prompt the LLM for `num_self_consistency_candidates` number of operators
         counter = OperatorCandidateCounter()
         # query LLM for the name and parameters of the operator
-        for _ in range(self.config['num_op_candidates']):
+        for _ in range(self.config['planning']['num_op_candidates']):
             proposed_op_str, grounded_params = prompt_llm_for_operator_name_params()
             if proposed_op_str == '': # LLM decided not to propose an operator
                 proposed_op:OperatorCandidate = OperatorCandidate('')
@@ -361,7 +361,7 @@ class HybridSymbolicLLMPlanner:
                 proposed_op = self.parse_operator(proposed_op_w_effects_str)
             counter.add_operator_candidate(proposed_op)
             # early stopping if there's a majority candidate
-            if counter.get_max_operator_candidate() > self.config['num_op_candidates'] // 2:
+            if counter.get_max_operator_candidate() > self.config['planning']['num_op_candidates'] // 2:
                 break
         
         return counter.get_max_operator_candidate()
@@ -393,7 +393,7 @@ class HybridSymbolicLLMPlanner:
 
             problem_w_added_ops = copy.deepcopy(problem)
             # check if the number of llm calls has reached the maximum
-            if self.llm_calls > self.max_num_llm_calls - self.config['num_op_candidates']:
+            if self.llm_calls > self.max_num_llm_calls - self.config['planning']['num_op_candidates']:
                 logging.info(f"Max. number of LLM calls reached. # calls {self.llm_calls}, # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
                 break
             else: # ask the llm for new operators and update model's operators
@@ -404,7 +404,7 @@ class HybridSymbolicLLMPlanner:
                 # add the plan to the list of plans if it is not None
                 if search_ahead_plan:
                     plans.append(search_ahead_plan)
-                if len(plans) >= self.config['min_plan_candidates']:
+                if len(plans) >= self.config['planning']['min_plan_candidates']:
                     logging.info(f"Minimum number of plans found. # plans: {len(plans)}, # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
                     return space, stats, plans
             
@@ -462,14 +462,14 @@ class HybridSymbolicLLMPlanner:
                 logging.info(f"Goal found after {stats.nexpansions} expansions from node {start_node}. {stats.num_goals} goal states found.")
 
                 # write the operators that resulted in a plan to a file
-                domain_file_name = self.config['planning_dir'] + os.sep + self.config['modified_planning_domain']
+                domain_file_name = self.config['planning']['planning_dir'] + os.sep + self.config['planning']['modified_planning_domain']
                 # find the `.pddl`, insert the num goal before `.pddl` of the file name
                 domain_file_name = domain_file_name[:domain_file_name.find('.pddl')] + f'_{stats.num_goals}.pddl'
                 
                 self.write_domain(problem, domain_file_name)
 
                 # pickle the SearchNode that resulted in a plan
-                with open(self.config['planning_dir'] + os.sep + f"{self.config['planning_goal_node']}_{stats.num_goals}.pkl", 'wb') as f:
+                with open(self.config['planning']['planning_dir'] + os.sep + f"{self.config['planning']['planning_goal_node']}_{stats.num_goals}.pkl", 'wb') as f:
                     dill.dump(node, f)
                 return plan # early return if a plan is found since we only care about plan with the shortest length
 
@@ -596,5 +596,5 @@ class HybridSymbolicLLMPlanner:
     
 if __name__ == '__main__':
     # testing
-    planner = HybridSymbolicLLMPlanner()
+    planner = HybridSymbolicLLMPlanner(config=load_config('config.yaml'))
     planner.search()

@@ -10,15 +10,13 @@
 
     ;; Define predicates
     (:predicates
-        (small-enough-for-gripper-to-pick-up ?tabletop-object - tabletop-object ?gripper - gripper); whether the object can be picked up.
-        (can-flip-up ?lid - coffee-machine-lid) ; whether the lid can be flipped up.
-        (can-flip-down ?lid - coffee-machine-lid) ; whether the lid can be flipped down. 
+        (closed ?container - container) ; whether the container is completely closed.
         (directly-on-table ?tabletop-object - tabletop-object ?table - table) ; whether the object is on the table directly making contact with the table.
-        (exclusively-occupying-gripper ?tabletop-object - tabletop-object ?gripper - gripper) ; whether the object is occupying the gripper. If true, `free gripper` should be false.
-        (attached ?lid - coffee-machine-lid ?holder - coffee-pod-holder) ; whether obj1 is attached to obj2. 
-        (in ?tabletop-object - tabletop-object ?container - container) ; whether the object is in the container.
-        (open ?container - container) ; whether the container is open.
+        (exclusively-occupying-gripper ?tabletop-object - tabletop-object ?gripper - gripper) ; whether the object is occupying the gripper. If true, `free gripper` should be false. 
         (free ?gripper - gripper) ; whether the gripper is not occupied by anything. If true, there should be no true `exclusively-occupying-gripper` atoms.
+        (inside ?tabletop-object - tabletop-object ?container - container) ; whether the object is inside the container.
+        (open-enough-to-fit-through ?container - container ?tabletop-object - tabletop-object) ; whether the container is open enough to fit the object through the opening
+        (small-enough-for-gripper-to-pick-up ?tabletop-object - tabletop-object ?gripper - gripper); whether the object can be picked up.(inside ?tabletop-object - tabletop-object ?container - container) ; whether the object is inside the container.
         (under ?mug - mug ?holder - coffee-pod-holder) ; whether the bottom tabletop object is under the top tabletop object.
         (upright ?mug - mug) ; whether the mug is upright.
     )
@@ -30,17 +28,17 @@
         :effect (and (exclusively-occupying-gripper ?tabletop-object ?gripper) (not (directly-on-table ?tabletop-object ?table)) (not (free ?gripper))) 
     )
     
-    (:action open-coffee-pod-holder
-        :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
-        :precondition (and (not (open ?holder)) (can-flip-up ?lid) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (exclusively-occupying-gripper ?lid ?gripper) (can-flip-down ?lid) (open ?holder) (not (free ?gripper)))
+    (:action open-coffee-pod-holder-for-object
+        :parameters (?holder - coffee-pod-holder ?tabletop-object - tabletop-object ?gripper - gripper)
+        :precondition (and (not (open-enough-to-fit-through ?holder ?tabletop-object)) (free ?gripper))
+        :effect (and (exclusively-occupying-gripper ?holder ?gripper) (open-enough-to-fit-through ?holder ?tabletop-object) (not (free ?gripper)))
     )
 
 
     (:action close-coffee-pod-holder
-        :parameters (?holder - coffee-pod-holder ?lid - coffee-machine-lid ?gripper - gripper)
-        :precondition (and (open ?holder) (can-flip-down ?lid) (attached ?lid ?holder) (free ?gripper))
-        :effect (and (exclusively-occupying-gripper ?lid ?gripper) (not (open ?holder)) (not (free ?gripper)))
+        :parameters (?holder - coffee-pod-holder ?gripper - gripper)
+        :precondition (and (not (closed ?holder)) (free ?gripper))
+        :effect (and (exclusively-occupying-gripper ?holder ?gripper) (closed ?holder) (not (free ?gripper)))
     )
 
     (:action free-gripper-from-large-object
@@ -52,8 +50,8 @@
 
     (:action place-pod-in-holder-from-gripper
         :parameters (?pod - coffee-pod ?holder - coffee-pod-holder ?gripper - gripper)
-        :precondition (and (exclusively-occupying-gripper ?pod ?gripper) (open ?holder) (not (free ?gripper)))
-        :effect (and (not (exclusively-occupying-gripper ?pod ?gripper)) (in ?pod ?holder) (free ?gripper))
+        :precondition (and (exclusively-occupying-gripper ?pod ?gripper) (open-enough-to-fit-through ?holder ?pod) (not (free ?gripper)))
+        :effect (and (not (exclusively-occupying-gripper ?pod ?gripper)) (inside ?pod ?holder) (free ?gripper))
     )
 
 
