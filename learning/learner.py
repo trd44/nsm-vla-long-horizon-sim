@@ -201,7 +201,7 @@ class OperatorWrapper(gym.Wrapper):
             float: the reward between -1, 0
         """
         # import the llm generated sub-goal reward shaping function
-        llm_reward_func_module = importlib.import_module(f'learning.reward_functions.{self.config['planning']['domain']}.{self.grounded_operator.name}')
+        llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{self.grounded_operator.name}")
 
         llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping')
 
@@ -253,8 +253,8 @@ class Learner:
         
         eval_callback = CustomEvalCallback(
             eval_env=self.eval_env,
-            best_model_save_path=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/best_model',
-            log_path=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/eval_logs',
+            best_model_save_path=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/best_model",
+            log_path=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/eval_logs",
             eval_freq=self.config['learning']['eval']['eval_freq'],
             n_eval_episodes=self.config['learning']['eval']['n_eval_episodes'],
             deterministic=self.config['learning']['eval']['deterministic'],
@@ -265,7 +265,7 @@ class Learner:
         model = SAC(
             "MlpPolicy",
             env = self.env,
-            tensorboard_log=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/tensorboard_logs',
+            tensorboard_log=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/tensorboard_logs",
             **self.config['learning']
         )
         model.learn(
@@ -273,7 +273,7 @@ class Learner:
             callback=eval_callback
         )
         model.save(
-            path = f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model'
+            path = f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/model"
         )
         # TODO: create an Executor_RL object associated with the newly learned policy. Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
     
@@ -290,7 +290,7 @@ class Learner:
         #TODO: dynamically fill in the prompt with operator specific information such as the operator's name and effects
         out = chat_completion(reward_shaping_prompt)
         #TODO: save the output python function to a file in the reward_functions directory
-        with open(f'learning/reward_functions/{self.domain}/{self.config['planning']['domain']}.{self.grounded_operator.name}.py', 'w') as f:
+        with open(f"learning/reward_functions/{self.domain}/{self.config['planning']['domain']}.{self.grounded_operator.name}.py", 'w') as f:
             f.write(out)
     
 
@@ -305,6 +305,6 @@ class Learner:
         """
         env = GymWrapper(env)
         env = OperatorWrapper(env, self.detector, self.grounded_operator, self.executed_operators, self.config)
-        env = Monitor(env, f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/monitor_logs', allow_early_resets=True)
+        env = Monitor(env, f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/monitor_logs", allow_early_resets=True)
         return env
     
