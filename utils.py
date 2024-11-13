@@ -10,6 +10,8 @@ import base64
 from typing import *
 from PIL import Image
 from langchain.tools import tool
+from stable_baselines3 import SAC
+from stable_baselines3.common.utils import set_random_seed
 
 config_file = "config.yaml"
 
@@ -18,7 +20,13 @@ def load_config(config_file):
         config = yaml.safe_load(file)
     return config
 
-def find_parentheses(self, s:str) -> Tuple[int, int]:
+def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
+    # Load the model
+    set_random_seed(seed, using_cuda=True)
+    model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
+    return model
+
+def find_parentheses(s:str) -> Tuple[int, int]:
         """returns the indices of the first opening and matching closing parentheses
 
         Args:
@@ -40,7 +48,7 @@ def find_parentheses(self, s:str) -> Tuple[int, int]:
                     return start + 1, i
         return -1, -1
 
-def split_by_parentheses(self, s:str, type='operator_predicates') -> List[str]:
+def split_by_parentheses(s:str, type='operator_predicates') -> List[str]:
     """splits a string by parentheses
 
     Args:
@@ -55,7 +63,7 @@ def split_by_parentheses(self, s:str, type='operator_predicates') -> List[str]:
     parts = []
     start = 0
     while start < len(s):
-        part_start, part_end = self._find_parentheses(s[start:])
+        part_start, part_end = find_parentheses(s[start:])
         if part_start == -1:
             break
         # add the part inside the parenthesis

@@ -276,6 +276,10 @@ class Learner:
             path = f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/model"
         )
         # TODO: create an Executor_RL object associated with the newly learned policy. Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
+        executor = execution.executor.Executor_RL(
+            operator_name=self.grounded_operator.name, alg='SAC',
+            policy=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model', 
+        )
     
     def _llm_order_effects(self):
         """Prompt the LLM to order the effects of the grounded operator in terms of which effects are expected to be achieved before others.

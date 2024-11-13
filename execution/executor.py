@@ -9,11 +9,6 @@ from utils import *
 
 set_random_seed(0, using_cuda=True)
 
-def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
-    # Load the model
-    set_random_seed(seed, using_cuda=True)
-    model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
-    return model
 
 class Executor():
 	def __init__(self, mode, operator_name:str, policy):
@@ -123,7 +118,7 @@ class Executor_RL(Executor):
 		env = detector.get_env()
 		obs = detector.get_obs()
 		if self.model is None:
-			self.model = load_policy(self.alg, env, self.policy, seed=0)
+			self.model = load_policy(env=env,path=self.policy, seed=0) #TODO: does seed need to be dynamic?
 		step_executor = 0
 		done = False
 		success = False
@@ -142,6 +137,12 @@ class Executor_RL(Executor):
 			if render:
 				env.render()
 		return obs, success
+	
+	def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
+		# Load the model
+		set_random_seed(seed, using_cuda=True)
+		model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
+		return model
 	
 	
 if __name__	== "__main__":
