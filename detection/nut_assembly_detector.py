@@ -45,13 +45,13 @@ class NutAssemblyDetector(Detector):
         }
 
         # Grounded objects
-        self.grounded_objects = {
-            'round-peg': ['round-peg1'],
-            'square-peg': ['square-peg1'],
-            'round-nut': ['round-nut1'],
-            'square-nut': ['square-nut1'],
-            'gripper': ['gripper1'],
-            'table': ['table1'],
+        self.grounded_object_to_pddl_object = {
+            'round-peg': 'round-peg1',
+            'square-peg': 'square-peg1',
+            'round-nut': 'round-nut1',
+            'square-nut': 'square-nut1',
+            'gripper': 'gripper1',
+            'table': 'table1',
         }
 
     def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str, gripper:str) -> bool:
