@@ -31,7 +31,7 @@ class Coffee_Detector(Detector):
                 'func':self.attached,
                 'params':['coffee_machine_lid', 'coffee_pod_holder']
             }, 
-            'inside': {
+            'in': {
                 'func':self.inside,
                 'params':['tabletop_object', 'container']
             }, 

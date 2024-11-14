@@ -20,7 +20,7 @@ class Cleanup_Detector(Detector):
                 'params':['container','gripper']
             },
             'occupying-gripper': {
-                'func':self.occupying_gripper,
+                'func':self.exclusively_occupying_gripper,
                 'params':['tabletop_object', 'gripper']
             },
             'inside': {
@@ -81,7 +81,7 @@ class Cleanup_Detector(Detector):
             return True
         return False
 
-    def occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
+    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
         """Returns True if the object is exclusively occupying the gripper.
 
         Args:
@@ -146,7 +146,7 @@ class Cleanup_Detector(Detector):
             bool: True if the gripper is free
         """
         for obj in self.object_types['tabletop_object']:
-            if self.occupying_gripper(obj, gripper):
+            if self.exclusively_occupying_gripper(obj, gripper):
                 return False
         return True
     
