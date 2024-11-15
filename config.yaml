@@ -34,31 +34,33 @@ learning:
   verbose: 1
 # setting for testing PDDL. Uncoment when testing.
 
+# planning:
+#   planning_dir: "planning/PDDL/coffee"
+#   domain: "coffee"
+#   init_planning_domain: "coffee_domain.pddl" # the initial domain file
+#   modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
+#   planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+#   planning_goal_node: "goal_node" # the pickled file name for the goal node
+#   novel_objects: ["drawer1"]
+#   num_op_candidates: 5
+#   max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+#   max_num_llm_calls: 60
+#   max_depth: 15 # maximum search depth
+#   min_plan_candidates: 1 # end search early if this many plans are found
+
 planning:
-  planning_dir: "planning/PDDL/coffee"
-  domain: "coffee"
-  init_planning_domain: "coffee_domain.pddl" # the initial domain file
-  modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
-  planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+  planning_dir: "planning/PDDL/cleanup"
+  domain: "cleanup"
+  init_planning_domain: "cleanup_domain.pddl" # the initial domain file
+  modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file will be saved as this
+  planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
   planning_goal_node: "goal_node" # the pickled file name for the goal node
-  novel_objects: ["drawer1"]
+  novel_objects: ["mug1"]
   num_op_candidates: 5
   max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-  max_num_llm_calls: 60
+  max_num_llm_calls: 30
   max_depth: 15 # maximum search depth
   min_plan_candidates: 1 # end search early if this many plans are found
-
-# planning_dir: "planning/PDDL/cleanup"
-# domain: "cleanup"
-# init_planning_domain: "cleanup_domain.pddl" # the initial domain file
-# modified_planning_domain: "modified_cleanup_domain.pddl" # final domain file will be saved as this
-# planning_problem: "cleanup_problem.pddl" # the partially defined planning problem file
-# novel_objects: ["mug1"]
-# num_op_candidates: 5
-# max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-# max_num_llm_calls: 30
-# max_depth: 15 # maximum search depth
-# min_plan_candidates: 1 # end search early if this many plans are found
 
 # planning_dir: "planning/PDDL/nut_assembly"
 # domain: "nut_assembly"

@@ -15,7 +15,7 @@
     (directly-on-table drawer1 table1)
     (free gripper1)
     (in coffee-pod1 drawer1)
-    (open-enough-to-fit-through mug1 coffee-pod1)
+    (open mug1)
     (small-enough-for-gripper-to-pick-up coffee-pod1 gripper1)
     (small-enough-for-gripper-to-pick-up mug1 gripper1)
     (small-enough-for-gripper-to-pick-up coffee-pod-holder1 gripper1)

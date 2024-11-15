@@ -15,6 +15,7 @@
         (large-enough-for-gripper-to-reach-inside ?container - container ?gripper - gripper) ; whether the gripper can reach inside the container.
         (open ?container - container) ; whether the container is open enough to fit the object through the opening
         (small-enough-for-gripper-to-pick-up ?tabletop-object - tabletop-object ?gripper - gripper) ; whether the object can be picked up.
+        (small-enough-to-fit-in-container ?tabletop-object - tabletop-object ?container - container) ; whether the object can fit inside the container.
         
     )
     
