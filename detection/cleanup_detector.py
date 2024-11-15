@@ -2,7 +2,7 @@ from detection.detector import Detector
 from typing import *
 from scipy.spatial.transform import Rotation as R
 
-class Cleanup_Detector(Detector):
+class CleanupDetector(Detector):
     def __init__(self, env, return_int=False):
         super().__init__(env, return_int)
         # predicate mappings

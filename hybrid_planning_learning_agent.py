@@ -2,19 +2,21 @@ import copy
 import os
 import dill
 import importlib
+import mimicgen
 import execution.executor
 import learning.learner
 import planning.hybrid_symbolic_llm_planner
 import planning.planning_utils
 from utils import *
 from robosuite.controllers import load_controller_config
+from robosuite.utils.input_utils import *
 from tarski import fstrips as fs
 
 class HybridPlanningLearningAgent:
     def __init__(self, config_file='config.yaml'):
         self.config:dict = load_config(config_file)
-        self.domain:str = self.config['domain'].split('_domain.')[0]
-        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config['planning'])
+        self.domain:str = self.config['planning']['domain']
+        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config)
         self.env = self._load_env()
         self.detector = self._load_detector()
     
@@ -68,13 +70,13 @@ class HybridPlanningLearningAgent:
         Returns:
             Tuple[bool, bool, execution.executor.Executor]: a tuple containing a boolean indicating whether the operator has an executor, a boolean indicating whether the operator was executed successfully, and the executor object of the operator.
         """
-        executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_detector')
+        executor_module = importlib.import_module(self.config['execution_dir']+'.'+self.domain+'.'+self.domain+'_executor')
 
         EXECUTORS = getattr(executor_module, self.domain.upper()+'_EXECUTORS')
-        grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator)
+        grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator.ident())
         # unpickle the .pkl files in the domain executor directory which is where the learned executors are stored
         learned_executors = {}
-        for file in os.listdir(self.config['execution_dir']+'/'+self.domain):
+        for file in os.listdir(self.config['execution_dir']+os.sep+self.domain):
             if file.endswith(".pkl"):
                 with open(file, 'rb') as f:
                     learned_executor:execution.executor.Executor = dill.load(f)
@@ -86,9 +88,9 @@ class HybridPlanningLearningAgent:
         elif grounded_operator_name in learned_executors: # operator has a learned executor
             executor:execution.executor.Executor = learned_executors[grounded_operator_name]
         else: # operator does not have an executor
-            return False, False # no executor, not executed successfully
+            return False, False, None # no executor, not executed successfully
         execution_successful = executor.execute(self.detector, grounded_operator)
-        return True, execution_successful
+        return True, execution_successful, executor
         
     def learn_operator(self, grounded_operator:fs.Action, executed_operators:List[fs.Action]=[]):
         """Train an RL agent to learn the operator.
@@ -97,7 +99,11 @@ class HybridPlanningLearningAgent:
             grounded_operator (fs.Action): the grounded operator to learn such as open-drawer(drawer1)
             executed_operators (List[fs.Action], optional): a list of operators that have been executed before the grounded operator. Defaults to [].
         """
-        env_copy = copy.deepcopy(self.env)
+        saved_sim_state = self.env.sim.get_state()
+        env_copy = self._load_env()
+        env_copy.reset()
+        env_copy.sim.set_state(saved_sim_state)
+        env_copy.sim.forward()
         detector_copy = copy.deepcopy(self.detector)
         detector_copy.set_env(env_copy)
 
@@ -113,7 +119,7 @@ class HybridPlanningLearningAgent:
             largest_number = None
 
             for filename in os.listdir(directory):
-                if self.config['planning_goal_node'] not in filename:
+                if self.config['planning']['planning_goal_node'] not in filename:
                     continue
                 # Extract number at the end of the file name (e.g., file123)
                 match = re.search(r'(\d+)(?=\.\w+$)', filename)
@@ -124,9 +130,9 @@ class HybridPlanningLearningAgent:
                         largest_number = number
                         largest_file = filename
 
-            return largest_file, largest_number
+            return directory+os.sep+largest_file, largest_number
         
-        goal_node_pkl, _ = find_file_with_largest_number(self.config['planning_dir'])
+        goal_node_pkl, _ = find_file_with_largest_number(self.config['planning']['planning_dir'])
         if goal_node_pkl is None:
             return None
         goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
@@ -142,8 +148,9 @@ class HybridPlanningLearningAgent:
         # only keep envs that end with "Novelty"
         envs = [x for x in envs if x[-7:] == "Novelty"]
         # find the novelty env i.e. the post-novelty env whose name contains the domain
+        lower_case_domain = self.domain.lower().replace('_', '')
         for env_name in envs:
-            if self.domain in env_name.lower() and 'pre_novelty' not in env_name.lower():
+            if lower_case_domain in env_name.lower() and 'pre_novelty' not in env_name.lower():
                 gym_env = suite.make(
                     env_name = env_name,
                     robots = 'Kinova3',
@@ -155,6 +162,7 @@ class HybridPlanningLearningAgent:
                     control_freq=20,
                     reward_shaping=True,
                     hard_reset=False,
+                    seed = self.config['learning']['seed']
                 )
                 return gym_env
 
@@ -163,12 +171,13 @@ class HybridPlanningLearningAgent:
         """load the detector based on the problem domain specified in the config file
         """
         detector_module = importlib.import_module(self.config['detection_dir']+'.'+self.domain+'_detector')
-
-        detector = getattr(detector_module, self.domain.capitalize()+'_Detector')
+        camel_case_domain = ''.join([word.capitalize() for word in self.domain.split('_')])     
+        detector = getattr(detector_module, camel_case_domain+'Detector')
         return detector(self.env)
 
 if __name__ == '__main__':
     agent = HybridPlanningLearningAgent()
+    agent.plan_learn_execute()
     
 
     

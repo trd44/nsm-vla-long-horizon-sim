@@ -6,14 +6,14 @@ import gymnasium as gym
 import importlib
 import numpy as np
 from tarski import fstrips as fs
-from robosuite.robosuite.wrappers import GymWrapper
+from robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
 from typing import *
-from reward_functions.rewardFunctionPrompts import *
+from learning.reward_functions.rewardFunctionPrompts import *
 from VLM.LlmApi import chat_completion
 
 class CustomEvalCallback(EvalCallback):
@@ -115,7 +115,7 @@ class CustomEvalCallback(EvalCallback):
             return continue_training
 
 class OperatorWrapper(gym.Wrapper):
-    def __init__(self, env, detector:detection.detector.Detector, grounded_operator:fs.Action, executed_operators:Dict[fs.Action:execution.executor.Executor], config:dict):
+    def __init__(self, env, detector:detection.detector.Detector, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         super().__init__(env)
         self.detector = detector
         self.grounded_operator = grounded_operator
@@ -233,7 +233,7 @@ class OperatorWrapper(gym.Wrapper):
 
 
 class Learner:
-    def __init__(self, env, domain:str, detector:detection.detector.Detector, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action:execution.executor.Executor], config:dict):
+    def __init__(self, env, domain:str, detector:detection.detector.Detector, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
         self.detector = detector
         self.domain = domain
@@ -311,4 +311,6 @@ class Learner:
         env = OperatorWrapper(env, self.detector, self.grounded_operator, self.executed_operators, self.config)
         env = Monitor(env, f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/monitor_logs", allow_early_resets=True)
         return env
-    
+
+
+

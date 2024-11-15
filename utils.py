@@ -26,6 +26,15 @@ def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
     model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
     return model
 
+def deepcopy_env(env, seed=0):
+    saved_sim_state = env.sim.get_state()
+    import mimicgen
+    env_copy = 
+    env_copy.reset()
+    env_copy.sim.set_state(saved_sim_state)
+    env_copy.sim.forward()
+    return env_copy
+
 def find_parentheses(s:str) -> Tuple[int, int]:
         """returns the indices of the first opening and matching closing parentheses
 

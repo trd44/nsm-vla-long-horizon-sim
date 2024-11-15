@@ -11,7 +11,7 @@ set_random_seed(0, using_cuda=True)
 
 
 class Executor():
-	def __init__(self, mode, operator_name:str, policy):
+	def __init__(self, mode, operator_name:str, policy=None):
 		self.name = operator_name
 		self.mode = mode
 		self.policy = policy
@@ -101,10 +101,10 @@ class Executor():
 		return True, []
 
 class Executor_RL(Executor):
-	def __init__(self, operator_name:str, alg:str, policy):
+	def __init__(self, operator_name:str, alg:str, policy:Union[str, os.PathLike], model:SAC=None):
 		super().__init__("RL", operator_name=operator_name, policy=policy)
 		self.alg = alg
-		self.model = None
+		self.model = model
 
 	def execute(self, detector:Detector, grounded_operator:fs.Action, render=False):
 		'''

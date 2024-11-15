@@ -59,7 +59,7 @@
     )
 
 
-    (:action pick-up-nut-from-peg ; LLM added
+    (:action pick-up-nut-from-peg
      :parameters (?gripper - gripper ?round-peg - round-peg ?square-nut - square-nut)
      :precondition (and (free ?gripper) (not (exclusively-occupying-gripper ?round-peg ?gripper)) (not (exclusively-occupying-gripper ?square-nut ?gripper)) (not (shapes-match ?square-nut ?round-peg)) (not (small-enough-for-gripper-to-pick-up ?round-peg ?gripper)) (on-peg ?square-nut ?round-peg) (small-enough-for-gripper-to-pick-up ?square-nut ?gripper))
      :effect (and
