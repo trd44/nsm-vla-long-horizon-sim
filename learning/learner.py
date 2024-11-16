@@ -282,12 +282,31 @@ class Learner:
             policy=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model', 
         )
     
+    def _grounded_operator_repr(self) -> str:
+        """Return a string representation of the grounded operator
+
+        Returns:
+            str: the string representation of the grounded operator
+        """
+        effects:str = '\n'.join([eff.pddl_repr() for eff in self.grounded_operator.effects])
+        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects:\n{effects}\n"
+    
     def _llm_order_effects(self):
         """Prompt the LLM to order the effects of the grounded operator in terms of which effects are expected to be achieved before others.
         """
-        #TODO: dynamically fill in the prompt with operator specific information such as the operator's name and effects
-        out = chat_completion(order_effects_prompt)
-        #TODO: reorder the effects based on the LLM's response
+        def find_effect(effect_name:str, effects:List[fs.SingleEffect]) -> fs.SingleEffect:
+            for effect in effects:
+                if effect.pddl_repr() == effect_name:
+                    return effect
+            return None
+        
+        grounded_op = self._grounded_operator_repr()
+        prompt = order_effects_prompt.format(grounded_operator=grounded_op)
+        out = chat_completion(prompt)
+        ordered_effects_section:str = out.split('effects:')[1].strip()
+        ordered_effects:List[str] = ordered_effects_section.split('\n')
+        ordered_effects:List[fs.SingleEffect] = [find_effect(effect_name, self.grounded_operator.effects) for effect_name in ordered_effects]
+        self.grounded_operator.effects = ordered_effects
     
     def _llm_sub_goal_reward_shaping(self):
         """Prompt the LLM to write a sub-goal reward shaping function that takes in an effect (sub-goal) and the observation with semantics and returns a reward depending on the progress towards achieving the effect.
