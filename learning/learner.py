@@ -130,12 +130,12 @@ class OperatorWrapper(gym.Wrapper):
             obs, reward, done, info = self.env.step(action)
         truncated = truncated or self.env.done
         self.detector.update_obs()
-        obs:dict = self.detector.get_obs()
-        binary_states_with_semantics:dict = self.detector.get_groundings()
+        obs_with_semantics:dict = self.detector.get_obs()
+        binary_obs_with_semantics:dict = self.detector.get_groundings()
         # combine obs with binary_states_with_semantics
-        obs.update(binary_states_with_semantics)
-        reward = self.compute_reward(obs)
-        #TODO: may need to turn obs into a numpy array
+        obs_with_semantics.update(binary_obs_with_semantics)
+        reward = self.compute_reward(obs_with_semantics)
+        
         return obs, reward, done, truncated, info
 
     def reset(self):
@@ -242,8 +242,8 @@ class Learner:
         self.grounded_operator = grounded_operator_to_learn
         self.env = self._wrap_env(env)
         self.eval_env = self._wrap_env(deepcopy_env(env, config))
-        self._llm_order_effects()
-        self._llm_sub_goal_reward_shaping()
+        #self._llm_order_effects()
+        #self._llm_sub_goal_reward_shaping()
 
     def learn(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the operator.
@@ -251,22 +251,19 @@ class Learner:
         Returns:
             execution.executor.Executor_RL: an RL executor for the operator and executes the policy for the operator when called
         """
-        
+        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+
         eval_callback = CustomEvalCallback(
             eval_env=self.eval_env,
-            best_model_save_path=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/best_model",
-            log_path=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/eval_logs",
-            eval_freq=self.config['learning']['eval']['eval_freq'],
-            n_eval_episodes=self.config['learning']['eval']['n_eval_episodes'],
-            deterministic=self.config['learning']['eval']['deterministic'],
-            render=self.config['learning']['eval']['render'],
-            verbose=self.config['learning']['eval']['verbose']
+            best_model_save_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/best_model",
+            log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/eval_logs",
+            **self.config['learning']['eval']
         )
 
         model = SAC(
             "MlpPolicy",
             env = self.env,
-            tensorboard_log=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/tensorboard_logs",
+            tensorboard_log=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['learning']['seed']}/tensorboard_logs",
             **self.config['learning']
         )
         model.learn(
@@ -274,12 +271,12 @@ class Learner:
             callback=eval_callback
         )
         model.save(
-            path = f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/model"
+            path = f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['learning']['seed']}/model"
         )
         # TODO: create an Executor_RL object associated with the newly learned policy. Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
         executor = execution.executor.Executor_RL(
             operator_name=self.grounded_operator.name, alg='SAC',
-            policy=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config["seed"]}/model', 
+            policy=f'learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['learning']["seed"]}/model', 
         )
     
     def _grounded_operator_repr(self) -> str:
@@ -303,19 +300,35 @@ class Learner:
         grounded_op = self._grounded_operator_repr()
         prompt = order_effects_prompt.format(grounded_operator=grounded_op)
         out = chat_completion(prompt)
-        ordered_effects_section:str = out.split('effects:')[1].strip()
+        # ordered effects section is the part of the output after `effects:` and before the ````
+        ordered_effects_section:str = out.split('effects:')[1].split('```')[0].strip()
         ordered_effects:List[str] = ordered_effects_section.split('\n')
         ordered_effects:List[fs.SingleEffect] = [find_effect(effect_name, self.grounded_operator.effects) for effect_name in ordered_effects]
         self.grounded_operator.effects = ordered_effects
-    
+
     def _llm_sub_goal_reward_shaping(self):
         """Prompt the LLM to write a sub-goal reward shaping function that takes in an effect (sub-goal) and the observation with semantics and returns a reward depending on the progress towards achieving the effect.
         """
-        #TODO: dynamically fill in the prompt with operator specific information such as the operator's name and effects
-        out = chat_completion(reward_shaping_prompt)
-        #TODO: save the output python function to a file in the reward_functions directory
-        with open(f"learning/reward_functions/{self.domain}/{self.config['planning']['domain']}.{self.grounded_operator.name}.py", 'w') as f:
-            f.write(out)
+        # dynamically fill in the prompt with operator specific information such as the operator's name and effects
+        grounded_op = self._grounded_operator_repr()
+        observation_with_semantics = self.detector.get_obs()
+        # keep only the keys that include the parameters of the grounded operator
+        op_name, grounded_params = extract_name_params_from_grounded(self.grounded_operator.ident())
+        observation_with_semantics = {k:v for k,v in observation_with_semantics.items() if any(param in k for param in grounded_params)}
+
+        prompt = reward_shaping_prompt.format(grounded_operator=grounded_op, observation_with_semantics=observation_with_semantics)
+        out = chat_completion(prompt)
+        #parse the output to get the reward shaping function
+        fn_start = out.find('def reward_shaping_fn')
+        fn_end = out.find('```', fn_start)
+        fn = out[fn_start:fn_end]
+        #save the output python function to a file in the reward_functions directory
+        # create the directory if it does not exist
+        if not os.path.exists(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}"):
+            os.makedirs(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}")
+        # create a file with the operator's name and save the function in it
+        with open(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}{os.sep}{op_name}.py", 'w') as f:
+            f.write(fn)
     
 
     def _wrap_env(self, env) -> gym.Wrapper:
