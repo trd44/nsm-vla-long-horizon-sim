@@ -14,6 +14,7 @@ from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
+from utils import *
 from VLM.LlmApi import chat_completion
 
 class CustomEvalCallback(EvalCallback):
@@ -237,10 +238,10 @@ class Learner:
         self.config = config
         self.detector = detector
         self.domain = domain
-        self.env = self._wrap_env(env)
-        self.eval_env = self._wrap_env(copy.deepcopy(env))
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
+        self.env = self._wrap_env(env)
+        self.eval_env = self._wrap_env(deepcopy_env(env, config))
         self._llm_order_effects()
         self._llm_sub_goal_reward_shaping()
 
@@ -309,7 +310,11 @@ class Learner:
         """
         env = GymWrapper(env)
         env = OperatorWrapper(env, self.detector, self.grounded_operator, self.executed_operators, self.config)
-        env = Monitor(env, f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['seed']}/monitor_logs", allow_early_resets=True)
+        env = Monitor(
+            env=env, 
+            filename=f"learning/policies/{self.domain}/{self.grounded_operator.name}/seed_{self.config['learning']['seed']}/monitor_logs",
+            allow_early_resets=True
+        )
         return env
 
 

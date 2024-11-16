@@ -13,6 +13,14 @@ detection_dir: "detection"
 plan_learn_execute:
   max_iter: 100
 
+simulation:
+  robots: "Kinova3"
+  has_renderer: True
+  has_offscreen_renderer: False
+  use_camera_obs: False
+  control_freq: 20
+  reward_shaping: True
+
 # parameters for RL
 learning:
   batch_size: 256 # default
@@ -20,8 +28,8 @@ learning:
   eval:
     eval_freq: 10000 # default
     n_eval_episodes: 5
-    deterministic: True,
-    render: False, 
+    deterministic: True
+    render: False 
     verbose: 1
   learning_rate: 0.0003
   learning_starts: 10000

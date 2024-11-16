@@ -10,6 +10,7 @@ import planning.planning_utils
 from utils import *
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
+from robosuite.environments.base import MujocoEnv
 from tarski import fstrips as fs
 
 class HybridPlanningLearningAgent:
@@ -17,7 +18,7 @@ class HybridPlanningLearningAgent:
         self.config:dict = load_config(config_file)
         self.domain:str = self.config['planning']['domain']
         self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config)
-        self.env = self._load_env()
+        self.env = load_env(self.domain, self.config)
         self.detector = self._load_detector()
     
     def plan_learn_execute(self):
@@ -99,12 +100,9 @@ class HybridPlanningLearningAgent:
             grounded_operator (fs.Action): the grounded operator to learn such as open-drawer(drawer1)
             executed_operators (List[fs.Action], optional): a list of operators that have been executed before the grounded operator. Defaults to [].
         """
-        saved_sim_state = self.env.sim.get_state()
-        env_copy = self._load_env()
-        env_copy.reset()
-        env_copy.sim.set_state(saved_sim_state)
-        env_copy.sim.forward()
-        detector_copy = copy.deepcopy(self.detector)
+        # deep copy env and detector to avoid modifying the original env and detector
+        env_copy = deepcopy_env(self.env, self.config)
+        detector_copy = self._load_detector()
         detector_copy.set_env(env_copy)
 
         learner = learning.learner.Learner(env_copy, self.domain, detector_copy, grounded_operator, executed_operators, self.config)
@@ -153,16 +151,8 @@ class HybridPlanningLearningAgent:
             if lower_case_domain in env_name.lower() and 'pre_novelty' not in env_name.lower():
                 gym_env = suite.make(
                     env_name = env_name,
-                    robots = 'Kinova3',
-                    controller_configs = load_controller_config(default_controller="OSC_POSE"),
-                    has_renderer=True,
-                    has_offscreen_renderer=False,
-                    ignore_done=True,
-                    use_camera_obs=False,
-                    control_freq=20,
-                    reward_shaping=True,
-                    hard_reset=False,
-                    seed = self.config['learning']['seed']
+                    **self.config['simulation'],
+                    controller_configs = load_controller_config(default_controller="OSC_POSE")
                 )
                 return gym_env
 

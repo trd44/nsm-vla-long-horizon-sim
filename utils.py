@@ -5,11 +5,15 @@ import json
 import re
 import copy
 import numpy as np
+import mimicgen
 import subprocess
 import base64
 from typing import *
 from PIL import Image
 from langchain.tools import tool
+from robosuite.controllers import load_controller_config
+from robosuite.utils.input_utils import *
+from robosuite.environments.base import MujocoEnv
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
 
@@ -26,10 +30,38 @@ def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
     model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
     return model
 
-def deepcopy_env(env, seed=0):
+def load_env(domain:Union[str, MujocoEnv], config:str):
+    """load the simulation environment based on the problem domain specified in the config file
+    """
+    envs = set(suite.ALL_ENVIRONMENTS)
+    # keep only envs that correspond to the different reset distributions from the paper
+    # only keep envs that end with "Novelty"
+    envs = [x for x in envs if x[-7:] == "Novelty"]
+    if config is None:
+        config = load_config(config_file)
+        
+    if isinstance(domain, MujocoEnv):
+        gym_env = suite.make(
+            env_name = domain.__class__.__name__,
+            **config['simulation'],
+            controller_configs = load_controller_config(default_controller="OSC_POSE"),
+        )
+        return gym_env
+    
+    # find the novelty env i.e. the post-novelty env whose name contains the domain
+    lower_case_domain = domain.lower().replace('_', '')
+    for env_name in envs:
+        if (lower_case_domain in env_name.lower() or domain in env_name) and 'pre_novelty' not in env_name.lower():
+            gym_env = suite.make(
+                env_name = env_name,
+                **config['simulation'],
+                controller_configs = load_controller_config(default_controller="OSC_POSE"),
+            )
+            return gym_env
+
+def deepcopy_env(env, config):
     saved_sim_state = env.sim.get_state()
-    import mimicgen
-    env_copy = 
+    env_copy = load_env(env, config)
     env_copy.reset()
     env_copy.sim.set_state(saved_sim_state)
     env_copy.sim.forward()
