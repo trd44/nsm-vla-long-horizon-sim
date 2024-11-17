@@ -26,14 +26,14 @@ learning:
   model:
     batch_size: 256 # default
     buffer_size: 1000000
-    gamma: 0.99, # default
+    gamma: 0.99 # default
     learning_rate: 0.0003
     learning_starts: 10000
     verbose: 1
     policy_kwargs:
       net_arch: [512, 512, 256]
     seed: 0
-    tau: 0.005, # default
+    tau: 0.005 # default
   eval:
     eval_freq: 10000 # default
     n_eval_episodes: 5
