@@ -23,23 +23,26 @@ simulation:
 
 # parameters for RL
 learning:
-  batch_size: 256 # default
-  buffer_size: 1000000
+  model:
+    batch_size: 256 # default
+    buffer_size: 1000000
+    gamma: 0.99, # default
+    learning_rate: 0.0003
+    learning_starts: 10000
+    verbose: 1
+    policy_kwargs:
+      net_arch: [512, 512, 256]
+    seed: 0
+    tau: 0.005, # default
   eval:
     eval_freq: 10000 # default
     n_eval_episodes: 5
     deterministic: True
     render: False 
     verbose: 1
-  learning_rate: 0.0003
-  learning_starts: 10000
-  policy_kwargs:
-    net_arch: [512, 512, 256]
-  seed: 0
-  tau: 0.005, # default
-  timesteps: 5000000
-  gamma: 0.99, # default
-  verbose: 1
+  learn:
+    total_timesteps: 5000000
+  
 # setting for testing PDDL. Uncoment when testing.
 
 # planning:

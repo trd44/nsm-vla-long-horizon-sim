@@ -132,21 +132,19 @@ class OperatorWrapper(gym.Wrapper):
         truncated = truncated or self.env.done
         self.detector.update_obs()
         obs_with_semantics:dict = self.detector.get_obs()
-        binary_obs_with_semantics:dict = self.detector.get_groundings()
-        # combine obs with binary_states_with_semantics
-        obs_with_semantics.update(binary_obs_with_semantics)
+        
         reward = self.compute_reward(obs_with_semantics)
         
         return obs, reward, done, truncated, info
 
-    def reset(self):
+    def reset(self, **kwargs):
         reset_success = False
         while not reset_success:
             # first, reset the environment to the very beginning
-            try:
-                obs, info = self.env.reset(seed=self.config['learning']['seed'])
+            try: # kwargs include the seed
+                obs, info = self.env.reset(**kwargs)
             except:
-                obs = self.env.reset(seed=self.config['learning']['seed'])
+                obs = self.env.reset(**kwargs)
                 info = {}
             # second, execute the executors that should be executed before the operator to learn
             reset_success = True
@@ -157,10 +155,10 @@ class OperatorWrapper(gym.Wrapper):
                     break
 
         self.detector.update_obs()
-        obs = self.detector.get_obs()
+        #obs = self.detector.get_obs()
         return obs, info
 
-    def check_effect_satisfied(effect:fs.SingleEffect, binary_obs:dict) -> bool:
+    def check_effect_satisfied(self, effect:fs.SingleEffect, binary_obs:dict) -> bool:
         """check if the effect is satisfied in the observation
 
         Args:
@@ -204,9 +202,10 @@ class OperatorWrapper(gym.Wrapper):
         """
         # import the llm generated sub-goal reward shaping function
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+
         llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
 
-        llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping')
+        llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
 
         # get the binary detector observation whose keys are predicates and values are True/False
         binary_obs:dict = self.detector.get_groundings()
@@ -227,7 +226,7 @@ class OperatorWrapper(gym.Wrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 sub_goal_reward += 1/num_effects
             else:
-                sub_goal_reward += llm_reward_shaping_func(effect, obs) * 1/num_effects
+                sub_goal_reward += llm_reward_shaping_func(obs, effect.pddl_repr()) * 1/num_effects
                 return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
@@ -245,7 +244,7 @@ class Learner:
         self.env = self._wrap_env(env)
         self.eval_env = self._wrap_env(deepcopy_env(env, config))
         #self._llm_order_effects()
-        self._llm_sub_goal_reward_shaping()
+        #self._llm_sub_goal_reward_shaping()
 
     def learn(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the operator.
@@ -257,36 +256,35 @@ class Learner:
 
         eval_callback = CustomEvalCallback(
             eval_env=self.eval_env,
-            best_model_save_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/best_model",
-            log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/eval_logs",
+            best_model_save_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/best_model",
+            log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/eval_logs",
             **self.config['learning']['eval']
         )
 
         # the learning config is everything in `self.config` except for the `eval` key
         # get rid of the `eval` key
-        learning_config = copy.deepcopy(self.config['learning'])
-        learning_config.pop('eval')
+
 
         model = SAC(
             "MlpPolicy",
             env = self.env,
-            tensorboard_log=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/tensorboard_logs",
-            **learning_config
+            tensorboard_log=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/tensorboard_logs",
+            **self.config['learning']['model']
         )
         model.learn(
-            total_timesteps=self.config['timesteps'],
+            **self.config['learning']['learn'],
             callback=eval_callback
         )
         model.save(
-            path = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/model"
+            path = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model"
         )
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
             operator_name=op_name, alg='SAC',
-            policy=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/model", 
+            policy=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model", 
         )
         # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
-        with open(f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/executor.pkl", 'wb') as f:
+        with open(f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/executor.pkl", 'wb') as f:
             dill.dump(executor, f)
         return executor
 
@@ -336,8 +334,8 @@ class Learner:
         fn = out[fn_start:fn_end]
         #save the output python function to a file in the reward_functions directory
         # create the directory if it does not exist
-        if not os.path.exists(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}"):
-            os.makedirs(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}")
+        if not os.path.exists(f"learning{os.sep}reward_functions{os.sep}{self.domain}"):
+            os.makedirs(f"learning/reward_functions{os.sep}{self.domain}")
         # create a file with the operator's name and save the function in it
         with open(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}{os.sep}{op_name}.py", 'w') as f:
             f.write(fn)
@@ -357,7 +355,7 @@ class Learner:
         env = OperatorWrapper(env, self.detector, self.grounded_operator, self.executed_operators, self.config)
         env = Monitor(
             env=env, 
-            filename=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['seed']}/monitor_logs",
+            filename=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/monitor_logs",
             allow_early_resets=True
         )
         return env
