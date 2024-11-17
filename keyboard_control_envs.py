@@ -11,8 +11,8 @@ from robosuite.utils.input_utils import input2action
 from robosuite.wrappers import VisualizationWrapper
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-from detection.coffee_detector import Coffee_Detector
-from detection.cleanup_detector import Cleanup_Detector
+from detection.coffee_detector import CoffeeDetector
+from detection.cleanup_detector import CleanupDetector
 from detection.nut_assembly_detector import NutAssemblyDetector
 import numpy as np
 
@@ -113,9 +113,9 @@ if __name__ == "__main__":
     
     # If options["env_name"] starts with "Co", use the Coffee_Detector
     if options["env_name"][:2] == "Co":
-        detector = Coffee_Detector(env)
+        detector = CoffeeDetector(env)
     elif options["env_name"][:2] == "Cu":
-        detector = Cleanup_Detector(env)
+        detector = CleanupDetector(env)
     elif options["env_name"][:2] == "Nu":
         detector = NutAssemblyDetector(env)
     else:
