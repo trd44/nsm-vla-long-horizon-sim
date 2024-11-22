@@ -61,10 +61,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
-RUN useradd -ms /bin/bash user
+# RUN useradd -ms /bin/bash user
 
 # Add the 'user' user to the sudoers file to give it sudo privileges
-RUN echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+# RUN echo "user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Switch to non-root user
 WORKDIR /home/user/oplearn
@@ -72,6 +72,8 @@ COPY . .
 RUN pip install --upgrade pip
 RUN pip install -e mimicgen
 RUN pip install -e robosuite
+RUN pip install -e tarski
+RUN pip install -r requirements.txt
 
-USER user
+# USER user
 
