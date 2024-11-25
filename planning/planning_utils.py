@@ -82,13 +82,17 @@ class OperatorCandidateCounter:
         self.operator_candidates = {}
     
     def add_operator_candidate(self, operator_candidate:OperatorCandidate):
-        if operator_candidate in self.operator_candidates:
-            self.operator_candidates[operator_candidate] += 1
-        else:
-            self.operator_candidates[operator_candidate] = 1
+        self.operator_candidates[operator_candidate] = self.operator_candidates.get(operator_candidate, 0) + 1
     
     def get_max_operator_candidate(self) -> OperatorCandidate:
+        if not self.operator_candidates:
+            return OperatorCandidate('')
         return max(self.operator_candidates, key=self.operator_candidates.get)
+
+    def get_max_operator_candidate_count(self) -> int:
+        if not self.operator_candidates:
+            return 0
+        return self.operator_candidates[self.get_max_operator_candidate()]
 
 class SearchNode:
     def __init__(self, state, parent, action, depth=None):

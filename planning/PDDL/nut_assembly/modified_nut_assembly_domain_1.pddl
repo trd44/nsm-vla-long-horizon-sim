@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain nut_assembly)
-    (:requirements :typing :equality)
+    (:requirements :equality :typing)
     (:types
         gripper - object
         table - object
@@ -44,8 +44,8 @@
      :precondition (and (directly-on-table ?nut ?table) (small-enough-for-gripper-to-pick-up ?nut ?gripper) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?nut ?gripper)
-        (not (directly-on-table ?nut ?table))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (directly-on-table ?nut ?table)))
     )
 
 

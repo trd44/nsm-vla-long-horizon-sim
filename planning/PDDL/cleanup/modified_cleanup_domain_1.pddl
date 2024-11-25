@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain cleanup)
-    (:requirements :typing :equality)
+    (:requirements :equality :typing)
     (:types
         gripper - object
         table - object
@@ -88,7 +88,7 @@
     )
 
 
-    (:action empty-container-onto-table
+    (:action tip-container-to-remove-object
      :parameters (?block - block ?gripper - gripper ?mug - mug ?table - table)
      :precondition (and (directly-on-table ?mug ?table) (free ?gripper) (inside ?block ?mug) (not (directly-on-table ?block ?table)) (not (exclusively-occupying-gripper ?block ?gripper)) (not (exclusively-occupying-gripper ?mug ?gripper)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (open ?mug) (small-enough-for-gripper-to-pick-up ?block ?gripper) (small-enough-for-gripper-to-pick-up ?mug ?gripper) (small-enough-to-fit-in-container ?block ?mug))
      :effect (and
@@ -100,7 +100,7 @@
     )
 
 
-    (:action place-on-tabletop
+    (:action place-on-table-from-gripper
      :parameters (?gripper - gripper ?mug - mug ?table - table)
      :precondition (and (exclusively-occupying-gripper ?mug ?gripper) (not (directly-on-table ?mug ?table)) (not (free ?gripper)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (open ?mug) (small-enough-for-gripper-to-pick-up ?mug ?gripper))
      :effect (and

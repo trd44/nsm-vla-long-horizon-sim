@@ -21,7 +21,7 @@
     (:action pick-up-nut-from-tabletop
         :parameters (?nut - nut ?table - table ?gripper - gripper) 
         :precondition (and (directly-on-table ?nut ?table) (small-enough-for-gripper-to-pick-up ?nut ?gripper) (free ?gripper)) 
-        :effect (and (exclusively-occupying-gripper ?nut ?gripper) (not (directly-on-table ?nut ?table)) (not (free ?gripper)))
+        :effect (and (exclusively-occupying-gripper ?nut ?gripper) (not (free ?gripper)) (not (directly-on-table ?nut ?table)))
     ) 
     
 

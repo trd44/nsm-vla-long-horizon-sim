@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain coffee)
-    (:requirements :typing :equality)
+    (:requirements :equality :typing)
     (:types
         gripper - object
         table - object
@@ -24,15 +24,15 @@
     )
 
     (:predicates
-        (small-enough-for-gripper-to-pick-up ?x1 - tabletop-object ?x2 - gripper)
+        (attached ?x1 - coffee-machine-lid ?x2 - coffee-pod-holder)
         (can-flip-up ?x1 - coffee-machine-lid)
         (can-flip-down ?x1 - coffee-machine-lid)
         (directly-on-table ?x1 - tabletop-object ?x2 - table)
         (exclusively-occupying-gripper ?x1 - tabletop-object ?x2 - gripper)
-        (attached ?x1 - coffee-machine-lid ?x2 - coffee-pod-holder)
+        (free ?x1 - gripper)
         (in ?x1 - tabletop-object ?x2 - container)
         (open ?x1 - container)
-        (free ?x1 - gripper)
+        (small-enough-for-gripper-to-pick-up ?x1 - tabletop-object ?x2 - gripper)
         (under ?x1 - mug ?x2 - coffee-pod-holder)
         (upright ?x1 - mug)
     )
@@ -49,8 +49,8 @@
      :precondition (and (directly-on-table ?tabletop-object ?table) (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?tabletop-object ?gripper)
-        (not (directly-on-table ?tabletop-object ?table))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (directly-on-table ?tabletop-object ?table)))
     )
 
 
@@ -59,9 +59,9 @@
      :precondition (and (not (open ?holder)) (can-flip-up ?lid) (attached ?lid ?holder) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?lid ?gripper)
-        (can-flip-down ?lid)
+        (not (free ?gripper))
         (open ?holder)
-        (not (free ?gripper)))
+        (can-flip-down ?lid))
     )
 
 
@@ -70,8 +70,8 @@
      :precondition (and (open ?holder) (can-flip-down ?lid) (attached ?lid ?holder) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?lid ?gripper)
-        (not (open ?holder))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (open ?holder)))
     )
 
 
@@ -89,9 +89,10 @@
      :precondition (and (exclusively-occupying-gripper ?pod ?gripper) (open ?holder) (not (free ?gripper)))
      :effect (and
         (not (exclusively-occupying-gripper ?pod ?gripper))
-        (in ?pod ?holder)
-        (free ?gripper))
+        (free ?gripper)
+        (in ?pod ?holder))
     )
+
 
 
     (:action place-mug-under-holder-from-gripper
@@ -115,7 +116,7 @@
     )
 
 
-    (:action pick-up-object-from-open-container
+    (:action pick-up-from-drawer
      :parameters (?coffee-pod - coffee-pod ?drawer - drawer ?gripper - gripper)
      :precondition (and (free ?gripper) (in ?coffee-pod ?drawer) (not (exclusively-occupying-gripper ?coffee-pod ?gripper)) (not (exclusively-occupying-gripper ?drawer ?gripper)) (not (small-enough-for-gripper-to-pick-up ?drawer ?gripper)) (open ?drawer) (small-enough-for-gripper-to-pick-up ?coffee-pod ?gripper))
      :effect (and

@@ -4,20 +4,21 @@
     (:requirements :strips :typing)
     (:types
         gripper table tabletop-object - object
-        coffee-pod container - tabletop-object
+        coffee-pod coffee-machine-lid container - tabletop-object
         mug coffee-pod-holder drawer - container
     )
 
     ;; Define predicates
     (:predicates
-    
+        (attached ?lid - coffee-machine-lid ?holder - coffee-pod-holder)
+        (can-flip-up ?lid - coffee-machine-lid)
+        (can-flip-down ?lid - coffee-machine-lid)
         (directly-on-table ?tabletop-object - tabletop-object ?table - table) ; whether the object is on the table directly making contact with the table.
         (exclusively-occupying-gripper ?tabletop-object - tabletop-object ?gripper - gripper) ; whether the object is occupying the gripper. If true, `free gripper` should be false. 
         (free ?gripper - gripper) ; whether the gripper is not occupied by anything. If true, there should be no true `exclusively-occupying-gripper` atoms.
         (in ?tabletop-object - tabletop-object ?container - container) ; whether the object is inside the container.
         (open ?container - container) ; whether the container is open
         (small-enough-for-gripper-to-pick-up ?tabletop-object - tabletop-object ?gripper - gripper); whether the object can be picked up.(inside ?tabletop-object - tabletop-object ?container - container) ; whether the object is inside the container.
-        
         (under ?mug - mug ?holder - coffee-pod-holder) ; whether the bottom tabletop object is under the top tabletop object.
         (upright ?mug - mug) ; whether the mug is upright.
     )
@@ -28,8 +29,8 @@
      :precondition (and (directly-on-table ?tabletop-object ?table) (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?tabletop-object ?gripper)
-        (not (directly-on-table ?tabletop-object ?table))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (directly-on-table ?tabletop-object ?table)))
     )
 
 
@@ -38,9 +39,9 @@
      :precondition (and (not (open ?holder)) (can-flip-up ?lid) (attached ?lid ?holder) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?lid ?gripper)
-        (can-flip-down ?lid)
+        (not (free ?gripper))
         (open ?holder)
-        (not (free ?gripper)))
+        (can-flip-down ?lid))
     )
 
 
@@ -49,8 +50,8 @@
      :precondition (and (open ?holder) (can-flip-down ?lid) (attached ?lid ?holder) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?lid ?gripper)
-        (not (open ?holder))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (open ?holder)))
     )
 
 
@@ -68,8 +69,8 @@
      :precondition (and (exclusively-occupying-gripper ?pod ?gripper) (open ?holder) (not (free ?gripper)))
      :effect (and
         (not (exclusively-occupying-gripper ?pod ?gripper))
-        (in ?pod ?holder)
-        (free ?gripper))
+        (free ?gripper)
+        (in ?pod ?holder))
     )
 
 

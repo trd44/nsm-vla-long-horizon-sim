@@ -346,12 +346,15 @@ class HybridSymbolicLLMPlanner:
             proposed_op_str, grounded_params = prompt_llm_for_operator_name_params()
             if proposed_op_str == '': # LLM decided not to propose an operator
                 proposed_op:OperatorCandidate = OperatorCandidate('')
+                continue
             else:
                 proposed_op:OperatorCandidate = self.parse_operator(proposed_op_str)
+                if proposed_op.is_empty():
+                    continue
                 proposed_op.set_grounded_params(grounded_params)
                 # standardize the name of the parameters
                 params = self.from_grounded_constants_to_lifted(state, grounded_params)
-                lifted_params = [f"?{params[c].name} - {params[c].name}" for c in grounded_params]
+                lifted_params = [f"?{params[c].name} - {params[c].name}" for c in grounded_params if c != '']
                 proposed_op.set_parameters(lifted_params)
                 # fill the precondition with the true and false atoms involving the parameter objects
                 proposed_op = fill_operator_precondition(proposed_op, grounded_params)
@@ -361,7 +364,7 @@ class HybridSymbolicLLMPlanner:
                 proposed_op = self.parse_operator(proposed_op_w_effects_str)
             counter.add_operator_candidate(proposed_op)
             # early stopping if there's a majority candidate
-            if counter.get_max_operator_candidate() > self.config['planning']['num_op_candidates'] // 2:
+            if counter.get_max_operator_candidate_count() > self.config['planning']['num_op_candidates'] // 2:
                 break
         
         return counter.get_max_operator_candidate()
@@ -498,7 +501,7 @@ class HybridSymbolicLLMPlanner:
         Returns:
             List[str]: the lifted constants
         """
-        constants_to_lifted_mapping = {c: model.language.get_constant(c).sort for c in constants}
+        constants_to_lifted_mapping = {c: model.language.get_constant(c).sort for c in constants if c != ''}
         return constants_to_lifted_mapping
 
     def relevant_objs_only_state_description(self, state:Model, obj_constants:List[str], grounded=False) -> Tuple[Set[str], Set[str]]:
