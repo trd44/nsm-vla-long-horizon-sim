@@ -244,8 +244,7 @@ class Learner:
         self.grounded_operator = grounded_operator_to_learn
         self.env = self._wrap_env(env)
         self.eval_env = self._wrap_env(deepcopy_env(env, config))
-        #self._llm_order_effects()
-        #self._llm_sub_goal_reward_shaping()
+        self.llm_reward_shaping_fn = self._load_llm_sub_goal_reward_shaping_fn()
 
     def learn(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the operator.
@@ -261,11 +260,6 @@ class Learner:
             log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/eval_logs",
             **self.config['learning']['eval']
         )
-
-        # the learning config is everything in `self.config` except for the `eval` key
-        # get rid of the `eval` key
-
-
         model = SAC(
             "MlpPolicy",
             env = self.env,
@@ -298,25 +292,25 @@ class Learner:
         """
         effects:str = '\n'.join([eff.pddl_repr() for eff in self.grounded_operator.effects])
         return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects:\n{effects}\n"
-    
-    def _llm_order_effects(self):
-        """Prompt the LLM to order the effects of the grounded operator in terms of which effects are expected to be achieved before others.
-        """
-        def find_effect(effect_name:str, effects:List[fs.SingleEffect]) -> fs.SingleEffect:
-            for effect in effects:
-                if effect.pddl_repr() == effect_name:
-                    return effect
-            return None
-        
-        grounded_op = self._grounded_operator_repr()
-        prompt = order_effects_prompt.format(grounded_operator=grounded_op)
-        out = chat_completion(prompt)
-        # ordered effects section is the part of the output after `effects:` and before the ````
-        ordered_effects_section:str = out.split('effects:')[1].split('```')[0].strip()
-        ordered_effects:List[str] = ordered_effects_section.split('\n')
-        ordered_effects:List[fs.SingleEffect] = [find_effect(effect_name, self.grounded_operator.effects) for effect_name in ordered_effects]
-        self.grounded_operator.effects = ordered_effects
 
+    
+    def _load_llm_sub_goal_reward_shaping_fn(self) -> Callable:
+        """Load the LLM generated sub-goal reward shaping function for the grounded operator
+
+        Returns:
+            Callable: the sub-goal reward shaping function. Creates the function if it does not exist
+        """
+        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+        # if the file exists, import the function and return it. Otherwise, prompt the LLM to write the function
+        try:
+            llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
+            llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
+        except:
+            self._llm_sub_goal_reward_shaping()
+            llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
+            llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
+        return llm_reward_shaping_func
+    
     def _llm_sub_goal_reward_shaping(self):
         """Prompt the LLM to write a sub-goal reward shaping function that takes in an effect (sub-goal) and the observation with semantics and returns a reward depending on the progress towards achieving the effect.
         """
