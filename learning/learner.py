@@ -118,9 +118,10 @@ class CustomEvalCallback(EvalCallback):
             return continue_training
 
 class OperatorWrapper(gym.Wrapper):
-    def __init__(self, env, detector:detection.detector.Detector, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         super().__init__(env)
-        self.detector = detector
+        self.detector = load_detector(config=config, env=env)
+        print(f"detector env's id: {id(self.detector.env)}, OperatorWrapper's env's id: {id(self.env)}")
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
@@ -131,10 +132,10 @@ class OperatorWrapper(gym.Wrapper):
         except:
             obs, reward, done, info = self.env.step(action)
         truncated = truncated or self.env.done
-        self.detector.update_obs()
+        # compute the reward based on the observation with semantics
         obs_with_semantics:dict = self.detector.get_obs()
-        
-        reward = self.compute_reward(obs_with_semantics)
+        binary_obs:dict = self.detector.detect_binary_states(self.env)
+        reward = self.compute_reward(obs_with_semantics, binary_obs)
         
         return obs, reward, done, truncated, info
 
@@ -192,11 +193,12 @@ class OperatorWrapper(gym.Wrapper):
                 exclusively_occupying_gripper_effect_present = True
         return not_free_gripper_effect_present and exclusively_occupying_gripper_effect_present
 
-    def compute_reward(self, obs:dict) -> float:
+    def compute_reward(self, numeric_obs_with_semantics:dict, binary_obs:dict) -> float:
         """compute the reward by calling a LLM generated reward function on an observation with semantics
 
         Args:
-            obs (dict): the observation in which the keys have semantics and the values are arrays of numeric values
+            numeric_obs_with_semantics: the observation in which the keys have semantics and the values are arrays of numeric values
+            binary_obs: the binary observation whose keys are predicates and values are True/False
 
         Returns:
             float: the reward between -1, 0
@@ -207,9 +209,6 @@ class OperatorWrapper(gym.Wrapper):
         llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
 
         llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
-
-        # get the binary detector observation whose keys are predicates and values are True/False
-        binary_obs:dict = self.detector.get_groundings()
         
         # there is a step cost of -1 regardless
         step_cost = -1
@@ -227,18 +226,15 @@ class OperatorWrapper(gym.Wrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 sub_goal_reward += 1/num_effects
             else:
-                sub_goal_reward += llm_reward_shaping_func(obs, effect.pddl_repr()) * 1/num_effects
+                sub_goal_reward += llm_reward_shaping_func(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
                 return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
 
         
-
-
 class Learner:
-    def __init__(self, env, domain:str, detector:detection.detector.Detector, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+    def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
-        self.detector = detector
         self.domain = domain
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
@@ -347,7 +343,7 @@ class Learner:
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
         env = GymWrapper(env)
-        env = OperatorWrapper(env, self.detector, self.grounded_operator, self.executed_operators, self.config)
+        env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config)
         env = Monitor(
             env=env, 
             filename=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/monitor_logs",

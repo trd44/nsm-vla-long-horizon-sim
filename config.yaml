@@ -28,14 +28,14 @@ learning:
     buffer_size: 1000000
     gamma: 0.99 # default
     learning_rate: 0.0003
-    learning_starts: 10000
+    learning_starts: 1 # default 10000
     verbose: 1
     policy_kwargs:
       net_arch: [512, 512, 256]
     seed: 0
     tau: 0.005 # default
   eval:
-    eval_freq: 10000 # default
+    eval_freq: 1 # default 10000
     n_eval_episodes: 5
     deterministic: True
     render: False 
@@ -45,19 +45,19 @@ learning:
   
 # setting for testing PDDL. Uncoment when testing.
 
-planning:
-  planning_dir: "planning/PDDL/coffee"
-  domain: "coffee"
-  init_planning_domain: "coffee_domain.pddl" # the initial domain file
-  modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
-  planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
-  planning_goal_node: "goal_node" # the pickled file name for the goal node
-  novel_objects: ["drawer1"]
-  num_op_candidates: 5
-  max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-  max_num_llm_calls: 60
-  max_depth: 15 # maximum search depth
-  min_plan_candidates: 1 # end search early if this many plans are found
+# planning:
+#   planning_dir: "planning/PDDL/coffee"
+#   domain: "coffee"
+#   init_planning_domain: "coffee_domain.pddl" # the initial domain file
+#   modified_planning_domain: "modified_coffee_domain.pddl" # final domain file will be saved as this
+#   planning_problem: "coffee_problem.pddl" # the partially defined planning problem file
+#   planning_goal_node: "goal_node" # the pickled file name for the goal node
+#   novel_objects: ["drawer1"]
+#   num_op_candidates: 5
+#   max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+#   max_num_llm_calls: 60
+#   max_depth: 15 # maximum search depth
+#   min_plan_candidates: 1 # end search early if this many plans are found
 
 # planning:
 #   planning_dir: "planning/PDDL/cleanup"
@@ -73,19 +73,19 @@ planning:
 #   max_depth: 15 # maximum search depth
 #   min_plan_candidates: 1 # end search early if this many plans are found
 
-# planning:
-#   planning_dir: "planning/PDDL/nut_assembly"
-#   domain: "nut_assembly"
-#   init_planning_domain: "nut_assembly_domain.pddl" # the initial domain file
-#   modified_planning_domain: "modified_nut_assembly_domain.pddl" # final domain file will be saved as this
-#   planning_problem: "nut_assembly_problem.pddl" # the partially defined planning problem file
-#   planning_goal_node: "goal_node" # the pickled file name for the goal node
-#   novel_objects: ["round-peg1"]
-#   num_op_candidates: 5
-#   max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
-#   max_num_llm_calls: 30
-#   max_depth: 4 # maximum search depth
-#   min_plan_candidates: 1 # end search early if this many plans are found
+planning:
+  planning_dir: "planning/PDDL/nut_assembly"
+  domain: "nut_assembly"
+  init_planning_domain: "nut_assembly_domain.pddl" # the initial domain file
+  modified_planning_domain: "modified_nut_assembly_domain.pddl" # final domain file will be saved as this
+  planning_problem: "nut_assembly_problem.pddl" # the partially defined planning problem file
+  planning_goal_node: "goal_node" # the pickled file name for the goal node
+  novel_objects: ["round-peg1"]
+  num_op_candidates: 5
+  max_new_operators_branching_factor: 1 # prompt the llm this many times in each state for a new operator
+  max_num_llm_calls: 30
+  max_depth: 4 # maximum search depth
+  min_plan_candidates: 1 # end search early if this many plans are found
 
 
 logging: # TODO: enable this

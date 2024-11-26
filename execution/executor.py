@@ -44,7 +44,7 @@ class Executor():
 		Returns;
 			Tuple[bool, Set[str]]: a tuple of a boolean value indicating whether the precondition holds and a set of unsatisfied preconditions
 		"""
-		groundings = detector.get_groundings()
+		groundings = detector.detect_binary_states()
 		precondition = self.grounded_operator.precondition
 		unsatisfied_conditions = set()
 		for precond in precondition.subformulas: # assume precondition is a conjunction of literals
@@ -81,7 +81,7 @@ class Executor():
 			logging.info(f"Unintended effects: {unintended_effects}")
 			return False, list(unintended_effects)
 		# There are no unintended effects. Check if all intended effects are satisfied
-		groundings = detector.get_groundings()
+		groundings = detector.detect_binary_states()
 		unsatisfied_effects = set()
 		for effect in effects:
 			# check if effect is negated

@@ -1,8 +1,7 @@
-import copy
 import os
 import dill
 import importlib
-import mimicgen
+import detection.detector
 import execution.executor
 import learning.learner
 import planning.hybrid_symbolic_llm_planner
@@ -10,7 +9,6 @@ import planning.planning_utils
 from utils import *
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
-from robosuite.environments.base import MujocoEnv
 from tarski import fstrips as fs
 
 class HybridPlanningLearningAgent:
@@ -19,7 +17,7 @@ class HybridPlanningLearningAgent:
         self.domain:str = self.config['planning']['domain']
         self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config)
         self.env = load_env(self.domain, self.config)
-        self.detector = self._load_detector()
+        self.detector = load_detector(self.config, self.env)
     
     def plan_learn_execute(self):
         """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file, learn a policy for each of the newly defined operators and execute each operator in the plan
@@ -30,13 +28,11 @@ class HybridPlanningLearningAgent:
             self.env.reset()
             plan:List[fs.Action] = self.plan()
             executed_operators:Dict[fs.Action:execution.executor.Executor] = {}
-            while len(plan) > 0:
+            while len(plan) > 0: # execute each operator in the plan
                 grounded_operator = plan.pop(0)
                 executor_exists, execution_successful, executor = self.execute_operator(grounded_operator)
-                if not executor_exists:
+                if not executor_exists: # learn the operator if it does not have an executor
                     self.learn_operator(grounded_operator, executed_operators)
-                    # if not learning_successful:
-                    #     raise Exception(f"Learning of operator {grounded_operator} failed")
                     _, execution_successful, executor = self.execute_operator(grounded_operator)
                 if not execution_successful: # restart the `plan_learn_execute` loop
                     break
@@ -102,10 +98,7 @@ class HybridPlanningLearningAgent:
         """
         # deep copy env and detector to avoid modifying the original env and detector
         env_copy = deepcopy_env(self.env, self.config)
-        detector_copy = self._load_detector()
-        detector_copy.set_env(env_copy)
-
-        learner = learning.learner.Learner(env_copy, self.domain, detector_copy, grounded_operator, executed_operators, self.config)
+        learner = learning.learner.Learner(env_copy, self.domain, grounded_operator, executed_operators, self.config)
         learner.learn()
 
     def _load_plan(self):
@@ -136,34 +129,7 @@ class HybridPlanningLearningAgent:
         goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
         plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
         return plan
-        
-    
-    def _load_env(self):
-        """load the simulation environment based on the problem domain specified in the config file
-        """
-        envs = set(suite.ALL_ENVIRONMENTS)
-        # keep only envs that correspond to the different reset distributions from the paper
-        # only keep envs that end with "Novelty"
-        envs = [x for x in envs if x[-7:] == "Novelty"]
-        # find the novelty env i.e. the post-novelty env whose name contains the domain
-        lower_case_domain = self.domain.lower().replace('_', '')
-        for env_name in envs:
-            if lower_case_domain in env_name.lower() and 'pre_novelty' not in env_name.lower():
-                gym_env = suite.make(
-                    env_name = env_name,
-                    **self.config['simulation'],
-                    controller_configs = load_controller_config(default_controller="OSC_POSE")
-                )
-                return gym_env
 
-    
-    def _load_detector(self):
-        """load the detector based on the problem domain specified in the config file
-        """
-        detector_module = importlib.import_module(self.config['detection_dir']+'.'+self.domain+'_detector')
-        camel_case_domain = ''.join([word.capitalize() for word in self.domain.split('_')])     
-        detector = getattr(detector_module, camel_case_domain+'Detector')
-        return detector(self.env)
 
 if __name__ == '__main__':
     agent = HybridPlanningLearningAgent()

@@ -1,4 +1,5 @@
 from detection.detector import Detector
+from mimicgen.envs.robosuite.nut_assembly import NutAssembly_D0_RoundPeg_Novelty
 
 class NutAssemblyDetector(Detector):
     '''
@@ -153,25 +154,14 @@ class NutAssemblyDetector(Detector):
                 return False
         return True
     
-    def _is_type(self, obj, obj_type):
-        """Returns True if the object is of the specified type.
+    def verify_env(self, env) -> bool:
+        '''
+        Verify if the environment is correct.
 
         Args:
-            obj (str): the object
-            obj_type (str): the object type
+            env (MujocoEnv): The environment
 
         Returns:
-            bool: True if the object is of the specified type
-        """
-        return obj in self.object_types[obj_type]
-    
-    def _to_pddl_format(self, objs):
-        """Converts the grounded object to their pddl format.
-
-        Args:
-            objs (List[str]): the grounded objects
-
-        Returns:
-            List[str]: the pddl objects
-        """
-        return [self.grounded_object_to_pddl_object.get(obj) for obj in objs]
+            bool: True if the environment is correct
+        '''
+        return isinstance(env, NutAssembly_D0_RoundPeg_Novelty)

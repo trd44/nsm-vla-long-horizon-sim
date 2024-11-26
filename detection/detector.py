@@ -1,5 +1,6 @@
 import itertools
 from typing import *
+from robosuite.environments.base import MujocoEnv
 
 class Detector:
     def __init__(self, env, return_int=False):
@@ -13,6 +14,7 @@ class Detector:
         return self.env
     
     def get_obs(self):
+        self.update_obs()
         return self.obs
     
     def set_env(self, env):
@@ -29,15 +31,27 @@ class Detector:
         else:
             self.obs = self.env.viewer._get_observations() if self.env.viewer_get_obs else self.env._get_observations()
     
-    def get_groundings(self) -> dict:
-        """Returns the groundings for the coffee detector.
-
+    def verify_env(self, env) -> bool:
+        """Verify that the environment is the correct environment class
+        Args:
+            env (MujocoEnv): the environment
         Returns:
-            dict: the groundings for the coffee detector
+            bool: True if the environment is correct
         """
-        groundings = {}
+        # must be implemented by the subclass
+        raise NotImplementedError("The verify_env method must be implemented in the subclass")
+    
+    def detect_binary_states(self, env) -> dict:
+        """Returns the groundings for the coffee detector.
+        Args:
+            env (MujocoEnv): the environment
+        Returns:
+            dict: the groundings for the detector
+        """
+        self.set_env(env)
+        obs = {}
         for predicate_name, predicate in self.predicates.items():
-            groundings[predicate_name] = {}
+            obs[predicate_name] = {}
             param_list = []
             # e.g. for predicate_name = 'inside', predicate['params'] = ['tabletop_object', 'container']
             for param_type in predicate['params']:
@@ -49,8 +63,8 @@ class Detector:
             for comb in param_combinations:
                 truth_value = callable_func(*comb)
                 predicate_str = f'{predicate_name} {" ".join(self._to_pddl_format(comb))}'
-                groundings[predicate_str] = truth_value
-        return groundings
+                obs[predicate_str] = truth_value
+        return obs
     
     def r_int(self, value):
         return int(value) if self.return_int else value

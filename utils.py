@@ -1,11 +1,12 @@
 import os
 import yaml
 import copy
+import detection.detector
 import json
 import re
 import copy
+import importlib
 import numpy as np
-import mimicgen
 import subprocess
 import base64
 from typing import *
@@ -24,6 +25,20 @@ def load_config(config_file):
         config = yaml.safe_load(file)
     return config
 
+def load_detector(config:dict, env:MujocoEnv) -> detection.detector.Detector:
+    """load the detector based on the domain specified in the config file
+    Args:
+        config (dict): the configuration dictionary
+        env (MujocoEnv): the underlying environment
+    Returns:
+        Detector: the detector object
+    """
+    domain = config['planning']['domain']
+    detector_module = importlib.import_module(config['detection_dir']+'.'+domain+'_detector')
+    camel_case_domain = ''.join([word.capitalize() for word in domain.split('_')])     
+    detector = getattr(detector_module, camel_case_domain+'Detector')
+    return detector(env)
+
 def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
     # Load the model
     set_random_seed(seed, using_cuda=True)
@@ -33,6 +48,7 @@ def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
 def load_env(domain:Union[str, MujocoEnv], config:str):
     """load the simulation environment based on the problem domain specified in the config file
     """
+    import mimicgen
     envs = set(suite.ALL_ENVIRONMENTS)
     # keep only envs that correspond to the different reset distributions from the paper
     # only keep envs that end with "Novelty"

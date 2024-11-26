@@ -1,6 +1,7 @@
 from detection.detector import Detector
 from typing import *
 from scipy.spatial.transform import Rotation as R
+from mimicgen.envs.robosuite.coffee import Coffee_Drawer_Novelty
 
 class CoffeeDetector(Detector):
     def __init__(self, env, return_int=False):
@@ -67,8 +68,12 @@ class CoffeeDetector(Detector):
 
     
     def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str) -> bool:
-        """
-        Returns True if the object is small enough for the gripper to pick up.
+        """Returns True if the object is small enough for the gripper to pick up.
+        Args:
+            tabletop_obj (str): the tabletop object
+            
+        Returns:
+            bool: True if the object is small enough for the gripper to pick up
         """
         #hardcoding mug and pod to be small enough to pick up
         if 'mug' in tabletop_obj or 'coffee_pod' in tabletop_obj:
@@ -100,11 +105,12 @@ class CoffeeDetector(Detector):
         assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
         return not self.can_flip_up(coffee_machine_lid)
 
-    def directly_on_table(self, tabletop_obj:str, table='table') -> bool:
+    def directly_on_table(self, tabletop_obj:str, table:str) -> bool:
         """Returns True if the object is directly on the table.
 
         Args:
             tabletop_obj (str): the tabletop object
+            table (str): the name of the table object
 
         Returns:
             bool: True if the object is directly on the table
@@ -116,7 +122,7 @@ class CoffeeDetector(Detector):
         return self.env.check_directly_on_table(tabletop_obj)
 
 
-    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
+    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper:str) -> bool:
         """Returns True if the object is exclusively occupying the gripper.
 
         Args:
@@ -229,25 +235,12 @@ class CoffeeDetector(Detector):
         assert self._is_type(mug, 'mug') and self._is_type(coffee_pod_holder, 'coffee_pod_holder')
         return self.env.check_mug_under_pod_holder()
     
-    def _is_type(self, obj, obj_type):
-        """Returns True if the object is of the specified type.
+    def verify_env(self, env) -> bool:
+        """Verify that the environment is the correct environment class.
 
         Args:
-            obj (str): the object
-            obj_type (str): the object type
-
+            env (MujocoEnv): the environment
         Returns:
-            bool: True if the object is of the specified type
+            bool: True if the environment is correct
         """
-        return obj in self.object_types[obj_type]
-    
-    def _to_pddl_format(self, objs):
-        """Converts the grounded object to their pddl format.
-
-        Args:
-            objs (List[str]): the grounded objects
-
-        Returns:
-            List[str]: the pddl objects
-        """
-        return [self.grounded_object_to_pddl_object.get(obj) for obj in objs]
+        return isinstance(env, Coffee_Drawer_Novelty)
