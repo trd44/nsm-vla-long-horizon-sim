@@ -125,6 +125,7 @@ class OperatorWrapper(gym.Wrapper):
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
+        self.llm_reward_shaping_fn:Callable = self._load_llm_sub_goal_reward_shaping_fn()
 
     def step(self, action):
         try:
@@ -136,6 +137,7 @@ class OperatorWrapper(gym.Wrapper):
         obs_with_semantics:dict = self.detector.get_obs()
         binary_obs:dict = self.detector.detect_binary_states(self.env)
         reward = self.compute_reward(obs_with_semantics, binary_obs)
+        done = done or reward == 1
         
         return obs, reward, done, truncated, info
 
@@ -203,12 +205,6 @@ class OperatorWrapper(gym.Wrapper):
         Returns:
             float: the reward between -1, 0
         """
-        # import the llm generated sub-goal reward shaping function
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-
-        llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
-
-        llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
         
         # there is a step cost of -1 regardless
         step_cost = -1
@@ -226,59 +222,10 @@ class OperatorWrapper(gym.Wrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 sub_goal_reward += 1/num_effects
             else:
-                sub_goal_reward += llm_reward_shaping_func(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
+                sub_goal_reward += self.llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
                 return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
-
-        
-class Learner:
-    def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
-        self.config = config
-        self.domain = domain
-        self.executed_operators = executed_operators
-        self.grounded_operator = grounded_operator_to_learn
-        self.env = self._wrap_env(env)
-        self.eval_env = self._wrap_env(deepcopy_env(env, config))
-        self.llm_reward_shaping_fn = self._load_llm_sub_goal_reward_shaping_fn()
-
-    def learn(self) -> execution.executor.Executor_RL:
-        """Train an RL agent to learn the operator.
-
-        Returns:
-            execution.executor.Executor_RL: an RL executor for the operator and executes the policy for the operator when called
-        """
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-
-        eval_callback = CustomEvalCallback(
-            eval_env=self.eval_env,
-            best_model_save_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/best_model",
-            log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/eval_logs",
-            **self.config['learning']['eval']
-        )
-        model = SAC(
-            "MlpPolicy",
-            env = self.env,
-            tensorboard_log=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/tensorboard_logs",
-            **self.config['learning']['model']
-        )
-        model.learn(
-            **self.config['learning']['learn'],
-            callback=eval_callback
-        )
-        model.save(
-            path = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model"
-        )
-        # create an Executor_RL object associated with the newly learned policy.
-        executor = execution.executor.Executor_RL(
-            operator_name=op_name, alg='SAC',
-            policy=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model", 
-        )
-        # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
-        with open(f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/executor.pkl", 'wb') as f:
-            dill.dump(executor, f)
-        return executor
-
     
     def _grounded_operator_repr(self) -> str:
         """Return a string representation of the grounded operator
@@ -330,6 +277,53 @@ class Learner:
         # create a file with the operator's name and save the function in it
         with open(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}{os.sep}{op_name}.py", 'w') as f:
             f.write(fn)
+
+        
+class Learner:
+    def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+        self.config = config
+        self.domain = domain
+        self.executed_operators = executed_operators
+        self.grounded_operator = grounded_operator_to_learn
+        self.env = self._wrap_env(env)
+        self.eval_env = self._wrap_env(deepcopy_env(env, config))
+
+    def learn(self) -> execution.executor.Executor_RL:
+        """Train an RL agent to learn the operator.
+
+        Returns:
+            execution.executor.Executor_RL: an RL executor for the operator and executes the policy for the operator when called
+        """
+        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+
+        eval_callback = CustomEvalCallback(
+            eval_env=self.eval_env,
+            best_model_save_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/best_model",
+            log_path=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/eval_logs",
+            **self.config['learning']['eval']
+        )
+        model = SAC(
+            "MlpPolicy",
+            env = self.env,
+            tensorboard_log=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/tensorboard_logs",
+            **self.config['learning']['model']
+        )
+        model.learn(
+            **self.config['learning']['learn'],
+            callback=eval_callback
+        )
+        model.save(
+            path = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model"
+        )
+        # create an Executor_RL object associated with the newly learned policy.
+        executor = execution.executor.Executor_RL(
+            operator_name=op_name, alg='SAC',
+            policy=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/model", 
+        )
+        # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
+        with open(f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/executor.pkl", 'wb') as f:
+            dill.dump(executor, f)
+        return executor
     
 
     def _wrap_env(self, env) -> gym.Wrapper:
