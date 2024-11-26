@@ -48,6 +48,7 @@ class Detector:
         Returns:
             dict: the groundings for the detector
         """
+        self.verify_env(env)
         self.set_env(env)
         obs = {}
         for predicate_name, predicate in self.predicates.items():

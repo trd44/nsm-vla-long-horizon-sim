@@ -243,4 +243,8 @@ class CoffeeDetector(Detector):
         Returns:
             bool: True if the environment is correct
         """
-        return isinstance(env, Coffee_Drawer_Novelty)
+        while hasattr(env, 'env'):
+            env = env.env
+            if isinstance(env, Coffee_Drawer_Novelty):
+                return True
+        return False

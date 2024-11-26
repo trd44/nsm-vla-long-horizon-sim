@@ -164,4 +164,9 @@ class NutAssemblyDetector(Detector):
         Returns:
             bool: True if the environment is correct
         '''
-        return isinstance(env, NutAssembly_D0_RoundPeg_Novelty)
+        # check whether the environment is a NutAssembly_D0_RoundPeg_Novelty environment wrapped in wrappers
+        while hasattr(env, 'env'):
+            env = env.env
+            if isinstance(env, NutAssembly_D0_RoundPeg_Novelty):
+                return True
+        return False

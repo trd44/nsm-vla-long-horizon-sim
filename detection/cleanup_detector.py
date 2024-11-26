@@ -178,6 +178,10 @@ class CleanupDetector(Detector):
         Returns:
             bool: True if the environment is correct
         """
-        return isinstance(env, CubeCleanup_Mug_Novelty)
+        while hasattr(env, 'env'):
+            env = env.env
+            if isinstance(env, CubeCleanup_Mug_Novelty):
+                return True
+        return False
 
         
