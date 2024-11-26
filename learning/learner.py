@@ -127,7 +127,17 @@ class OperatorWrapper(gym.Wrapper):
         self.config = config
         self.llm_reward_shaping_fn:Callable = self._load_llm_sub_goal_reward_shaping_fn()
 
-    def step(self, action):
+    def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
+        """step function that steps the environment and computes the reward based on the observation with semantics
+
+        Args:
+            action (array): 7 dimensional array representing the action to take
+
+        Returns:
+            Tuple[np.array, float, bool, bool, dict]: the observation, reward, done, truncated, and info
+        """
+        # discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
+        action = self._discretize_gripper_action(action)
         try:
             obs, reward, done, truncated, info = self.env.step(action)
         except:
@@ -226,6 +236,29 @@ class OperatorWrapper(gym.Wrapper):
                 return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
+    
+    def _discretize_gripper_action(self, action:np.array) -> np.array:
+        """discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
+
+        Args:
+            action (np.array): the action to discretize
+
+        Returns:
+            np.array: the discretized action
+        """
+        # discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
+        gripper_opening_min = self.env.action_space.low[-1]
+        gripper_opening_max = self.env.action_space.high[-1]
+        gripper_opening_range = gripper_opening_max - gripper_opening_min
+        gripper_close_threshold = gripper_opening_min + gripper_opening_range/3
+        gripper_open_threshold = gripper_opening_max - gripper_opening_range/3
+        if action[-1] < gripper_close_threshold: # close the gripper
+            action[-1] = gripper_opening_min
+        elif action[-1] > gripper_open_threshold: # open the gripper
+            action[-1] = gripper_opening_max
+        else: # do nothing
+            action[-1] = 0
+        return action
     
     def _grounded_operator_repr(self) -> str:
         """Return a string representation of the grounded operator
