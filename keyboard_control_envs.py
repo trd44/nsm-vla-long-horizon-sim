@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
             # Step through the simulation and render
             obs, reward, done, info = env.step(action)
-            groundings = detector.detect_binary_states()
+            groundings = detector.detect_binary_states(env)
             env.render()
 
     # Get action limits
