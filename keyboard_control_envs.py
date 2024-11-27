@@ -15,6 +15,7 @@ from detection.coffee_detector import CoffeeDetector
 from detection.cleanup_detector import CleanupDetector
 from detection.nut_assembly_detector import NutAssemblyDetector
 import numpy as np
+import mimicgen
 
 
 def choose_mimicgen_environment():
@@ -33,18 +34,11 @@ def choose_mimicgen_environment():
         pass
 
     # all base robosuite environments (and maybe robosuite task zoo)
-    robosuite_envs = set(suite.ALL_ENVIRONMENTS)
-
-    # all environments including mimicgen environments
-    import mimicgen
     all_envs = set(suite.ALL_ENVIRONMENTS)
-
-    # get only mimicgen envs
-    only_mimicgen = sorted(all_envs - robosuite_envs)
 
     # keep only envs that correspond to the different reset distributions from the paper
     # only keep envs that end with "Novelty"
-    envs = [x for x in only_mimicgen if x[-7:] == "Novelty"]
+    envs = sorted([x for x in all_envs if x[-7:] == "Novelty"])
 
     # Select environment to run
     print("Here is a list of environments in the suite:\n")

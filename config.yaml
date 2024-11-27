@@ -21,6 +21,15 @@ simulation:
   control_freq: 20
   reward_shaping: True
 
+# simulation environment setup for the evaluation of the RL policy during training. Parameters are the same as the simulation environment setup for the RL training above except for `has_renderer`
+eval_simulation:
+  robots: "Kinova3"
+  has_renderer: True
+  has_offscreen_renderer: False
+  use_camera_obs: False
+  control_freq: 20
+  reward_shaping: True
+
 # parameters for RL
 learning:
   model:
@@ -38,7 +47,8 @@ learning:
     eval_freq: 1 # default 10000
     n_eval_episodes: 5
     deterministic: True
-    render: False 
+    render: True # if True, make sure `render_mode` below is set up "human" and `eval_simulation` above is set up with `has_renderer` as True
+    render_mode: "human"
     verbose: 1
   learn:
     total_timesteps: 5000000

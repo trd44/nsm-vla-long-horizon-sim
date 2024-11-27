@@ -16,7 +16,7 @@ class HybridPlanningLearningAgent:
         self.config:dict = load_config(config_file)
         self.domain:str = self.config['planning']['domain']
         self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config)
-        self.env = load_env(self.domain, self.config)
+        self.env = load_env(self.domain, self.config['simulation'])
         self.detector = load_detector(self.config, self.env)
     
     def plan_learn_execute(self):
@@ -97,7 +97,7 @@ class HybridPlanningLearningAgent:
             executed_operators (List[fs.Action], optional): a list of operators that have been executed before the grounded operator. Defaults to [].
         """
         # deep copy env and detector to avoid modifying the original env and detector
-        env_copy = deepcopy_env(self.env, self.config)
+        env_copy = deepcopy_env(self.env, self.config['simulation'])
         learner = learning.learner.Learner(env_copy, self.domain, grounded_operator, executed_operators, self.config)
         learner.learn()
 

@@ -19,8 +19,9 @@ from utils import *
 from VLM.LlmApi import chat_completion
 
 class CustomEvalCallback(EvalCallback):
-    def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, verbose=1):
+    def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super(CustomEvalCallback, self).__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
+        self.eval_env.render_mode = render_mode
 
     def _on_step(self) -> bool:
 
@@ -147,7 +148,7 @@ class OperatorWrapper(gym.Wrapper):
         obs_with_semantics:dict = self.detector.get_obs()
         binary_obs:dict = self.detector.detect_binary_states(self.env)
         reward = self.compute_reward(obs_with_semantics, binary_obs)
-        done = done or reward == 1
+        done = done or reward == 0
         
         return obs, reward, done, truncated, info
 
@@ -319,7 +320,7 @@ class Learner:
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.env = self._wrap_env(env)
-        self.eval_env = self._wrap_env(deepcopy_env(env, config))
+        self.eval_env = self._wrap_env(deepcopy_env(env, config['eval_simulation']))
 
     def learn(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the operator.
@@ -360,7 +361,7 @@ class Learner:
     
 
     def _wrap_env(self, env) -> gym.Wrapper:
-        """Wrap the environment in a GymWrapper.
+        """Wrap the environment in multiple wrappers.
 
         Args:
             env (gym environment): the environment to wrap
