@@ -122,7 +122,6 @@ class OperatorWrapper(gym.Wrapper):
     def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         super().__init__(env)
         self.detector = load_detector(config=config, env=env)
-        print(f"detector env's id: {id(self.detector.env)}, OperatorWrapper's env's id: {id(self.env)}")
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
