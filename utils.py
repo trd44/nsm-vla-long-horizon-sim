@@ -15,6 +15,7 @@ from langchain.tools import tool
 from robosuite.controllers import load_controller_config
 from robosuite.utils.input_utils import *
 from robosuite.environments.base import MujocoEnv
+from robosuite.wrappers import VisualizationWrapper
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
 
@@ -45,7 +46,7 @@ def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
     model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
     return model
 
-def load_env(domain:Union[str, MujocoEnv], config:str):
+def load_env(domain:Union[str, MujocoEnv], config:dict) -> MujocoEnv:
     """load the simulation environment based on the problem domain specified in the config file
     """
     import mimicgen
@@ -55,27 +56,37 @@ def load_env(domain:Union[str, MujocoEnv], config:str):
     envs = [x for x in envs if x[-7:] == "Novelty"]
     if config is None:
         config = load_config(config_file)
-        
+    
+    gym_env = None
     if isinstance(domain, MujocoEnv):
         gym_env = suite.make(
             env_name = domain.__class__.__name__,
-            **config['simulation'],
+            **config,
             controller_configs = load_controller_config(default_controller="OSC_POSE"),
         )
-        return gym_env
+    elif isinstance(domain, str):
+        # find the novelty env i.e. the post-novelty env whose name contains the domain
+        lower_case_domain = domain.lower().replace('_', '')
+        for env_name in envs:
+            if (lower_case_domain in env_name.lower() or domain in env_name) and 'pre_novelty' not in env_name.lower():
+                gym_env = suite.make(
+                    env_name = env_name,
+                    **config,
+                    controller_configs = load_controller_config(default_controller="OSC_POSE"),
+                )
+                break
     
-    # find the novelty env i.e. the post-novelty env whose name contains the domain
-    lower_case_domain = domain.lower().replace('_', '')
-    for env_name in envs:
-        if (lower_case_domain in env_name.lower() or domain in env_name) and 'pre_novelty' not in env_name.lower():
-            gym_env = suite.make(
-                env_name = env_name,
-                **config['simulation'],
-                controller_configs = load_controller_config(default_controller="OSC_POSE"),
-            )
-            return gym_env
+    if gym_env is not None:
+        # set up the viewer for rendering
+        if config['has_renderer']:
+            # Wrap this environment in a visualization wrapper
+            gym_env = VisualizationWrapper(gym_env, indicator_configs=None)
+            gym_env.viewer.set_camera(camera_id=0)
+    else:
+        raise ValueError(f"Environment with domain {domain} not found")
+    return gym_env
 
-def deepcopy_env(env, config):
+def deepcopy_env(env, config) -> MujocoEnv:
     saved_sim_state = env.sim.get_state()
     env_copy = load_env(env, config)
     env_copy.reset()
@@ -425,6 +436,7 @@ def save_agent_view_image(image:np.array):
     Args:
         image (np.array): image of the agent's view
     """
+    config = load_config(config_file)
     image = Image.fromarray(image)
     # PIL image is flipped, so flip it back
     image = image.transpose(Image.FLIP_TOP_BOTTOM)
