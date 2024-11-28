@@ -125,6 +125,7 @@ class OperatorWrapper(gym.Wrapper):
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
+        self.domain = self.config['planning']['domain']
         self.llm_reward_shaping_fn:Callable = self._load_llm_sub_goal_reward_shaping_fn()
 
     def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
@@ -303,12 +304,12 @@ class OperatorWrapper(gym.Wrapper):
         fn_start = out.find('# llm generated reward shaping function')
         fn_end = out.find('```', fn_start)
         fn = out[fn_start:fn_end]
-        #save the output python function to a file in the reward_functions directory
+        # save the output python function to a file in the reward_functions directory
         # create the directory if it does not exist
         if not os.path.exists(f"learning{os.sep}reward_functions{os.sep}{self.domain}"):
-            os.makedirs(f"learning/reward_functions{os.sep}{self.domain}")
+            os.makedirs(f"learning{os.sep}reward_functions{os.sep}{self.domain}")
         # create a file with the operator's name and save the function in it
-        with open(f"learning/reward_functions{os.sep}{self.domain}{os.sep}{self.config['planning']['domain']}{os.sep}{op_name}.py", 'w') as f:
+        with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}.py", 'w') as f:
             f.write(fn)
 
         
@@ -368,7 +369,10 @@ class Learner:
         Returns:
             gym.Wrapper: the wrapped environment
         """
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+        op_name, grounded_params = extract_name_params_from_grounded(self.grounded_operator.ident())
+        # obs_with_semantics = env.viewer._get_observations() if env.viewer_get_obs else env._get_observations() # hacky way to get the observations with semantics
+        # obs_keys_to_inlcude = [k for k in obs_with_semantics.keys() if any(param in k for param in grounded_params)] # find the keys that include the parameters of the grounded operator
+
         env = GymWrapper(env)
         env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config)
         env = Monitor(
