@@ -9,5 +9,5 @@ Planning/HDDL/lilotane/
 __pycache__/
 .vscode/
 config.yaml
-learning/policies/*/*/eval_logs/*
-learning/policies/*/*/tensorboard_logs/*
+**/eval_logs/
+**/tensorboard_logs/
