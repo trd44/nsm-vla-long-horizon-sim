@@ -1,7 +1,9 @@
 import os
+import dill
 import yaml
 import copy
 import detection.detector
+import execution.executor
 import planning.planning_utils
 import json
 import re
@@ -95,6 +97,40 @@ def deepcopy_env(env, config) -> MujocoEnv:
     env_copy.sim.set_state(saved_sim_state)
     env_copy.sim.forward()
     return env_copy
+
+def load_executor(config:dict, grounded_operator:Union[str, fs.Action]) -> execution.executor.Executor:
+    """load the executor based on the domain and the grounded operator
+
+    Args:
+        config (dict): the configuration dictionary containing the configuration parameters for execution and planning
+        grounded_operator (Union[str, fs.Action]): the grounded operator
+
+    Returns:
+        execution.executor.Executor: the executor object for the grounded operator
+    """
+    domain = config['planning']['domain']
+    executor_module = importlib.import_module(f"{config['execution_dir']}{os.sep}{domain}{os.sep}{domain}'_executor")
+
+    EXECUTORS = getattr(executor_module, domain.upper()+'_EXECUTORS')
+    grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator.ident())
+    # unpickle the .pkl files in the domain executor directory which is where the learned executors are stored
+    learned_executors = {}
+    for file in os.listdir(f"{config['execution_dir']}{os.sep}{domain}"):
+        if file.endswith(".pkl"):
+            with open(file, 'rb') as f:
+                learned_executor:execution.executor.Executor = dill.load(f)
+                learned_executors[learned_executor.name] = learned_executor
+    
+    # check if the operator has an executor
+    executor = None
+    if grounded_operator_name in EXECUTORS: # operator has an executor
+        executor:execution.executor.Executor = EXECUTORS[grounded_operator_name]
+    elif grounded_operator_name in learned_executors: # operator has a learned executor
+        executor:execution.executor.Executor = learned_executors[grounded_operator_name]
+    else: # operator does not have an executor
+        return None
+    return executor
+
 
 def load_plan(config):
     """If the plan has been generated and saved, load the plan from the planning/PDDL directory according to the config
