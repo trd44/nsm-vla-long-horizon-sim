@@ -1,14 +1,11 @@
 import os
 import dill
 import importlib
-import detection.detector
 import execution.executor
 import learning.learner
 import planning.hybrid_symbolic_llm_planner
 import planning.planning_utils
 from utils import *
-from robosuite.controllers import load_controller_config
-from robosuite.utils.input_utils import *
 from tarski import fstrips as fs
 
 class HybridPlanningLearningAgent:
@@ -48,7 +45,7 @@ class HybridPlanningLearningAgent:
             List[fs.Action]: a list a sequence of actions to achieve the goal a.k.a the plans
         """
         # try loading the plan from the planning directory in case it has already been generated
-        plan = self._load_plan()
+        plan = load_plan(config=self.config)
         if plan is not None:
             return plan
         
@@ -100,35 +97,6 @@ class HybridPlanningLearningAgent:
         env_copy = deepcopy_env(self.env, self.config['simulation'])
         learner = learning.learner.Learner(env_copy, self.domain, grounded_operator, executed_operators, self.config)
         learner.learn()
-
-    def _load_plan(self):
-        """If the plan has been generated and saved, load the plan from the 
-        """
-        # search the `planning_dir` for the latest goal node pkl file i.e. the one with the largest number
-        def find_file_with_largest_number(directory):
-            largest_file = None
-            largest_number = None
-
-            for filename in os.listdir(directory):
-                if self.config['planning']['planning_goal_node'] not in filename:
-                    continue
-                # Extract number at the end of the file name (e.g., file123)
-                match = re.search(r'(\d+)(?=\.\w+$)', filename)
-                if match:
-                    number = int(match.group(1))
-                    # Update largest file and number if this one is larger
-                    if largest_number is None or number > largest_number:
-                        largest_number = number
-                        largest_file = filename
-
-            return directory+os.sep+largest_file, largest_number
-        
-        goal_node_pkl, _ = find_file_with_largest_number(self.config['planning']['planning_dir'])
-        if goal_node_pkl is None:
-            return None
-        goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
-        plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
-        return plan
 
 
 if __name__ == '__main__':
