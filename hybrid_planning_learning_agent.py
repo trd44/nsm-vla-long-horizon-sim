@@ -1,12 +1,12 @@
 import os
 import dill
 import importlib
-import execution.executor
 import learning.learner
 import planning.hybrid_symbolic_llm_planner
 import planning.planning_utils
 from utils import *
 from tarski import fstrips as fs
+from execution.executor import Executor
 
 class HybridPlanningLearningAgent:
     def __init__(self, config_file='config.yaml'):
@@ -24,7 +24,7 @@ class HybridPlanningLearningAgent:
         while iteration < self.config['plan_learn_execute']['max_iter'] and not goal_achieved:
             self.env.reset()
             plan:List[fs.Action] = self.plan()
-            executed_operators:Dict[fs.Action:execution.executor.Executor] = OrderedDict()
+            executed_operators:Dict[fs.Action:Executor] = OrderedDict()
             while len(plan) > 0: # execute each operator in the plan
                 grounded_operator = plan.pop(0)
                 executor_exists, execution_successful, executor = self.execute_operator(grounded_operator)
@@ -56,7 +56,7 @@ class HybridPlanningLearningAgent:
             return plans[0]
         raise Exception("No plan found")
     
-    def execute_operator(self, grounded_operator:fs.Action) -> Tuple[bool, bool, execution.executor.Executor]:
+    def execute_operator(self, grounded_operator:fs.Action) -> Tuple[bool, bool, Executor]:
         """execute the operator in the simulation environment
 
         Args:
