@@ -1,7 +1,10 @@
 import os
+import dill
 import yaml
 import copy
 import detection.detector
+import execution.executor
+import planning.planning_utils
 import json
 import re
 import copy
@@ -18,6 +21,7 @@ from robosuite.environments.base import MujocoEnv
 from robosuite.wrappers import VisualizationWrapper
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
+from tarski import fstrips as fs
 
 config_file = "config.yaml"
 
@@ -93,6 +97,71 @@ def deepcopy_env(env, config) -> MujocoEnv:
     env_copy.sim.set_state(saved_sim_state)
     env_copy.sim.forward()
     return env_copy
+
+def load_executor(config:dict, grounded_operator:Union[str, fs.Action]) -> execution.executor.Executor:
+    """load the executor based on the domain and the grounded operator
+
+    Args:
+        config (dict): the configuration dictionary containing the configuration parameters for execution and planning
+        grounded_operator (Union[str, fs.Action]): the grounded operator
+
+    Returns:
+        execution.executor.Executor: the executor object for the grounded operator
+    """
+    domain = config['planning']['domain']
+    executor_module = importlib.import_module(f"{config['execution_dir']}{os.sep}{domain}{os.sep}{domain}'_executor")
+
+    EXECUTORS = getattr(executor_module, domain.upper()+'_EXECUTORS')
+    grounded_operator_name, _ = extract_name_params_from_grounded(grounded_operator.ident())
+    # unpickle the .pkl files in the domain executor directory which is where the learned executors are stored
+    learned_executors = {}
+    for file in os.listdir(f"{config['execution_dir']}{os.sep}{domain}"):
+        if file.endswith(".pkl"):
+            with open(file, 'rb') as f:
+                learned_executor:execution.executor.Executor = dill.load(f)
+                learned_executors[learned_executor.name] = learned_executor
+    
+    # check if the operator has an executor
+    executor = None
+    if grounded_operator_name in EXECUTORS: # operator has an executor
+        executor:execution.executor.Executor = EXECUTORS[grounded_operator_name]
+    elif grounded_operator_name in learned_executors: # operator has a learned executor
+        executor:execution.executor.Executor = learned_executors[grounded_operator_name]
+    else: # operator does not have an executor
+        return None
+    return executor
+
+
+def load_plan(config):
+    """If the plan has been generated and saved, load the plan from the planning/PDDL directory according to the config
+    Args:
+        config (dict): the configuration dictionary containing configuration parameters for planning
+    """
+    # search the `planning_dir` for the latest goal node pkl file i.e. the one with the largest number
+    def find_file_with_largest_number(directory):
+        largest_file = None
+        largest_number = None
+
+        for filename in os.listdir(directory):
+            if config['planning']['planning_goal_node'] not in filename:
+                continue
+            # Extract number at the end of the file name (e.g., file123)
+            match = re.search(r'(\d+)(?=\.\w+$)', filename)
+            if match:
+                number = int(match.group(1))
+                # Update largest file and number if this one is larger
+                if largest_number is None or number > largest_number:
+                    largest_number = number
+                    largest_file = filename
+
+        return directory+os.sep+largest_file, largest_number
+    
+    goal_node_pkl, _ = find_file_with_largest_number(config['planning']['planning_dir'])
+    if goal_node_pkl is None:
+        return None
+    goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
+    plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
+    return plan
 
 def find_parentheses(s:str) -> Tuple[int, int]:
         """returns the indices of the first opening and matching closing parentheses
