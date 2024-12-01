@@ -5,7 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (domain cleanup)
-    (:requirements :equality :typing)
+    (:requirements :typing :equality)
     (:types
         gripper - object
         table - object
@@ -44,8 +44,8 @@
      :precondition (and (directly-on-table ?tabletop-object ?table) (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?tabletop-object ?gripper)
-        (not (directly-on-table ?tabletop-object ?table))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (directly-on-table ?tabletop-object ?table)))
     )
 
 
@@ -62,9 +62,9 @@
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (not (open ?drawer)) (free ?gripper))
      :effect (and
-        (open ?drawer)
         (exclusively-occupying-gripper ?drawer ?gripper)
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (open ?drawer))
     )
 
 
@@ -72,9 +72,9 @@
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (open ?drawer) (free ?gripper))
      :effect (and
-        (not (open ?drawer))
         (exclusively-occupying-gripper ?drawer ?gripper)
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (open ?drawer)))
     )
 
 
@@ -88,15 +88,15 @@
     )
 
 
-    (:action tip-container-to-remove-object
+    (:action pour-out-contents
      :parameters (?block - block ?gripper - gripper ?mug - mug ?table - table)
      :precondition (and (directly-on-table ?mug ?table) (free ?gripper) (inside ?block ?mug) (not (directly-on-table ?block ?table)) (not (exclusively-occupying-gripper ?block ?gripper)) (not (exclusively-occupying-gripper ?mug ?gripper)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (open ?mug) (small-enough-for-gripper-to-pick-up ?block ?gripper) (small-enough-for-gripper-to-pick-up ?mug ?gripper) (small-enough-to-fit-in-container ?block ?mug))
      :effect (and
-        (directly-on-table ?block ?table)
         (exclusively-occupying-gripper ?mug ?gripper)
-        (not (directly-on-table ?mug ?table))
         (not (free ?gripper))
-        (not (inside ?block ?mug)))
+        (not (directly-on-table ?mug ?table))
+        (not (inside ?block ?mug))
+        (directly-on-table ?block ?table))
     )
 
 
@@ -105,8 +105,8 @@
      :precondition (and (exclusively-occupying-gripper ?mug ?gripper) (not (directly-on-table ?mug ?table)) (not (free ?gripper)) (not (large-enough-for-gripper-to-reach-inside ?mug ?gripper)) (open ?mug) (small-enough-for-gripper-to-pick-up ?mug ?gripper))
      :effect (and
         (directly-on-table ?mug ?table)
-        (free ?gripper)
-        (not (exclusively-occupying-gripper ?mug ?gripper)))
+        (not (exclusively-occupying-gripper ?mug ?gripper))
+        (free ?gripper))
     )
 
 )

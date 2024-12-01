@@ -14,7 +14,7 @@ class OperatorCandidate:
         else:
             self.precondition = []
         if effects:
-            self.effects = sorted(effects)
+            self.effects = effects
         else:
             self.effects = []
         if grounded_params:
@@ -32,7 +32,7 @@ class OperatorCandidate:
         self.precondition = sorted(precondition)
     
     def set_effects(self, effects:List[str]):
-        self.effects = sorted(effects)
+        self.effects = effects
     
     def set_grounded_params(self, grounded_params:List[str]):
         self.grounded_params = grounded_params

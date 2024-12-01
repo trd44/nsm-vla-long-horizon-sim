@@ -25,8 +25,8 @@
      :precondition (and (directly-on-table ?tabletop-object ?table) (small-enough-for-gripper-to-pick-up ?tabletop-object ?gripper) (free ?gripper))
      :effect (and
         (exclusively-occupying-gripper ?tabletop-object ?gripper)
-        (not (directly-on-table ?tabletop-object ?table))
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (directly-on-table ?tabletop-object ?table)))
     )
 
 
@@ -43,9 +43,9 @@
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (not (open ?drawer)) (free ?gripper))
      :effect (and
-        (open ?drawer)
         (exclusively-occupying-gripper ?drawer ?gripper)
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (open ?drawer))
     )
 
 
@@ -53,9 +53,9 @@
      :parameters (?drawer - drawer ?gripper - gripper)
      :precondition (and (open ?drawer) (free ?gripper))
      :effect (and
-        (not (open ?drawer))
         (exclusively-occupying-gripper ?drawer ?gripper)
-        (not (free ?gripper)))
+        (not (free ?gripper))
+        (not (open ?drawer)))
     )
 
 
