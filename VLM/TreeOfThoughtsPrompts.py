@@ -48,12 +48,12 @@ Answer: Let's think step by step.
 """
 
 # prompt asking the LLM to define the effect for the new operator
-define_effect_prompt = """You are a robot arm with a gripper that uses the gripper to grasp and manipulate tabletop objects. Given a PDDL operator's name, its parameter objects, the preconditions that are satisfied in the current state, define the resulting state after applying the operator in the current state. The first step of manipulating an object is to make contact with it with your gripper. An object should exclusively occupy your gripper during manipulation. Therefore, if the object to manipulate is not occupying your gripper yet, you should first make contact with it with your gripper. Your gripper should not be free while it is occupied. The effects MUST ONLY involve objects in `The operator`'s parameters. Avoid quantifiers and conditional effects. Sort the effects in the order they are expected to be achieved. Fill the effects of `The operator` based on the resulting state in the following format:
+define_effect_prompt = """You are a robot arm with a gripper that uses the gripper to grasp and manipulate tabletop objects. Given a PDDL operator's name, its parameter objects, the preconditions that are satisfied in the current state, define the effects after applying the operator in the current state. The first step of manipulating an object is to make contact with it with your gripper. An object should exclusively occupy your gripper during manipulation. Therefore, if the object to manipulate is not occupying your gripper yet, you should prioritize making contact with it with your gripper. Your gripper should not be free while it is occupied. The effects MUST ONLY involve objects in The operator's parameters. Avoid quantifiers and conditional effects. Do not invent new predicates. Think about the order in which the effects are expected to be acheived one by one. Sort the effects in the order they are expected to be achieved. Make sure there are no conflicting effects. Fill the effects of The operator in their sorted order in the following format:
 ```
 (:action operator_name
     :parameters (?param1 - param1-type ?param2 - param2-type ...)
-    :precondition (and (predicate1 ?param1 ?param2...) (predicate2 ?param1 ?param2...)...)
-    :effect (and (predicate1 ?param1 ?param2...) (predicate2 ?param1 ?param2...)...)
+    :precondition (and (predicate ?param1 ?param2...) (predicate ?param1 ?param2...)...)
+    :effect (and (predicate ?param1 ?param2...) (predicate ?param1 ?param2...)...)
 )
 ```
 Problem:
