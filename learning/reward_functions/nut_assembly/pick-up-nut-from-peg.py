@@ -32,15 +32,6 @@ def reward_shaping_fn(observation_with_semantics:Dict[str, Union[bool, float, np
         # Clip progress to [0,1]
         progress = np.clip(progress, 0.0, 1.0)
         return float(progress)
-    elif grounded_effect == 'not (free gripper1)':
-        # Similar to exclusively-occupying-gripper, use distance
-        gripper_pos = observation_with_semantics['gripper1_pos']
-        nut_pos = observation_with_semantics['square-nut1_pos']
-        distance = np.linalg.norm(gripper_pos - nut_pos)
-        max_distance = np.linalg.norm(observation_with_semantics['gripper1_to_obj_max_absolute_dist'])
-        progress = 1 - (distance / max_distance)
-        progress = np.clip(progress, 0.0, 1.0)
-        return float(progress)
     else:
         # If the grounded effect is not recognized, return 0 progress
         return 0.0
