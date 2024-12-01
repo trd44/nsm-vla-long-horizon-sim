@@ -268,6 +268,8 @@ class OperatorWrapper(gym.Wrapper):
             str: the string representation of the grounded operator
         """
         effects:str = '\n'.join([eff.pddl_repr() for eff in self.grounded_operator.effects])
+        if self.check_duplicate_grasp_effects():
+            effects = effects.pop('not (free gripper1)')
         return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects:\n{effects}\n"
 
     
