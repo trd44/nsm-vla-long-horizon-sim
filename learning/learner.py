@@ -149,6 +149,8 @@ class OperatorWrapper(gym.Wrapper):
         binary_obs:dict = self.detector.detect_binary_states(self.env)
         reward = self.compute_reward(obs_with_semantics, binary_obs)
         done = done or reward == 0
+        if reward == 0:
+            print("successfully completed the operator")
         
         return obs, reward, done, truncated, info
 
@@ -231,6 +233,7 @@ class OperatorWrapper(gym.Wrapper):
                 continue
             # in addition to the step cost, the robot gets a reward in the range of [0, 1]. The reward is given based on sub-goals achieved. Each effect of the operator is a sub-goal. Therefore, the robot would get `1/len(effects)` reward for each effect achieved.
             if self.check_effect_satisfied(effect, binary_obs):
+                print(f"successfully achieved the subgoal {effect.pddl_repr()}")
                 sub_goal_reward += 1/num_effects
             else:
                 sub_goal_reward += self.llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
@@ -270,8 +273,8 @@ class OperatorWrapper(gym.Wrapper):
         effects:list = [eff.pddl_repr() for eff in self.grounded_operator.effects]
         if self.check_duplicate_grasp_effects():
             effects.remove('not (free gripper1)')
-        effects_str:str = '\n'.join(effects)
-        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects:\n{effects_str}\n"
+        effects_str:str = ' '.join(f'({eff})' for eff in effects)
+        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects: and {effects_str}"
 
     
     def _load_llm_sub_goal_reward_shaping_fn(self) -> Callable:

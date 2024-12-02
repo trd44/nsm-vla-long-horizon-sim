@@ -14,11 +14,11 @@ class CoffeeDetector(Detector):
                 }, 
             'can-flip-up': {
                 'func': self.can_flip_up,
-                'params':['coffee_machine_lid']
+                'params':['coffee-machine-lid']
              },
             'can-flip-down': {
                 'func': self.can_flip_down,
-                'params':['coffee_machine_lid']
+                'params':['coffee-machine-lid']
             },
             'directly-on-table': {
                 'func':self.directly_on_table,
@@ -30,7 +30,7 @@ class CoffeeDetector(Detector):
             }, 
             'attached': {
                 'func':self.attached,
-                'params':['coffee_machine_lid', 'coffee_pod_holder']
+                'params':['coffee-machine-lid', 'coffee-pod-holder']
             }, 
             'in': {
                 'func':self.inside,
@@ -46,25 +46,25 @@ class CoffeeDetector(Detector):
             }, 
             'under': {
                 'func':self.under,
-                'params':['mug', 'coffee_pod_holder']
+                'params':['mug', 'coffee-pod-holder']
             }
         }
         # mapping from relevant object types to objects in the environment
         self.object_types = {
-            'tabletop_object':['coffee_pod', 'coffee_machine_lid', 'coffee_pod_holder', 'mug', 'drawer'], 
-            'container':['coffee_pod_holder', 'drawer', 'mug'], 'gripper':['gripper'], 
+            'tabletop_object':['coffee-pod', 'coffee-machine-lid', 'coffee-pod-holder', 'mug', 'drawer'], 
+            'container':['coffee-pod-holder', 'drawer', 'mug'], 'gripper':['gripper'], 
             'mug':['mug'], 
-            'coffee_machine_lid':['coffee_machine_lid'], 
-            'coffee_pod_holder':['coffee_pod_holder'], 
+            'coffee-machine-lid':['coffee-machine-lid'], 
+            'coffee-pod-holder':['coffee-pod-holder'], 
             'drawer':['drawer'], 
-            'coffee_pod':['coffee_pod'], 
+            'coffee-pod':['coffee-pod'], 
             'table':['table']
         }
 
         # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
-        self.grounded_object_to_pddl_object = {'mug':'mug1', 'coffee_machine_lid':'coffee_machine_lid1', 'coffee_pod_holder':'coffee_pod_holder1', 'drawer':'drawer1', 'coffee_pod':'coffee_pod1', 'table':'table1', 'gripper':'gripper1'}
+        self.grounded_object_to_pddl_object = {'mug':'mug1', 'coffee-machine-lid':'lid1', 'coffee-pod-holder':'coffee-pod-holder1', 'drawer':'drawer1', 'coffee-pod':'coffee-pod1', 'table':'table1', 'gripper':'gripper1'}
 
-        self.grounded_tabletop_object_to_coffee_class_object = {'mug':self.env.mug, 'coffee_machine_lid':self.env.coffee_machine.lid, 'coffee_pod_holder':self.env.coffee_machine.pod_holder, 'drawer':self.env.cabinet_object, 'coffee_pod':self.env.coffee_pod, 'gripper':self.env.robots[0].gripper}
+        self.grounded_tabletop_object_to_coffee_class_object = {'mug':self.env.mug, 'coffee-machine-lid':self.env.coffee_machine.lid, 'coffee-pod-holder':self.env.coffee_machine.pod_holder, 'drawer':self.env.cabinet_object, 'coffee-pod':self.env.coffee_pod, 'gripper':self.env.robots[0].gripper}
 
     
     def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str) -> bool:
@@ -76,7 +76,7 @@ class CoffeeDetector(Detector):
             bool: True if the object is small enough for the gripper to pick up
         """
         #hardcoding mug and pod to be small enough to pick up
-        if 'mug' in tabletop_obj or 'coffee_pod' in tabletop_obj:
+        if 'mug' in tabletop_obj or 'coffee-pod' in tabletop_obj:
             return True
         return False
     
@@ -84,12 +84,12 @@ class CoffeeDetector(Detector):
         """Returns True if the coffee pod lid can be flipped up.
 
         Args:
-            coffee_machine_lid (str: the coffee machine lid object
+            coffee-machine-lid (str: the coffee machine lid object
 
         Returns:
             bool: True if the coffee pod lid can be flipped up
         """
-        assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
+        assert self._is_type(coffee_machine_lid, 'coffee-machine-lid')
         return self.env.check_can_flip_up_lid()
         
 
@@ -97,12 +97,12 @@ class CoffeeDetector(Detector):
         """Returns True if the coffee pod lid can be flipped down.
 
         Args:
-            coffee_machine_lid (str): the coffee pod lid object
+            coffee-machine-lid (str): the coffee pod lid object
 
         Returns:
             bool: True if the coffee pod lid can be flipped down
         """
-        assert self._is_type(coffee_machine_lid, 'coffee_machine_lid')
+        assert self._is_type(coffee_machine_lid, 'coffee-machine-lid')
         return not self.can_flip_up(coffee_machine_lid)
 
     def directly_on_table(self, tabletop_obj:str, table:str) -> bool:
@@ -116,8 +116,8 @@ class CoffeeDetector(Detector):
             bool: True if the object is directly on the table
         """
         assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(table, 'table')
-        # hardcoding coffee_machine_lid to not be directly on table
-        if self._is_type(tabletop_obj, 'coffee_machine_lid'):
+        # hardcoding coffee-machine-lid to not be directly on table
+        if self._is_type(tabletop_obj, 'coffee-machine-lid'):
             return False
         return self.env.check_directly_on_table(tabletop_obj)
 
@@ -141,14 +141,14 @@ class CoffeeDetector(Detector):
         """Returns True if the coffee machine lid is attached to the coffee pod holder.
 
         Args:
-            coffee_machine_lid (_type_): the coffee machine lid object
-            coffee_pod_holder (_type_): the coffee pod holder object
+            coffee-machine-lid (_type_): the coffee machine lid object
+            coffee-pod-holder (_type_): the coffee pod holder object
 
         Returns:
             bool: True if the coffee machine lid is attached to the coffee pod holder
         """
         # hardcoding the coffee machine lid to be attached to the coffee pod holder since we are only dealing with one coffee machine lid and one coffee pod holder that are always attached
-        assert coffee_machine_lid == 'coffee_machine_lid' and coffee_pod_holder == 'coffee_pod_holder'
+        assert coffee_machine_lid == 'coffee-machine-lid' and coffee_pod_holder == 'coffee-pod-holder'
         return True
     
     def inside(self, tabletop_obj:str, container:str) -> bool:
@@ -162,18 +162,18 @@ class CoffeeDetector(Detector):
             bool: True if the object is inside the container
         """
         assert self._is_type(tabletop_obj, 'tabletop_object') and self._is_type(container, 'container')
-        if container == 'coffee_pod_holder':
-            if tabletop_obj == 'coffee_pod':
+        if container == 'coffee-pod-holder':
+            if tabletop_obj == 'coffee-pod':
                 return self.env.check_pod()
             else:
                 return False # only coffee pods can be inside the coffee pod holder
         elif container == 'drawer':
-            if tabletop_obj in ('mug', 'coffee_pod'):
+            if tabletop_obj in ('mug', 'coffee-pod'):
                 return self.env.check_in_drawer(tabletop_obj)
             else:
                 return False # only mugs and coffee pods can be inside the drawer
         else: # container is mug
-            if tabletop_obj == 'coffee_pod':
+            if tabletop_obj == 'coffee-pod':
                 return self.env.check_in_mug(tabletop_obj)
             else:
                 return False # only coffee pods can be inside the mug
@@ -189,8 +189,8 @@ class CoffeeDetector(Detector):
             bool: True if the container is open
         """
         assert self._is_type(container, 'container')
-        if self._is_type(container, 'coffee_pod_holder'):
-            return self.can_flip_down('coffee_machine_lid') and self.attached('coffee_machine_lid', 'coffee_pod_holder') # lid is currently up and attached to the coffee pod holder
+        if self._is_type(container, 'coffee-pod-holder'):
+            return self.can_flip_down('coffee-machine-lid') and self.attached('coffee-machine-lid', 'coffee-pod-holder') # lid is currently up and attached to the coffee pod holder
         elif self._is_type(container, 'drawer'):
             return self.env.check_drawer_open()
         elif self._is_type(container, 'mug'):
@@ -227,12 +227,12 @@ class CoffeeDetector(Detector):
 
         Args:
             mug (_type_): the mug object
-            coffee_pod_holder (_type_): the coffee pod holder object
+            coffee-pod-holder (_type_): the coffee pod holder object
 
         Returns:
             bool: True if the mug is under the coffee pod holder
         """
-        assert self._is_type(mug, 'mug') and self._is_type(coffee_pod_holder, 'coffee_pod_holder')
+        assert self._is_type(mug, 'mug') and self._is_type(coffee_pod_holder, 'coffee-pod-holder')
         return self.env.check_mug_under_pod_holder()
     
     def verify_env(self, env) -> bool:
