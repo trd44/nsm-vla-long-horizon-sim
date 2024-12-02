@@ -14,9 +14,13 @@ from robosuite.utils.input_utils import *
 from detection.coffee_detector import CoffeeDetector
 from detection.cleanup_detector import CleanupDetector
 from detection.nut_assembly_detector import NutAssemblyDetector
+from robosuite.wrappers import GymWrapper
+from utils import *
+from learning.learner import *
 import numpy as np
 import mimicgen
 
+config = load_config("config.yaml")
 
 def choose_mimicgen_environment():
     """
@@ -39,6 +43,9 @@ def choose_mimicgen_environment():
     # keep only envs that correspond to the different reset distributions from the paper
     # only keep envs that end with "Novelty"
     envs = sorted([x for x in all_envs if x[-7:] == "Novelty"])
+    domain = config['planning']['domain']
+    lower_case_domain = domain.lower().replace('_', '')
+    envs = [env for env in envs if (lower_case_domain in env.lower() or domain in env) and 'pre_novelty' not in env.lower()]
 
     # Select environment to run
     print("Here is a list of environments in the suite:\n")
@@ -85,15 +92,21 @@ if __name__ == "__main__":
         hard_reset=False,
     )
     # Wrap this environment in a visualization wrapper
-    env = VisualizationWrapper(env, indicator_configs=None)
-    env.reset()
-    env.viewer.set_camera(camera_id=0)
+    config = load_config("config.yaml") # make sure planning is set to the nut_assembly domain
+    plan = load_plan(config)
+    grounded_op = plan[0] # a hack to get the pick-up-nut-from-peg operator
+    dummy_executed_operators = OrderedDict()
+    visual_env = VisualizationWrapper(env, indicator_configs=None)
+    wrapped_env = GymWrapper(visual_env)
+    wrapped_env = OperatorWrapper(wrapped_env, grounded_op, dummy_executed_operators, config)
+    wrapped_env.reset()
+    wrapped_env.viewer.set_camera(camera_id=0)
 
     # keyboard control
     from robosuite.devices import Keyboard
 
     device = Keyboard(pos_sensitivity=1.0, rot_sensitivity=1.0)
-    env.viewer.add_keypress_callback(device.on_press)
+    wrapped_env.viewer.add_keypress_callback(device.on_press)
 
     # Setup printing options for numbers
     np.set_printoptions(formatter={"float": lambda x: "{0:0.3f}".format(x)})
@@ -102,7 +115,7 @@ if __name__ == "__main__":
     camera_id = env.sim.model.camera_name2id("agentview")
 
     # Set the new camera position (x, y, z)
-    env.sim.model.cam_pos[camera_id] = np.array([0, 0, 2])  # Modify these values to set the desired position
+    wrapped_env.sim.model.cam_pos[camera_id] = np.array([0, 0, 2])  # Modify these values to set the desired position
     env.sim.model.cam_quat[camera_id] = np.array([0.0, 0, 0, 1])  # Example quaternion
     
     # If options["env_name"] starts with "Co", use the Coffee_Detector
@@ -117,12 +130,12 @@ if __name__ == "__main__":
 
     while True:
         # Reset the environment
-        obs = env.reset()
+        obs = wrapped_env.reset()
 
         # Setup rendering
         cam_id = 0
         num_cam = len(env.sim.model.camera_names)
-        env.render()
+        wrapped_env.render()
 
         # Initialize variables that should the maintained between resets
         last_grasp = 0
@@ -132,7 +145,7 @@ if __name__ == "__main__":
 
         while True:
             # Set active robot
-            active_robot = env.robots[0]
+            active_robot = wrapped_env.robots[0]
 
             # Get the newest action
             action, grasp = input2action(
@@ -150,7 +163,7 @@ if __name__ == "__main__":
                 last_grasp = grasp
 
             # Fill out the rest of the action space if necessary
-            rem_action_dim = env.action_dim - action.size
+            rem_action_dim = wrapped_env.action_dim - action.size
             if rem_action_dim > 0:
                 # Initialize remaining action space
                 rem_action = np.zeros(rem_action_dim)
@@ -159,12 +172,12 @@ if __name__ == "__main__":
                 
             elif rem_action_dim < 0:
                 # We're in an environment with no gripper action space, so trim the action space to be the action dim
-                action = action[: env.action_dim]
+                action = action[: wrapped_env.action_dim]
 
             # Step through the simulation and render
-            obs, reward, done, info = env.step(action)
+            obs, reward, done, truncated, info = wrapped_env.step(action)
             groundings = detector.detect_binary_states(env)
-            env.render()
+            wrapped_env.render()
 
     # Get action limits
     # low, high = env.action_spec
