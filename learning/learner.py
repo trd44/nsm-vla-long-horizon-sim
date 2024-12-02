@@ -270,8 +270,8 @@ class OperatorWrapper(gym.Wrapper):
         effects:list = [eff.pddl_repr() for eff in self.grounded_operator.effects]
         if self.check_duplicate_grasp_effects():
             effects.remove('not (free gripper1)')
-        effects_str:str = '\n'.join(effects)
-        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects:\n{effects_str}\n"
+        effects_str:str = ' '.join(f'({eff})' for eff in effects)
+        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects: and {effects_str}"
 
     
     def _load_llm_sub_goal_reward_shaping_fn(self) -> Callable:
