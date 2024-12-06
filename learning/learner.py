@@ -233,7 +233,6 @@ class OperatorWrapper(gym.Wrapper):
                 continue
             # in addition to the step cost, the robot gets a reward in the range of [0, 1]. The reward is given based on sub-goals achieved. Each effect of the operator is a sub-goal. Therefore, the robot would get `1/len(effects)` reward for each effect achieved.
             if self.check_effect_satisfied(effect, binary_obs):
-                print(f"successfully achieved the subgoal {effect.pddl_repr()}")
                 sub_goal_reward += 1/num_effects
             else:
                 sub_goal_reward += self.llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects

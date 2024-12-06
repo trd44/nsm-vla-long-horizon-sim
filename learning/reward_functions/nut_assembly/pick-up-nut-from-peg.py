@@ -2,36 +2,29 @@
 from typing import *
 import numpy as np
 
-def reward_shaping_fn(observation_with_semantics:Dict[str, Union[bool, float, np.array]], grounded_effect:str) -> float:
+def reward_shaping_fn(observation_with_semantics: Dict[str, Union[bool, float, np.array]], grounded_effect: str) -> float:
     '''
     Args:
         observation_with_semantics (Dict[str, Union[bool, float, np.array]]): a dictionary containing the observation with semantics
         grounded_effect (str): a grounded effect of the operator
     Returns:
-        float: the reward between 0 and 1 indicate percentage of completion towards the grounded effect
+        float: the reward between 0 and 1 indicating percentage of completion towards the grounded effect
     '''
-    if grounded_effect == 'exclusively-occupying-gripper square-nut1 gripper1':
-        # Compute distance between gripper and square-nut1
-        gripper_pos = observation_with_semantics['gripper1_pos']
-        nut_pos = observation_with_semantics['square-nut1_pos']
-        distance = np.linalg.norm(gripper_pos - nut_pos)
-        # Compute maximum possible distance
-        max_distance = np.linalg.norm(observation_with_semantics['gripper1_to_obj_max_absolute_dist'])
-        # Calculate progress
-        progress = 1 - (distance / max_distance)
-        # Clip progress to [0,1]
-        progress = np.clip(progress, 0.0, 1.0)
-        return float(progress)
-    elif grounded_effect == 'not (on-peg square-nut1 round-peg1)':
-        # Compute height above round-peg1 base
-        height_above_base = observation_with_semantics['square-nut1_bottom_height_above_round-peg1_base']
-        # Get the height of the round-peg1
-        peg_height = observation_with_semantics['round-peg1_height']
-        # Calculate progress
-        progress = height_above_base / peg_height
-        # Clip progress to [0,1]
-        progress = np.clip(progress, 0.0, 1.0)
-        return float(progress)
-    else:
-        # If the grounded effect is not recognized, return 0 progress
-        return 0.0
+    # Extract relevant information
+    gripper1_pos = observation_with_semantics['gripper1_pos']
+    square_nut1_pos = observation_with_semantics['square-nut1_pos']
+    gripper1_to_square_nut1_dist_vector = observation_with_semantics['gripper1_to_square-nut1_dist']
+    gripper1_to_square_nut1_dist = np.linalg.norm(gripper1_to_square_nut1_dist_vector)
+    max_possible_distance = np.linalg.norm(observation_with_semantics['gripper1_to_obj_max_absolute_dist'])
+    progress_grasp = 1 - (gripper1_to_square_nut1_dist / max_possible_distance)
+    progress_grasp = np.clip(progress_grasp, 0, 1)
+
+    square_nut1_bottom_height_above_round_peg1_base = observation_with_semantics['square-nut1_bottom_height_above_round-peg1_base']
+    max_possible_height = observation_with_semantics['gripper1_to_obj_max_absolute_dist'][2]  # The maximum z-distance
+    progress_lift = square_nut1_bottom_height_above_round_peg1_base / max_possible_height
+    progress_lift = np.clip(progress_lift, 0, 1)
+
+    # Combine progress towards both effects
+    progress = min(progress_grasp, progress_lift)
+
+    return float(progress)
