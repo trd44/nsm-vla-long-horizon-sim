@@ -221,6 +221,7 @@ class OperatorWrapper(gym.Wrapper):
         
         # there is a step cost of -1 regardless
         step_cost = -1
+        penalty = self.collision_penalty(numeric_obs_with_semantics)
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
@@ -235,10 +236,44 @@ class OperatorWrapper(gym.Wrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 sub_goal_reward += 1/num_effects
             else:
+                # check if the robot's collision distances with objects
+
                 sub_goal_reward += self.llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
                 return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
-        return step_cost + sub_goal_reward
+        return step_cost + penalty + sub_goal_reward
+    
+    def collision_penalty(self, numeric_obs_with_semantics:dict) -> float:
+        """Penalize the robot for getting too close to objects it is not supposed to collide with
+
+        Args:
+            numeric_obs_with_semantics: the observation in which the keys have semantics and the values are arrays of numeric values
+
+        Returns:
+            float: the penalty for getting too close to objects from (-inf, 0]
+        """
+        # find objects that the robot is allowed to collide with. These are objects that the robot grasps either in the precondition or the effects of the grounded operator
+        allowed_objects = []
+        collision_threshold = 0.02 # getting closer than this distance will incur a penalty
+        for effect in self.grounded_operator.effects:
+            if effect.atom.predicate.name == 'exclusively-occupying-gripper':
+                for arg in effect.atom.subterms:
+                    # find the parameter that's not the gripper
+                    if arg.name != 'gripper1':
+                        allowed_objects.append(arg.name)
+        for condition in self.grounded_operator.precondition.subformulas:
+            if not hasattr(condition, 'connective') and condition.predicate.name == 'exclusively-occupying-gripper':
+                for arg in condition.subterms:
+                    # find the parameter that's not the gripper
+                    if arg.name != 'gripper1':
+                        allowed_objects.append(arg.name)
+        # find the objects that the robot is close to
+        penalty = 0
+        for obs, val in numeric_obs_with_semantics.items():
+            if 'collision_dist' in obs and not any(obj in obs for obj in allowed_objects):
+                if val < collision_threshold:
+                    penalty += -1/(val+0.001) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
+        return penalty
     
     def _discretize_gripper_action(self, action:np.array) -> np.array:
         """discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
