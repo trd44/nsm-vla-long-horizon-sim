@@ -131,7 +131,33 @@ def load_executor(config:dict, grounded_operator:Union[str, fs.Action]):
         return None
     return executor
 
+def find_file_with_largest_number(directory, name) -> Tuple[str, int]:
+    """Find the file with the largest number in the name in the directory
 
+    Args:
+        directory (str): the directory to search
+        name (str): the file name to search for
+
+    Returns:
+        _type_: _description_
+    """
+    largest_file = None
+    largest_number = None
+
+    for filename in os.listdir(directory):
+        if name not in filename:
+            continue
+        # Extract number at the end of the file name (e.g., file123)
+        match = re.search(r'(\d+)(?=\.\w+$)', filename)
+        if match:
+            number = int(match.group(1))
+            # Update largest file and number if this one is larger
+            if largest_number is None or number > largest_number:
+                largest_number = number
+                largest_file = filename
+    if largest_file is None:
+        return directory, None
+    return directory+os.sep+largest_file, largest_number
 
 def load_plan(config):
     """If the plan has been generated and saved, load the plan from the planning/PDDL directory according to the config
@@ -139,30 +165,53 @@ def load_plan(config):
         config (dict): the configuration dictionary containing configuration parameters for planning
     """
     # search the `planning_dir` for the latest goal node pkl file i.e. the one with the largest number
-    def find_file_with_largest_number(directory):
-        largest_file = None
-        largest_number = None
-
-        for filename in os.listdir(directory):
-            if config['planning']['planning_goal_node'] not in filename:
-                continue
-            # Extract number at the end of the file name (e.g., file123)
-            match = re.search(r'(\d+)(?=\.\w+$)', filename)
-            if match:
-                number = int(match.group(1))
-                # Update largest file and number if this one is larger
-                if largest_number is None or number > largest_number:
-                    largest_number = number
-                    largest_file = filename
-
-        return directory+os.sep+largest_file, largest_number
     
-    goal_node_pkl, _ = find_file_with_largest_number(config['planning']['planning_dir'])
+    goal_node_pkl, _ = find_file_with_largest_number(config['planning']['planning_dir'], config['planning']['planning_goal_node'])
     if goal_node_pkl is None:
         return None
     goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)
     plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
     return plan
+
+
+def plot_heatmap(two_d_array:list, values:list, title:str, x_label:str, y_label:str, x_ticks:list, y_ticks:list):
+    """plot a heatmap given a 2D array
+
+    Args:
+        2d_array (List): the 2D array to plot
+        values (List): the values to plot
+        title (str): the title of the plot
+        x_label (str): the x-axis label
+        y_label (str): the y-axis label
+        x_ticks (List): the x-axis ticks
+        y_ticks (List): the y-axis ticks
+    """
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    im = ax.imshow(two_d_array)
+
+    # We want to show all ticks...
+    ax.set_xticks(np.arange(len(x_ticks)))
+    ax.set_yticks(np.arange(len(y_ticks)))
+    # ... and label them with the respective list entries
+    ax.set_xticklabels(x_ticks)
+    ax.set_yticklabels(y_ticks)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    for i in range(len(y_ticks)):
+        for j in range(len(x_ticks)):
+            text = ax.text(j, i, values[i][j],
+                           ha="center", va="center", color="w")
+
+    ax.set_title(title)
+    fig.tight_layout()
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.show()
 
 def find_parentheses(s:str) -> Tuple[int, int]:
         """returns the indices of the first opening and matching closing parentheses

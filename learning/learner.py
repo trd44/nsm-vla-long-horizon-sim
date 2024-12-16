@@ -6,6 +6,7 @@ import execution.executor
 import gymnasium as gym
 import importlib
 import numpy as np
+import csv
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC
@@ -127,6 +128,18 @@ class OperatorWrapper(gym.Wrapper):
         self.config = config
         self.domain = self.config['planning']['domain']
         self.llm_reward_shaping_fn:Callable = self._load_llm_sub_goal_reward_shaping_fn()
+        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+        self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}"
+        _, largest_file_number = find_file_with_largest_number(self.rollout_save_dir, 'rollout')
+        if largest_file_number is None:
+            largest_file_number = 0
+        self.rollout_save_path = f"{self.rollout_save_dir}/rollout_{largest_file_number+1}.csv"
+        self.csv_file = open(self.rollout_save_path, 'w')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['gripper_pos', 'closest_point', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
+        self.time_step = 0
+        self.episode = 0
+        
 
     def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
         """step function that steps the environment and computes the reward based on the observation with semantics
@@ -152,7 +165,9 @@ class OperatorWrapper(gym.Wrapper):
         if reward == 0:
             print("successfully completed the operator")
         
-        return obs, reward, done, truncated, info
+        self.time_step += 1
+        self.episode += 1 if done else 0
+        return obs, reward, done, truncated, obs_with_semantics
 
     def reset(self, **kwargs):
         reset_success = False
@@ -221,7 +236,7 @@ class OperatorWrapper(gym.Wrapper):
         
         # there is a step cost of -1 regardless
         step_cost = -1
-        penalty = self.collision_penalty(numeric_obs_with_semantics)
+        penalties, collision_points = self.collision_penalty(numeric_obs_with_semantics)
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
@@ -229,28 +244,36 @@ class OperatorWrapper(gym.Wrapper):
         num_effects = len(effects) if not duplicate_grasp_effects else len(effects) - 1
          
         sub_goal_reward = 0
+        num_subgoals_achieved = 0
         for effect in effects:
             if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects: # if the effect is `not (free gripper1)`, skip it since it is the same effect as `exclusively-occupying-gripper ?object gripper1`
                 continue
             # in addition to the step cost, the robot gets a reward in the range of [0, 1]. The reward is given based on sub-goals achieved. Each effect of the operator is a sub-goal. Therefore, the robot would get `1/len(effects)` reward for each effect achieved.
             if self.check_effect_satisfied(effect, binary_obs):
+                num_subgoals_achieved += 1
                 sub_goal_reward += 1/num_effects
             else:
                 # check if the robot's collision distances with objects
 
                 sub_goal_reward += self.llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
-                return step_cost + sub_goal_reward # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
+                break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
-        return step_cost + penalty + sub_goal_reward
+        total_reward = step_cost + sum(penalties) + sub_goal_reward
+        # save info to the csv file, one row per each collision point
+        for collision_point, penalty in zip(collision_points, penalties):
+            self.csv_writer.writerow([numeric_obs_with_semantics['gripper_pos'], collision_point, penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
+        self.csv_file.flush()
+        return total_reward
     
-    def collision_penalty(self, numeric_obs_with_semantics:dict) -> float:
+    def collision_penalty(self, numeric_obs_with_semantics:dict) -> Tuple[float, List[np.array]]:
         """Penalize the robot for getting too close to objects it is not supposed to collide with
 
         Args:
             numeric_obs_with_semantics: the observation in which the keys have semantics and the values are arrays of numeric values
 
         Returns:
-            float: the penalty for getting too close to objects from (-inf, 0]
+            penalties: a list of penalties for getting too close to objects
+            collision_points: a list of 3D collision points
         """
         # find objects that the robot is allowed to collide with. These are objects that the robot grasps either in the precondition or the effects of the grounded operator
         allowed_objects = []
@@ -268,12 +291,18 @@ class OperatorWrapper(gym.Wrapper):
                     if arg.name != 'gripper1':
                         allowed_objects.append(arg.name)
         # find the objects that the robot is close to
-        penalty = 0
-        for obs, val in numeric_obs_with_semantics.items():
-            if 'collision_dist' in obs and not any(obj in obs for obj in allowed_objects):
-                if val < collision_threshold:
-                    penalty += -1/(val+0.001) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
-        return penalty
+        penalties = []
+        collision_points = []
+        for key, obs in numeric_obs_with_semantics.items():
+            if 'collision_dist' in key and not any(obj in key for obj in allowed_objects):
+                if obs[0] < collision_threshold: # the first element is the collision distance
+                    penalties.append(-1/(obs[0]+0.001)) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
+                    collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
+        return penalties, collision_points
+    
+    def close(self):
+        self.csv_file.close()
+        return super().close()
     
     def _discretize_gripper_action(self, action:np.array) -> np.array:
         """discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
