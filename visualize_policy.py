@@ -65,6 +65,10 @@ def choose_policy(config:dict) -> Tuple[SAC, GymWrapper]:
         print(f"Input is not valid. Use {os.listdir(f'{policies_dir}{os.sep}{domain}{os.sep}{chosen_operator}')[seed]} by default.\n")
     chosen_seed = os.listdir(f"{policies_dir}{os.sep}{domain}{os.sep}{chosen_operator}")[seed]
     print(f"Chosen seed: {chosen_seed}\n")
+
+    # TODO: select model to visualize
+    # for i, model in enumerate(os.listdir(f"{policies_dir}{os.sep}{domain}{os.sep}{chosen_operator}{os.sep}{chosen_seed}")):
+    #     print(f"[{i}] {model}")
     
     # load the environment for the selected policy
     # make sure `has_renderer` is set to True in the config file
