@@ -120,7 +120,7 @@ class CustomEvalCallback(EvalCallback):
             return continue_training
 
 class OperatorWrapper(gym.Wrapper):
-    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, record_rollouts:bool=False):
         super().__init__(env)
         self.detector = load_detector(config=config, env=env)
         self.grounded_operator = grounded_operator
@@ -136,9 +136,10 @@ class OperatorWrapper(gym.Wrapper):
         self.rollout_save_path = f"{self.rollout_save_dir}/rollout_{largest_file_number+1}.csv"
         self.csv_file = open(self.rollout_save_path, 'w')
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['gripper_pos', 'closest_point', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
+        self.csv_writer.writerow(['gripper_x', 'gripper_y', 'gripper_z', 'closest_x', 'closest_y', 'closest_z', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
         self.time_step = 0
         self.episode = -1
+        self.record_rollouts = record_rollouts
         
 
     def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
@@ -261,9 +262,10 @@ class OperatorWrapper(gym.Wrapper):
         total_reward = step_cost + sum(penalties) + sub_goal_reward
         # save info to the csv file, one row per each collision point
         # save every 10 episodes every 10 timesteps
-        if self.time_step % 10 == 0 and self.episode % 10 == 0:
+        if self.record_rollouts and self.time_step % 100 == 0:
             for collision_point, penalty in zip(collision_points, penalties):
-                self.csv_writer.writerow([numeric_obs_with_semantics['gripper1_pos'], collision_point, penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
+                g_pos = numeric_obs_with_semantics['gripper1_pos']
+                self.csv_writer.writerow([g_pos[0], g_pos[1], g_pos[2], collision_point[0], collision_point[1], collision_point[2], penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
             self.csv_file.flush()
         return total_reward
     
@@ -394,7 +396,7 @@ class Learner:
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.env = self._wrap_env(env)
-        self.eval_env = self._wrap_env(deepcopy_env(env, config['eval_simulation']))
+        self.eval_env = self._wrap_env(deepcopy_env(env, config['eval_simulation']), record_rollouts=True)
 
     def learn(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the operator.
@@ -434,7 +436,7 @@ class Learner:
         return executor
     
 
-    def _wrap_env(self, env) -> gym.Wrapper:
+    def _wrap_env(self, env, record_rollouts=False) -> gym.Wrapper:
         """Wrap the environment in multiple wrappers.
 
         Args:
@@ -448,7 +450,7 @@ class Learner:
         # obs_keys_to_inlcude = [k for k in obs_with_semantics.keys() if any(param in k for param in grounded_params)] # find the keys that include the parameters of the grounded operator
 
         env = GymWrapper(env)
-        env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config)
+        env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, record_rollouts=record_rollouts)
         env = Monitor(
             env=env, 
             filename=f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}/monitor_logs",

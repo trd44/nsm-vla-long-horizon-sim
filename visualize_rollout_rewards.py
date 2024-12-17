@@ -5,39 +5,38 @@ import matplotlib.pyplot as plt
 
 #%%
 # plot a colored scatter plot of the collision penalty where each point has a different color based on the penalty
-def plot_collision_penalty(collision_penalty, collision_closest_points):
+def plot_collision_penalty(collision_penalty, first_coords, second_coords):
     """Given the y, z coordinates of the closest points and their corresponding collision penalties, plot a colored scatter plot of the collision penalty where each point has a different color based on the penalty
 
     Args:
         collision_penalty (list): a list of collision penalties
-        collision_closest_points (List[Tuple]): a list of tuples containing the y, z coordinates of the closest points
+        first_coords (list): a list of first coordinates of the closest points
+        second_coords (list): a list of second coordinates of the closest points
     """
     # plot the collision penalty
     plt.figure()
-    plt.scatter([point[0] for point in collision_closest_points], [point[1] for point in collision_closest_points], c=collision_penalty, cmap='viridis')
+    plt.scatter(first_coords, second_coords, c=collision_penalty, cmap='viridis')
     plt.colorbar()
     plt.xlabel('y')
     plt.ylabel('z')
     plt.title('Collision Penalty')
     plt.show()
 #%%
-rollout_path = 'learning/policies/nut_assembly/pick-up-nut-from-peg/seed_0/rollout_3.csv'
+rollout_path = 'learning/policies/nut_assembly/pick-up-nut-from-peg/seed_0/rollout_1.csv'
 # load the csv file containing the rollout data
 rollout_data = pd.read_csv(rollout_path)
 rollout_data
-print(rollout_data['closest_point'].head())
-print(rollout_data['closest_point'].dtype)
 
 # %%
 # extract collision penalty and closest points where the x coordnate of the point is in the range [-0.01, 0.01]
 # find the rows where the x coordnate of the point is in the range [-0.01, 0.01]
-x_filter = rollout_data['closest_point'].apply(lambda p: -0.01 <= p[0] <= 0.02)
+x_filter = rollout_data['closest_x'].apply(lambda x: -0.05 <= x <= 0.05)
 collision_penalty = rollout_data['collision_penalty'][x_filter]
-closest_points = rollout_data['closest_point'][x_filter]
-print(collision_penalty)
-print(closest_points)
+closest_y = rollout_data['closest_y'][x_filter]
+closest_z = rollout_data['closest_z'][x_filter]
+collision_penalty
 
 # %%
 # plot the collision penalty
-plot_collision_penalty(collision_penalty, collision_closest_points)
+plot_collision_penalty(collision_penalty, closest_y, closest_z)
 # %%
