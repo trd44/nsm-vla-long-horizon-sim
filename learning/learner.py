@@ -138,7 +138,7 @@ class OperatorWrapper(gym.Wrapper):
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['gripper_pos', 'closest_point', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
         self.time_step = 0
-        self.episode = 0
+        self.episode = -1
         
 
     def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
@@ -166,7 +166,7 @@ class OperatorWrapper(gym.Wrapper):
             print("successfully completed the operator")
         
         self.time_step += 1
-        self.episode += 1 if done else 0
+        self.episode += 1 if done or truncated else 0
         return obs, reward, done, truncated, obs_with_semantics
 
     def reset(self, **kwargs):
@@ -187,7 +187,7 @@ class OperatorWrapper(gym.Wrapper):
                     break
 
         self.detector.update_obs()
-        #obs = self.detector.get_obs()
+        self.episode += 1
         return obs, info
 
     def check_effect_satisfied(self, effect:fs.SingleEffect, binary_obs:dict) -> bool:
@@ -260,9 +260,11 @@ class OperatorWrapper(gym.Wrapper):
         
         total_reward = step_cost + sum(penalties) + sub_goal_reward
         # save info to the csv file, one row per each collision point
-        for collision_point, penalty in zip(collision_points, penalties):
-            self.csv_writer.writerow([numeric_obs_with_semantics['gripper_pos'], collision_point, penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
-        self.csv_file.flush()
+        # save every 10 episodes every 10 timesteps
+        if self.time_step % 10 == 0 and self.episode % 10 == 0:
+            for collision_point, penalty in zip(collision_points, penalties):
+                self.csv_writer.writerow([numeric_obs_with_semantics['gripper1_pos'], collision_point, penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
+            self.csv_file.flush()
         return total_reward
     
     def collision_penalty(self, numeric_obs_with_semantics:dict) -> Tuple[float, List[np.array]]:
@@ -295,8 +297,11 @@ class OperatorWrapper(gym.Wrapper):
         collision_points = []
         for key, obs in numeric_obs_with_semantics.items():
             if 'collision_dist' in key and not any(obj in key for obj in allowed_objects):
-                if obs[0] < collision_threshold: # the first element is the collision distance
+                if obs[0] <= collision_threshold: # the first element is the collision distance.
                     penalties.append(-1/(obs[0]+0.001)) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
+                    collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
+                elif obs[0] < 0.03: # only care about the collision points if the robot is closer than the threshold of 0.1 m
+                    penalties.append(0) # no penalty if the robot is not close to the object
                     collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
         return penalties, collision_points
     

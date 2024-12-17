@@ -11,6 +11,7 @@ import importlib
 import numpy as np
 import subprocess
 import base64
+import pandas as pd
 from typing import *
 from PIL import Image
 from langchain.tools import tool
@@ -173,6 +174,16 @@ def load_plan(config):
     plan:List[fs.Action] = planning.planning_utils.reverse_engineer_plan(goal_node)
     return plan
 
+def load_csv(file_path:str) -> pd.DataFrame:
+    """load a csv file into a pandas dataframe
+
+    Args:
+        file_path (str): the path to the csv file
+
+    Returns:
+        pd.DataFrame: the pandas dataframe
+    """
+    return pd.read_csv(file_path)
 
 def plot_heatmap(two_d_array:list, values:list, title:str, x_label:str, y_label:str, x_ticks:list, y_ticks:list):
     """plot a heatmap given a 2D array
