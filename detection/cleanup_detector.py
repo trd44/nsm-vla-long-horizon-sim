@@ -20,7 +20,7 @@ class CleanupDetector(Detector):
                 'func':self.large_enough_for_gripper_to_reach_inside,
                 'params':['container','gripper']
             },
-            'occupying-gripper': {
+            'exclusively-occupying-gripper': {
                 'func':self.exclusively_occupying_gripper,
                 'params':['tabletop_object', 'gripper']
             },
@@ -42,17 +42,17 @@ class CleanupDetector(Detector):
             }
         }
         # mapping from relevant object types to objects in the environment
-        self.object_types = {'tabletop_object':['cube', 'mug', 'drawer'], 'container':['drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'drawer':['drawer'], 'table':['table']}
+        self.object_types = {'tabletop_object':['block', 'mug', 'drawer'], 'container':['drawer', 'mug'], 'gripper':['gripper'], 'mug':['mug'], 'drawer':['drawer'], 'table':['table']}
 
         # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
-        self.grounded_object_to_pddl_object = {'mug':'mug1', 'cube':'cube1', 'drawer':'drawer1', 'table':'table1', 'gripper':'gripper1'}
+        self.grounded_object_to_pddl_object = {'mug':'mug1', 'block':'block1', 'drawer':'drawer1', 'table':'table1', 'gripper':'gripper1'}
     
     def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str, gripper:str) -> bool:
         """
         Returns True if the object is small enough for the gripper to pick up.
         """
         #hardcoding mug and pod to be small enough to pick up
-        if tabletop_obj == 'mug' or tabletop_obj == 'cube':
+        if tabletop_obj == 'mug' or tabletop_obj == 'block':
             return True
         return False
 
@@ -82,7 +82,7 @@ class CleanupDetector(Detector):
             return True
         return False
 
-    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper') -> bool:
+    def exclusively_occupying_gripper(self, tabletop_obj:str, gripper='gripper1') -> bool:
         """Returns True if the object is exclusively occupying the gripper.
 
         Args:
@@ -94,6 +94,8 @@ class CleanupDetector(Detector):
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and gripper in self.object_types['gripper']
         gripper = self.env.robots[0].gripper
+        if tabletop_obj == 'block':
+            tabletop_obj = 'cube' # the block is called cube in the environment
         tabletop_obj_contact_geoms = getattr(self.env, tabletop_obj).contact_geoms
         return self.env._check_grasp(gripper, tabletop_obj_contact_geoms)
     
@@ -109,15 +111,15 @@ class CleanupDetector(Detector):
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and container in self.object_types['container']
         if container == 'drawer':
-            if tabletop_obj in ('mug', 'cube'):
+            if tabletop_obj in ('mug', 'block'):
                 return self.env.check_in_drawer(tabletop_obj)
             else:
-                return False # only mugs and cubes can be inside the drawer
+                return False # only mugs and blocks can be inside the drawer
         elif container == 'mug':
-            if tabletop_obj == 'cube':
+            if tabletop_obj == 'block':
                 return self.env.check_in_mug(tabletop_obj)
             else:
-                return False # only cubes can be inside the mug
+                return False # only blocks can be inside the mug
         else:  # only drawers and mugs can contain objects
             return False
 
@@ -163,10 +165,10 @@ class CleanupDetector(Detector):
         """
         assert tabletop_obj in self.object_types['tabletop_object'] and container in self.object_types['container']
         if container == 'drawer':
-            if tabletop_obj in ('mug', 'cube'):
+            if tabletop_obj in ('mug', 'block'):
                 return True
         elif container == 'mug':
-            if tabletop_obj == 'cube':
+            if tabletop_obj == 'block':
                 return True
         return False
     

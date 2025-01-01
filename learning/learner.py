@@ -129,17 +129,18 @@ class OperatorWrapper(gym.Wrapper):
         self.domain = self.config['planning']['domain']
         self.llm_reward_shaping_fn:Callable = self._load_llm_sub_goal_reward_shaping_fn()
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}"
-        _, largest_file_number = find_file_with_largest_number(self.rollout_save_dir, 'rollout')
-        if largest_file_number is None:
-            largest_file_number = 0
-        self.rollout_save_path = f"{self.rollout_save_dir}/rollout_{largest_file_number+1}.csv"
-        self.csv_file = open(self.rollout_save_path, 'w')
-        self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['gripper_x', 'gripper_y', 'gripper_z', 'closest_x', 'closest_y', 'closest_z', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
         self.time_step = 0
         self.episode = -1
         self.record_rollouts = record_rollouts
+        if self.record_rollouts:
+            self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}"
+            _, largest_file_number = find_file_with_largest_number(self.rollout_save_dir, 'rollout')
+            if largest_file_number is None:
+                largest_file_number = 0
+            self.rollout_save_path = f"{self.rollout_save_dir}/rollout_{largest_file_number+1}.csv"
+            self.csv_file = open(self.rollout_save_path, 'w')
+            self.csv_writer = csv.writer(self.csv_file)
+            self.csv_writer.writerow(['gripper_x', 'gripper_y', 'gripper_z', 'closest_x', 'closest_y', 'closest_z', 'collision_penalty', 'total_reward', 'num_achieved_subgoals', 'done', 'timestep', 'episode'])
         
 
     def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
