@@ -64,7 +64,7 @@ class CoffeeDetector(Detector):
         # this is a hack to map the grounded object to their pddl format. This is needed because the grounded object is in the format e.g. 'mug' while the pddl object is in the format 'mug1'
         self.grounded_object_to_pddl_object = {'mug':'mug1', 'coffee-machine-lid':'lid1', 'coffee-pod-holder':'coffee-pod-holder1', 'drawer':'drawer1', 'coffee-pod':'coffee-pod1', 'table':'table1', 'gripper':'gripper1'}
 
-        self.grounded_tabletop_object_to_coffee_class_object = {'mug':self.env.mug, 'coffee-machine-lid':self.env.coffee_machine.lid, 'coffee-pod-holder':self.env.coffee_machine.pod_holder, 'drawer':self.env.cabinet_object, 'coffee-pod':self.env.coffee_pod, 'gripper':self.env.robots[0].gripper}
+        self.grounded_tabletop_object_to_coffee_class_object = {'mug':self.env.mug, 'coffee-machine-lid':self.env.coffee_machine_lid, 'coffee-pod-holder':self.env.coffee_pod_holder, 'drawer':self.env.drawer, 'coffee-pod':self.env.coffee_pod, 'gripper':self.env.robots[0].gripper}
 
     
     def small_enough_for_gripper_to_pick_up(self, tabletop_obj:str) -> bool:
