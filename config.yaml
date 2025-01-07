@@ -53,7 +53,7 @@ learning:
   learn_operator:
     total_timesteps: 5000000
   learn_subgoal:
-    total_timesteps: 30000
+    timesteps_per_iter: 50000
   subgoal_eval_iterations: 10
   reward_shaping_fn:
     num_candidates: 3

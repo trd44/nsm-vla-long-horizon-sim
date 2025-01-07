@@ -95,7 +95,7 @@ class OperatorWrapper(gym.Wrapper):
         reward = self.compute_reward(obs_with_semantics, binary_obs)
         
         # save subgoal successes as an array in info
-        info['subgoal_successes'] = list(self.last_subgoal_successes.values())
+        info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
         # overall goal success is if all subgoals are achieved
         info['goal_success'] = all(self.last_subgoal_successes.values())
         # episode is done also if the current subgoal we are focusing on is achieved
@@ -310,53 +310,65 @@ class Learner:
             execution.executor.Executor_RL: an RL executor for the operator
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        model_save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}"
+        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}"
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        model = None
+        model_path = None
         for effect in self.grounded_operator.effects:
             if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects:
                 continue
-            model = self.learn_subgoal(effect, model_save_path, prev_subgoal_model=model)
+            model_path = self.learn_subgoal(effect, save_path, prev_subgoal_model_path=model_path)
 
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
             operator_name=op_name, alg='SAC',
-            policy=f"{model_save_path}model", 
+            policy=model_path, 
         )
         # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
         with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}{os.sep}executor.pkl", 'wb') as f:
             dill.dump(executor, f)
         return executor
 
-    def learn_subgoal(self, subgoal:fs.SingleEffect, save_path:str, prev_subgoal_model:SAC) -> SAC:
+    def learn_subgoal(self, subgoal:fs.SingleEffect, save_path:str, prev_subgoal_model_path:str|os.PathLike=None) -> SAC:
         """Train an RL agent to learn a subgoal/effect of the operator.
         Args:
             subgoal (fs.SingleEffect): the subgoal to learn
-            prev_subgoal_model (SAC): the model that has already been trained on the previous subgoal
+            save_path (str): the path to save the model
+            prev_subgoal_model_path (str|os.PathLike): the path to the previous subgoal model
         Returns:
             the best performing model for the subgoal
         """
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
         subgoal_name:str = subgoal.pddl_repr().replace(' ', '_')
         subgoal_save_path = f"{save_path}{os.sep}{subgoal_name}"
         
-        active_models = []
-        eval_callbacks = []
+        active_model_data = []
+
         for i, reward_fn in enumerate(self.llm_reward_candicates):
-            reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fns_{i}"
-            env:Monitor = self._wrap_env(self.unwrapped_env, subgoal=subgoal, save_path=reward_fn_save_path)
+            reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fn_{i}"
+
+            # initialize the model environment
+            env:Monitor = self._wrap_env(self.unwrapped_env, subgoal=subgoal, save_path=reward_fn_save_path)  
+
+            # initialize the evaluation environment
             eval_env:Monitor = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['eval_simulation']), subgoal=subgoal, save_path=f"{reward_fn_save_path}_eval", record_rollouts=False)
+
             # set the reward shaping function for the subgoal
             env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
-
-            model = SAC(
-            "MlpPolicy",
-            env = env,
-            tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-            **self.config['learning']['model']
+            if prev_subgoal_model_path is not None:
+                # make a copy of the model
+                model = SAC.load(path=prev_subgoal_model_path, env=env)
+                model_save_path = prev_subgoal_model_path 
+            else:
+                model = SAC(
+                "MlpPolicy",    
+                env = env,
+                tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                **self.config['learning']['model']
+                )
+                model_save_path = f"{reward_fn_save_path}{os.sep}model"
+            model.save(
+                path = model_save_path
             )
-            active_models.append(model)
 
             eval_callback = CustomEvalCallback(
             eval_env=eval_env,
@@ -364,19 +376,36 @@ class Learner:
             log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
             **self.config['learning']['eval']
             )
-            eval_callbacks.append(eval_callback)
+            
+            active_model_data.append((model_save_path, env, eval_callback))
         
-        for model, eval_callback in zip(active_models, eval_callbacks):
-            model.learn(
-            total_timesteps=self.config['learning']['learn_subgoal']['total_timesteps'],
-            callback=eval_callback
-            )
-            model.save(
-            path = f"{reward_fn_save_path}{os.sep}model"
-            )
-        
-        # find the best model based on the eval_callback's subgoal success rate
-
+        duplicate_grasp_effects = self.check_duplicate_grasp_effects()
+        if duplicate_grasp_effects:
+            num_subgoals = len(self.grounded_operator.effects) - 1
+        else:
+            num_subgoals = len(self.grounded_operator.effects)
+        subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
+        subgoal_timesteps_so_far = 0
+        while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
+            for active_model_path, env,eval_callback in active_model_data:
+                model = SAC.load(path=active_model_path, env=env)
+                model.learn(
+                total_timesteps=self.config['learning']['learn_subgoal']['total_timesteps'],
+                callback=eval_callback
+                )
+                model.save(
+                path = f"{reward_fn_save_path}{os.sep}model"
+                )
+            subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['total_timesteps']
+            # terminate the worst performing model
+            subgoal_success_rates = [eval_callback.get_recent_mean_subgoal_success_rate() for _, _, eval_callback in active_model_data]
+            worst_performing_model_idx = np.argmin(subgoal_success_rates)
+            best_performing_model_idx = np.argmax(subgoal_success_rates)
+            if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
+                active_model_data.pop(worst_performing_model_idx)
+        # return the best performing model
+        best_performing_model_path, _, _ = active_model_data[np.argmax(subgoal_success_rates)]
+        return best_performing_model_path
 
 
     def prompt_llm_for_reward_shaping_fn_candidates(self):
@@ -427,12 +456,12 @@ class Learner:
         Args:
             env (gym environment): the environment to wrap
             subgoal (fs.SingleEffect): the subgoal to learn
+            save_path (str): the path to save the monitor logs
+            record_rollouts (bool): whether to record rollouts
 
         Returns:
             gym.Wrapper: the wrapped environment
         """
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-
         env = GymWrapper(env)
         env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, curr_subgoal=subgoal, record_rollouts=record_rollouts)
         env = Monitor(
@@ -477,8 +506,16 @@ class CustomEvalCallback(EvalCallback):
     def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super(CustomEvalCallback, self).__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
         self.eval_env.render_mode = render_mode
-        self._subgoal_successes_buffer: List[List[bool]] = []
+        self._subgoal_successes_buffer: List[bool] = []
         self.evaluations_subgoal_successes: List[List[bool]] = []
+    
+    def get_recent_subgoal_success_rate(self):
+        """Return the recent subgoal success rate
+        """
+        if len(self.evaluations_subgoal_successes) == 0:
+            return 0
+        return np.mean(self.evaluations_subgoal_successes[-1])
+        
 
     def _on_step(self) -> bool:
 
@@ -499,6 +536,7 @@ class CustomEvalCallback(EvalCallback):
 
             # Reset success rate buffer
             self._is_success_buffer = []
+            self._subgoal_successes_buffer = []
 
             episode_rewards, episode_lengths = evaluate_policy(
                 self.model,
@@ -523,6 +561,7 @@ class CustomEvalCallback(EvalCallback):
                     kwargs = dict(successes=self.evaluations_successes)
                 if len(self._subgoal_successes_buffer) > 0:
                     self.evaluations_subgoal_successes.append(self._subgoal_successes_buffer)
+                    kwargs['subgoal_successes'] = self.evaluations_subgoal_successes
  
 
                 np.savez(
@@ -544,11 +583,12 @@ class CustomEvalCallback(EvalCallback):
                     print(f"Success rate: {100 * success_rate:.2f}%")
                 self.logger.record("eval/goal_success_rate", success_rate)
             
+            subgoal_success_rate = 0
             if len(self._subgoal_successes_buffer) > 0:
-                subgoals_success_rate = np.mean(self._subgoal_successes_buffer)
+                subgoal_success_rate = np.mean(self._subgoal_successes_buffer)
                 if self.verbose > 0:
-                    print(f"Subgoals success rate: {100 * subgoals_success_rate:.2f}%")
-                self.logger.record("eval/subgoals_success_rate", subgoals_success_rate)
+                    print(f"Subgoals success rate: {100 * subgoal_success_rate:.2f}%")
+                self.logger.record("eval/subgoal_success_rate", subgoal_success_rate)
 
             # Dump log so the evaluation results are printed with the correct timestep
             if self.verbose > 0:
@@ -594,7 +634,7 @@ class CustomEvalCallback(EvalCallback):
         info = locals_["info"]
         if locals_["done"]:
             maybe_is_success = info.get("goal_success")
-            subgoal_successes = info.get("subgoal_successes")
-            self._subgoal_successes_buffer.append(subgoal_successes)
+            subgoal_success = info.get("subgoal_success")
+            self._subgoal_successes_buffer.append(subgoal_success)
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
