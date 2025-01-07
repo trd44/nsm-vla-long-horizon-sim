@@ -19,6 +19,8 @@ from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
 from VLM.LlmApi import chat_completion
 
+
+
 class OperatorWrapper(gym.Wrapper):
     def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
         super().__init__(env)
@@ -31,7 +33,7 @@ class OperatorWrapper(gym.Wrapper):
         self.last_subgoal_successes, self.subgoal_reward_shaping_fn_mapping = self._init_subgoal_dicts()
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
         self.time_step = 0
-        self.episode = 0
+        self.episode = -1
         self.record_rollouts = record_rollouts
 
         if self.record_rollouts:
@@ -102,8 +104,7 @@ class OperatorWrapper(gym.Wrapper):
         done = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()] or done
         
         self.time_step += 1
-        self.episode += 1 if done or truncated else 0
-        return obs, reward, done, truncated, obs_with_semantics
+        return obs, reward, done, truncated, info
 
     def reset(self, **kwargs):
         reset_success = False
@@ -121,7 +122,8 @@ class OperatorWrapper(gym.Wrapper):
                 if not ex_success:
                     reset_success = False
                     break
-
+        # reset the success of the subgoals
+        self.last_subgoal_successes, _ = self._init_subgoal_dicts()
         self.detector.update_obs()
         self.episode += 1
         return obs, info
@@ -245,7 +247,7 @@ class OperatorWrapper(gym.Wrapper):
                 if obs[0] <= collision_threshold: # the first element is the collision distance.
                     penalties.append(-1/(obs[0]+0.001)) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
                     collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
-                elif obs[0] < 0.03: # only care about the collision points if the robot is closer than the threshold of 0.1 m
+                elif obs[0] < 0.03: # only care about the collision points if the robot is closer than the threshold of 0.03 m
                     penalties.append(0) # no penalty if the robot is not close to the object
                     collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
         return penalties, collision_points
@@ -288,6 +290,7 @@ class Learner:
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
         self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
+        np.random.seed(self.config['learning']['model']['seed'])
     
     
     def _load_llm_reward_fn_candidates(self) -> List[Callable]:
@@ -414,7 +417,7 @@ class Learner:
         subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
-            for active_model_path, env,eval_callback in active_model_data:
+            for active_model_path, env, eval_callback in active_model_data:
                 model = SAC.load(path=active_model_path, env=env)
                 model.learn(
                 total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
