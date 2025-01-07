@@ -61,7 +61,7 @@ class OperatorWrapper(gym.Wrapper):
             subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = None
         return subgoal_success_dict, subgoal_reward_shaping_fn_mapping
     
-    def set_subgoal_reward_shaping_fn(self, effect:str|fs.SingleEffect, fn:Callable):
+    def set_subgoal_reward_shaping_fn(self, effect:Union[str, fs.SingleEffect], fn:Callable):
         """Set the reward shaping function for the subgoal
 
         Args:
@@ -181,6 +181,7 @@ class OperatorWrapper(gym.Wrapper):
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
+        last_useful_reward_shaping_fn = None
         for effect in effects:
             if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects: # if the effect is `not (free gripper1)`, skip it since it is the same effect as `exclusively-occupying-gripper ?object gripper1`
                 continue
@@ -189,13 +190,16 @@ class OperatorWrapper(gym.Wrapper):
                 self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
                 num_subgoals_achieved += 1
                 sub_goal_reward += 1/num_effects
+                last_useful_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
             else:
+                self.last_subgoal_successes[effect.pddl_repr()] = False
                 # check if the robot's collision distances with objects
-                try:
-                    llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()]
-                except:
-                    raise Exception(f"Reward shaping function for sub-goal {effect.pddl_repr()} not set")
-                sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, effect.pddl_repr()) * 1/num_effects
+                llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
+                if llm_reward_shaping_fn is None:
+                    # reward shaping for this subgoal has not been specifically set yet. Use the previously useful reward shaping function that helped the robot achieve the last subgoal
+                    llm_reward_shaping_fn = last_useful_reward_shaping_fn
+                    self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = llm_reward_shaping_fn
+                sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         total_reward = step_cost + sum(penalties) + sub_goal_reward
@@ -283,7 +287,7 @@ class Learner:
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
-        self.llm_reward_candicates = self._load_llm_reward_fn_candidates()
+        self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
     
     
     def _load_llm_reward_fn_candidates(self) -> List[Callable]:
@@ -294,13 +298,22 @@ class Learner:
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
         reward_fn_candidates = []
-        for i in range(self.config['learning']['reward_shaping']['num_candidates']):
+        for i in range(self.config['learning']['reward_shaping_fn']['num_candidates']):
             try:
                 llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}_{i}")
                 llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
                 reward_fn_candidates.append(llm_reward_shaping_func)
             except:
-                self.prompt_llm_for_reward_shaping_fn_candidates()
+                func = self.prompt_llm_for_reward_shaping_fn_candidate()
+                # save the reward shaping function candidates to a file
+                # save the output python function to a file in the reward_functions directory
+                # create the directory if it does not exist
+                if not os.path.exists(f"learning{os.sep}reward_functions{os.sep}{self.domain}"):
+                    os.makedirs(f"learning{os.sep}reward_functions{os.sep}{self.domain}")
+                # create a file with the operator's name and save the function in it
+                with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}_{i}.py", 'w') as f:
+                    f.write(func)
+                
         return reward_fn_candidates
     
     def learn_operator(self) -> execution.executor.Executor_RL:
@@ -312,12 +325,15 @@ class Learner:
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
         save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}"
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        model_path = None
+        model_data = None
         for effect in self.grounded_operator.effects:
             if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects:
                 continue
-            model_path = self.learn_subgoal(effect, save_path, prev_subgoal_model_path=model_path)
-
+            model_data = self.learn_subgoal(effect, save_path, prev_subgoal_model_data=model_data)
+        # load the model to re-save it in the model save_path
+        model_path, _, _ = model_data
+        model = SAC.load(path=model_path)
+        model.save(path=f"{save_path}{os.sep}final_model")
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
             operator_name=op_name, alg='SAC',
@@ -328,22 +344,26 @@ class Learner:
             dill.dump(executor, f)
         return executor
 
-    def learn_subgoal(self, subgoal:fs.SingleEffect, save_path:str, prev_subgoal_model_path:str|os.PathLike=None) -> SAC:
+    def learn_subgoal(self, subgoal:fs.SingleEffect, save_path:str, prev_subgoal_model_data:Union[str, os.PathLike]=None) -> Tuple[str, Monitor, Any]:
         """Train an RL agent to learn a subgoal/effect of the operator.
         Args:
             subgoal (fs.SingleEffect): the subgoal to learn
             save_path (str): the path to save the model
             prev_subgoal_model_path (str|os.PathLike): the path to the previous subgoal model
         Returns:
-            the best performing model for the subgoal
+            Tuple[str, Monitor, CustomEvalCallback]: the path to the model, the environment, and the evaluation callback
         """
         subgoal_name:str = subgoal.pddl_repr().replace(' ', '_')
         subgoal_save_path = f"{save_path}{os.sep}{subgoal_name}"
-        
+        if prev_subgoal_model_data is not None:
+            prev_model_path, prev_env, prev_eval_callback = prev_subgoal_model_data
         active_model_data = []
 
-        for i, reward_fn in enumerate(self.llm_reward_candicates):
-            reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fn_{i}"
+        for i, reward_fn in enumerate(self.llm_reward_candidates):
+            if prev_subgoal_model_data is not None:
+                reward_fn_save_path = f"{prev_model_path}{i}"
+            else:
+                reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fn_{i}"
 
             # initialize the model environment
             env:Monitor = self._wrap_env(self.unwrapped_env, subgoal=subgoal, save_path=reward_fn_save_path)  
@@ -351,31 +371,38 @@ class Learner:
             # initialize the evaluation environment
             eval_env:Monitor = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['eval_simulation']), subgoal=subgoal, save_path=f"{reward_fn_save_path}_eval", record_rollouts=False)
 
-            # set the reward shaping function for the subgoal
-            env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
-            eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
-            if prev_subgoal_model_path is not None:
+            if prev_subgoal_model_data is not None:
                 # make a copy of the model
-                model = SAC.load(path=prev_subgoal_model_path, env=env)
-                model_save_path = prev_subgoal_model_path 
+                env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
+                model = SAC.load(path=prev_model_path, env=env)
+                eval_env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
+                eval_callback = CustomEvalCallback(
+                    eval_env=eval_env,
+                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
+                    **self.config['learning']['eval']
+                )
             else:
                 model = SAC(
-                "MlpPolicy",    
-                env = env,
-                tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-                **self.config['learning']['model']
+                    "MlpPolicy",    
+                    env = env,
+                    tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                    **self.config['learning']['model']
                 )
-                model_save_path = f"{reward_fn_save_path}{os.sep}model"
+                eval_callback = CustomEvalCallback(
+                    eval_env=eval_env,
+                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
+                    **self.config['learning']['eval']
+                )
+            model_save_path = f"{reward_fn_save_path}{os.sep}model"
             model.save(
                 path = model_save_path
             )
 
-            eval_callback = CustomEvalCallback(
-            eval_env=eval_env,
-            best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
-            log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
-            **self.config['learning']['eval']
-            )
+            # set the reward shaping function for the subgoal
+            env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
+            eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             
             active_model_data.append((model_save_path, env, eval_callback))
         
@@ -390,13 +417,13 @@ class Learner:
             for active_model_path, env,eval_callback in active_model_data:
                 model = SAC.load(path=active_model_path, env=env)
                 model.learn(
-                total_timesteps=self.config['learning']['learn_subgoal']['total_timesteps'],
+                total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
                 callback=eval_callback
                 )
                 model.save(
                 path = f"{reward_fn_save_path}{os.sep}model"
                 )
-            subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['total_timesteps']
+            subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
             subgoal_success_rates = [eval_callback.get_recent_mean_subgoal_success_rate() for _, _, eval_callback in active_model_data]
             worst_performing_model_idx = np.argmin(subgoal_success_rates)
@@ -404,12 +431,14 @@ class Learner:
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
                 active_model_data.pop(worst_performing_model_idx)
         # return the best performing model
-        best_performing_model_path, _, _ = active_model_data[np.argmax(subgoal_success_rates)]
-        return best_performing_model_path
+        return active_model_data[np.argmax(subgoal_success_rates)]
 
 
-    def prompt_llm_for_reward_shaping_fn_candidates(self):
+
+    def prompt_llm_for_reward_shaping_fn_candidate(self) -> str:
         """Prompt the LLM to generate reward shaping functions candidates for the grounded operator
+        Returns
+            str: the reward shaping function candidate
         """
         grounded_op = self._grounded_operator_repr()
         dummy_detector = load_detector(self.config, self.unwrapped_env)
@@ -419,19 +448,13 @@ class Learner:
         observation_with_semantics = {k:v for k,v in observation_with_semantics.items() if any(param in k for param in grounded_params)}
 
         prompt = reward_shaping_prompt.format(grounded_operator=grounded_op, observation_with_semantics=observation_with_semantics)
-        for i in range(self.config['learning']['reward_shaping']['num_candidates']):
-            out = chat_completion(prompt)
-            #parse the output to get the reward shaping function
-            fn_start = out.find('# llm generated reward shaping function')
-            fn_end = out.find('```', fn_start)
-            fn = out[fn_start:fn_end]
-            # save the output python function to a file in the reward_functions directory
-            # create the directory if it does not exist
-            if not os.path.exists(f"learning{os.sep}reward_functions{os.sep}{self.domain}"):
-                os.makedirs(f"learning{os.sep}reward_functions{os.sep}{self.domain}")
-            # create a file with the operator's name and save the function in it
-            with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}_{i}.py", 'w') as f:
-                f.write(fn)
+        
+        out = chat_completion(prompt)
+        #parse the output to get the reward shaping function
+        fn_start = out.find('# llm generated reward shaping function')
+        fn_end = out.find('```', fn_start)
+        fn = out[fn_start:fn_end]
+        return fn
     
     def check_duplicate_grasp_effects(self) -> bool:
         """check if the grounded operator has both `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` effects. If so, they should count as one effect
