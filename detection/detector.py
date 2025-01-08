@@ -52,7 +52,6 @@ class Detector:
         self.set_env(env)
         obs = {}
         for predicate_name, predicate in self.predicates.items():
-            obs[predicate_name] = {}
             param_list = []
             # e.g. for predicate_name = 'inside', predicate['params'] = ['tabletop_object', 'container']
             for param_type in predicate['params']:
@@ -62,6 +61,9 @@ class Detector:
             param_combinations = list(itertools.product(*param_list))
             callable_func = predicate['func']
             for comb in param_combinations:
+                # skip if the same object is used twice
+                if len(set(comb)) < len(comb):
+                    continue
                 truth_value = callable_func(*comb)
                 predicate_str = f'{predicate_name} {" ".join(self._to_pddl_format(comb))}'
                 obs[predicate_str] = truth_value

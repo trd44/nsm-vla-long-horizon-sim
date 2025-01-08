@@ -72,7 +72,7 @@ if __name__ == "__main__":
     options = {}
 
     # Choose environment
-    options["env_name"] =  choose_mimicgen_environment()
+    options["env_name"] = choose_mimicgen_environment()
 
     # Choose robot
     options["robots"] = choose_robots(exclude_bimanual=True)
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     dummy_executed_operators = OrderedDict()
     visual_env = VisualizationWrapper(env, indicator_configs=None)
     wrapped_env = GymWrapper(visual_env)
-    wrapped_env = OperatorWrapper(wrapped_env, grounded_op, dummy_executed_operators, config)
+    wrapped_env = OperatorWrapper(wrapped_env, grounded_op, dummy_executed_operators, config, record_rollouts=False)
     wrapped_env.reset()
     wrapped_env.viewer.set_camera(camera_id=0)
 
@@ -179,12 +179,3 @@ if __name__ == "__main__":
             groundings = detector.detect_binary_states(env)
             wrapped_env.render()
 
-    # Get action limits
-    # low, high = env.action_spec
- 
-    # # do visualization
-    # for i in range(10000):
-    #     action = np.random.uniform(low, high)
-    #     obs, reward, done, _ = env.step(action)
-    #     #detector.exclusively_occupying_gripper('coffee_pod')
-    #     env.render()

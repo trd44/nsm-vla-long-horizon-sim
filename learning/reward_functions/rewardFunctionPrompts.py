@@ -8,12 +8,12 @@ The observation_with_semantics dictionary:
 ```
 {observation_with_semantics}
 ```
-Output the reward shaping function by filling in the blanks in the following template. To calculate the reward for the given grounded effect, you should extract the relevant information from the observation_with_semantics dictionary. You should then use the values to calculate progress towards the grounded effect. Do not make up any numbers. Pay attention to collision free paths.
+Output the reward shaping function by finishing the following reward function. To calculate the reward for the given grounded effect, you should extract the relevant information from the observation_with_semantics dictionary. You should then use the values to calculate progress towards the grounded effect. Do not make up any numbers.
 The template:
 ```
 # llm generated reward shaping function
 from typing import *
-import numpy as n
+import numpy as np
 
 def reward_shaping_fn(observation_with_semantics:Dict[str, Union[bool, float, np.array]], grounded_effect:str) -> float:
     '''

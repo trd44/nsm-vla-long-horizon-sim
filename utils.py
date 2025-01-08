@@ -140,11 +140,13 @@ def find_file_with_largest_number(directory, name) -> Tuple[str, int]:
         name (str): the file name to search for
 
     Returns:
-        _type_: _description_
+        Tuple[str, int]: the path to the file with the largest number and the largest number
     """
     largest_file = None
     largest_number = None
-
+    # return None if the directory does not exist
+    if not os.path.exists(directory):
+        return directory, None
     for filename in os.listdir(directory):
         if name not in filename:
             continue

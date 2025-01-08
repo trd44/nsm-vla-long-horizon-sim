@@ -80,7 +80,7 @@ class HybridPlanningLearningAgent:
         # deep copy env and detector to avoid modifying the original env and detector
         env_copy = deepcopy_env(self.env, self.config['simulation'])
         learner = learning.learner.Learner(env_copy, self.domain, grounded_operator, executed_operators, self.config)
-        learner.learn()
+        learner.learn_operator()
 
 
 if __name__ == '__main__':
