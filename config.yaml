@@ -47,7 +47,7 @@ learning:
     eval_freq: 10000 # default 10000
     n_eval_episodes: 5
     deterministic: True
-    render: False # if True, make sure `render_mode` below is set up "human" and `eval_simulation` above is set up with `has_renderer` as True
+    render: False # if True, make sure `render_mode` below is set to "human" and `eval_simulation` above is set up with `has_renderer` as True
     render_mode: "human"
     verbose: 1
   learn_operator:
