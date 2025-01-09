@@ -529,7 +529,12 @@ class Learner:
         """
         env = GymWrapper(env)
         env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, curr_subgoal=subgoal, record_rollouts=record_rollouts)
-        subgoals = [f'{eff.pddl_repr()}_subgoal' for eff in self.grounded_operator.effects]
+        subgoals = []
+        for eff in self.grounded_operator.effects:
+            if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
+                continue
+            else:
+                subgoals.append(eff.pddl_repr())
         env = Monitor(
             env=env, 
             filename=f"{save_path}{os.sep}monitor_logs",
