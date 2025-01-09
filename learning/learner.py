@@ -522,7 +522,7 @@ class Learner:
             env=env, 
             filename=f"{save_path}{os.sep}monitor_logs",
             allow_early_resets=True,
-            info_keywords=['subgoal_success', 'goal_success', 'ep_cumu_reward', 'ep_cumu_col_penalty', 'ep_cumu_collisions'] + subgoals
+            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_reward', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
         )
         return env
     
@@ -563,11 +563,11 @@ class CustomEvalCallback(EvalCallback):
         self.eval_env.render_mode = render_mode
         self._subgoal_successes_buffer: List[bool] = [] # stores the per episode subgoal successes
         self.evaluations_subgoal_successes: List[List[bool]] = [] # stores the subgoal successes for each round of evaluation i.e a few episodes per evaluation
-        self._ep_r_shaping_buffer = List[float] = [] # stores the per episode reward shaping values
+        self._ep_r_shaping_buffer: List[float] = [] # stores the per episode reward shaping values
         self.evaluations_r_shaping: List[List[float]] = [] # stores the reward shaping values for each round of evaluation i.e a few episodes per evaluation
-        self._ep_col_penalty_buffer = List[float] = [] # stores the per episode collision penalties
+        self._ep_col_penalty_buffer: List[float] = [] # stores the per episode collision penalties
         self.evaluations_col_penalties: List[List[float]] = [] # stores the collision penalties for each round of evaluation i.e a few episodes per evaluation
-        self._ep_num_collisions_buffer = List[int] = [] # stores the per episode number of collisions
+        self._ep_num_collisions_buffer: List[int] = [] # stores the per episode number of collisions
         self.evaluations_num_collisions: List[List[int]] = [] # stores the number of collisions for each round of evaluation i.e a few episodes per evaluation
 
     def get_recent_subgoal_success_rate(self):
