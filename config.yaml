@@ -41,7 +41,7 @@ learning:
     verbose: 1
     policy_kwargs:
       net_arch: [512, 512, 256]
-    seed: 1
+    seed: 0
     tau: 0.005 # default
   eval:
     eval_freq: 10000 # default 10000
