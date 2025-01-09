@@ -122,7 +122,7 @@ class OperatorWrapper(gym.Wrapper):
         if self.record_rollouts and self.time_step % 100 == 0:
             for collision_point, penalty in zip(collision_points, penalties):
                 g_pos = obs_with_semantics['gripper1_pos']
-                self.csv_writer.writerow([g_pos[0], g_pos[1], g_pos[2], collision_point[0], collision_point[1], collision_point[2], penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
+                self.csv_writer.writerow([g_pos[0], g_pos[1], g_pos[2], collision_point[0], collision_point[1], collision_point[2], penalty, reward, sum(list(self.last_subgoal_successes.values())), reward + sum(penalties) == 0, self.time_step, self.episode])
             self.csv_file.flush()
         
         self.time_step += 1
@@ -522,7 +522,7 @@ class Learner:
             env=env, 
             filename=f"{save_path}{os.sep}monitor_logs",
             allow_early_resets=True,
-            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_reward', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
+            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_r_shaping', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
         )
         return env
     
