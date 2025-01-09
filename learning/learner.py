@@ -111,7 +111,7 @@ class OperatorWrapper(gym.Wrapper):
         info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
         # save additional subgoal success info for each subgoal
         for subgoal, success in self.last_subgoal_successes.items():
-            info[f'{subgoal}_success'] = success
+            info[f'{subgoal}_subgoal'] = success
         # overall goal success is if all subgoals are achieved
         info['goal_success'] = all(self.last_subgoal_successes.values())
         # episode is done also if the current subgoal we are focusing on is achieved
@@ -152,6 +152,18 @@ class OperatorWrapper(gym.Wrapper):
         self.last_subgoal_successes, _ = self._init_subgoal_dicts()
         self.detector.update_obs()
         self.episode += 1
+        # reset the infos
+        info['ep_cumu_r_shaping'] = self.episode_r_shaping
+        info['ep_cumu_col_penalty'] = self.episode_collision_penalty
+        info['ep_cumu_collisions'] = self.episode_num_collisions
+        
+        # save subgoal successes
+        info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
+        # save additional subgoal success info for each subgoal
+        for subgoal, success in self.last_subgoal_successes.items():
+            info[f'{subgoal}_subgoal'] = success
+        # overall goal success is if all subgoals are achieved
+        info['goal_success'] = all(self.last_subgoal_successes.values())
         return obs, info
 
     def check_effect_satisfied(self, effect:fs.SingleEffect, binary_obs:dict) -> bool:
