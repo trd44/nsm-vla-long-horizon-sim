@@ -441,13 +441,21 @@ class Learner:
                         theta=noise_kwargs["theta"],
                         dt=noise_kwargs["dt"],
                 )
-                model = self.RL_algorithm(
-                    "MlpPolicy",    
-                    env = env,
-                    tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-                    action_noise=action_noise,
-                    **model_kwargs
-                )
+                if action_noise == None:
+                    model = self.RL_algorithm(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        **model_kwargs
+                    )
+                else:
+                    model = self.RL_algorithm(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        action_noise=action_noise,
+                        **model_kwargs
+                    )
                 eval_callback = CustomEvalCallback(
                     eval_env=eval_env,
                     best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
