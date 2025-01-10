@@ -7,9 +7,10 @@ import gymnasium as gym
 import importlib
 import numpy as np
 import csv
+import stable_baselines3
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, PPO, DDPG
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
@@ -245,7 +246,6 @@ class OperatorWrapper(gym.Wrapper):
                 last_useful_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
-                # check if the robot's collision distances with objects
                 llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
                 if llm_reward_shaping_fn is None:
                     # reward shaping for this subgoal has not been specifically set yet. Use the previously useful reward shaping function that helped the robot achieve the last subgoal
@@ -325,6 +325,8 @@ class Learner:
     def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
         self.domain = domain
+        # from stable_baselines3 import the learning algorithm
+        self.RL_algorithm = importlib.import_module(f"stable_baselines3.{self.config['learning']['algorithm'].lower()}").__dict__[self.config['learning']['algorithm']]
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
@@ -374,11 +376,11 @@ class Learner:
             model_data = self.learn_subgoal(effect, save_path, prev_subgoal_model_data=model_data)
         # load the model to re-save it in the model save_path
         model_path, _, _ = model_data
-        model = SAC.load(path=model_path)
+        model = self.RL_algorithm.load(path=model_path)
         model.save(path=f"{save_path}{os.sep}final_model")
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
-            operator_name=op_name, alg='SAC',
+            operator_name=op_name, alg=self.config['learning']['algorithm'],
             policy=model_path, 
         )
         # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
@@ -416,7 +418,7 @@ class Learner:
             if prev_subgoal_model_data is not None:
                 # make a copy of the model
                 env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
-                model = SAC.load(path=prev_model_path, env=env)
+                model = self.RL_algorithm.load(path=prev_model_path, env=env)
                 eval_env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
                 eval_callback = CustomEvalCallback(
                     eval_env=eval_env,
@@ -425,7 +427,7 @@ class Learner:
                     **self.config['learning']['eval']
                 )
             else:
-                model = SAC(
+                model = self.RL_algorithm(
                     "MlpPolicy",    
                     env = env,
                     tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
@@ -457,7 +459,7 @@ class Learner:
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
             for active_model_path, env, eval_callback in active_model_data:
-                model = SAC.load(path=active_model_path, env=env)
+                model = self.RL_algorithm.load(path=active_model_path, env=env)
                 model.learn(
                 total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
                 callback=eval_callback
@@ -467,7 +469,7 @@ class Learner:
                 )
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
-            subgoal_success_rates = [eval_callback.get_recent_mean_subgoal_success_rate() for _, _, eval_callback in active_model_data]
+            subgoal_success_rates = [eval_callback.get_recent_subgoal_success_rate() for _, _, eval_callback in active_model_data]
             worst_performing_model_idx = np.argmin(subgoal_success_rates)
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
@@ -534,7 +536,7 @@ class Learner:
             if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
                 continue
             else:
-                subgoals.append(eff.pddl_repr())
+                subgoals.append(f'{eff.pddl_repr()}_subgoal')
         env = Monitor(
             env=env, 
             filename=f"{save_path}{os.sep}monitor_logs",
@@ -684,33 +686,36 @@ class CustomEvalCallback(EvalCallback):
                 subgoal_success_rate = np.mean(self._subgoal_successes_buffer)
                 if self.verbose > 0:
                     print(f"Mean subgoals success rate per episode: {100 * subgoal_success_rate:.2f}%")
-            self.logger.record("eval/mean_subgoal_success_rate_per_ep", subgoal_success_rate)
+            self.logger.record("eval/mean_ep_subgoal_success_rate", subgoal_success_rate)
             
-            mean_r_shaping = -1
+            mean_ep_r_shaping = None
             if len(self._ep_r_shaping_buffer) > 0:
                 mean_ep_r_shaping = np.mean(self._ep_r_shaping_buffer)
                 if self.verbose > 0:
                     print(f"Mean episode reward shaping per episode: {mean_ep_r_shaping:.2f}")
-            self.logger.record("eval/mean_r_shaping_per_ep", mean_r_shaping)
+            self.logger.record("eval/mean_ep_r_shaping", mean_ep_r_shaping)
 
-            mean_col_penalty = -float('inf')
+            mean_col_penalty = None
             if len(self._ep_col_penalty_buffer) > 0:
                 mean_col_penalty = np.mean(self._ep_col_penalty_buffer)
                 if self.verbose > 0:
                     print(f"Mean episode collision penalty per episode: {mean_col_penalty:.2f}")
-            self.logger.record("eval/mean_col_penalty_per_ep", mean_col_penalty)
+            self.logger.record("eval/mean_ep_col_penalty", mean_col_penalty)
 
-            mean_num_collisions = float('inf')
+            mean_num_collisions = None
             if len(self._ep_num_collisions_buffer) > 0:
                 mean_num_collisions = np.mean(self._ep_num_collisions_buffer)
                 if self.verbose > 0:
                     print(f"Mean episode number of collisions per episode: {mean_num_collisions:.2f}")
-            self.logger.record("eval/mean_num_collisions_per_ep", mean_num_collisions)
+            self.logger.record("eval/mean_ep_num_collisions", mean_num_collisions)
 
             # Dump log so the evaluation results are printed with the correct timestep
             if self.verbose > 0:
-                print(f"Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                print(f"Eval num_timesteps={self.num_timesteps}, " f"mean episode reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                # get the min and max episode reward too
+                print(f"Min episode reward: {np.min(episode_rewards)}, " f"Max episode reward: {np.max(episode_rewards)}")
                 print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                print(f"Min episode length: {np.min(episode_lengths)}, " f"Max episode length: {np.max(episode_lengths)}")
             # Add to current Logger
             self.logger.record("eval/mean_ep_reward", float(mean_reward))
             self.logger.record("eval/mean_ep_length", mean_ep_length)           
@@ -731,13 +736,13 @@ class CustomEvalCallback(EvalCallback):
             # Split the log_path to get the second to last directory
             csv_path = os.path.split(self.log_path)[0]
             with open(os.path.join(csv_path, 'results_eval.csv'), 'a') as f:
-                f.write("{},{},{},{},{},{},{},{},{}\n".format(
+                f.write("{},{},{},{},{},{},{},{}\n".format(
                     self.num_timesteps,  
                     subgoal_success_rate,
                     success_rate, 
                     mean_ep_length,
                     mean_reward,  
-                    mean_r_shaping, 
+                    mean_ep_r_shaping, 
                     mean_num_collisions,
                     mean_col_penalty,  
                 ))

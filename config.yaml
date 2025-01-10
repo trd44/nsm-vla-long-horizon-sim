@@ -32,17 +32,46 @@ eval_simulation:
 
 # parameters for RL
 learning:
-  model:
-    batch_size: 256 # default
-    buffer_size: 1000000
+  algorithm: "PPO"
+  model: # for PPO
+    batch_size: 64 # default
     gamma: 0.99 # default
     learning_rate: 0.0003
-    learning_starts: 10000 # default 10000
     verbose: 1
+    n_steps: 2048 # default
     policy_kwargs:
-      net_arch: [512, 512, 256]
+      net_arch:
+        pi: [512, 512, 256] # default [64, 64]
+        vf: [512, 512, 256] # default [64, 64]
     seed: 0
-    tau: 0.005 # default
+  # model: # for DDPG
+  #   batch_size: 100 # default
+  #   buffer_size: 1000000 # default
+  #   gamma: 0.99 # default
+  #   learning_rate: 0.001 # default
+  #   learning_starts: 100 # default
+  #   verbose: 1
+  #   policy_kwargs:
+  #     net_arch: [512, 512, 256] # default [400, 300]
+  #   seed: 0
+  #   tau: 0.005 # default
+  #   action_noise: "OrnsteinUhlenbeckActionNoise" # default
+  #   action_noise_kwargs:
+  #     mean: 0.0
+  #     sigma: 0.2
+  #     theta: 0.15
+  #     dt: 1e-2
+  # model: # for SAC
+  #   batch_size: 256 # default
+  #   buffer_size: 1000000 # not for PPO
+  #   gamma: 0.99 # default
+  #   learning_rate: 0.0003
+  #   learning_starts: 10000 # default 10000
+  #   verbose: 1
+  #   policy_kwargs:
+  #     net_arch: [512, 512, 256]
+  #   seed: 0
+  #   tau: 0.005 # default
   eval:
     eval_freq: 10000 # default 10000
     n_eval_episodes: 5
