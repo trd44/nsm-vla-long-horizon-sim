@@ -15,6 +15,7 @@ from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopT
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
@@ -427,11 +428,25 @@ class Learner:
                     **self.config['learning']['eval']
                 )
             else:
+                model_kwargs = dict(self.config['learning']['model'])  # copy so we can modify
+                noise_type = model_kwargs.pop("action_noise", None)
+                noise_kwargs = model_kwargs.pop("action_noise_kwargs", None)
+                
+                action_noise = None
+                if noise_type == "OrnsteinUhlenbeckActionNoise" and noise_kwargs is not None:
+                    n_actions = env.action_space.shape[-1]
+                    action_noise = OrnsteinUhlenbeckActionNoise(
+                        mean=np.full(n_actions, noise_kwargs["mean"]),
+                        sigma=noise_kwargs["sigma"] * np.ones(n_actions),
+                        theta=noise_kwargs["theta"],
+                        dt=noise_kwargs["dt"],
+                )
                 model = self.RL_algorithm(
                     "MlpPolicy",    
                     env = env,
                     tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-                    **self.config['learning']['model']
+                    action_noise=action_noise,
+                    **model_kwargs
                 )
                 eval_callback = CustomEvalCallback(
                     eval_env=eval_env,
@@ -439,6 +454,18 @@ class Learner:
                     log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
                     **self.config['learning']['eval']
                 )
+                # model = self.RL_algorithm(
+                #     "MlpPolicy",    
+                #     env = env,
+                #     tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                #     **self.config['learning']['model']
+                # )
+                # eval_callback = CustomEvalCallback(
+                #     eval_env=eval_env,
+                #     best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                #     log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
+                #     **self.config['learning']['eval']
+                # )
             model_save_path = f"{reward_fn_save_path}{os.sep}model"
             model.save(
                 path = model_save_path
@@ -461,11 +488,11 @@ class Learner:
             for active_model_path, env, eval_callback in active_model_data:
                 model = self.RL_algorithm.load(path=active_model_path, env=env)
                 model.learn(
-                total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
-                callback=eval_callback
+                    total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
+                    callback=eval_callback
                 )
                 model.save(
-                path = f"{reward_fn_save_path}{os.sep}model"
+                    path = f"{reward_fn_save_path}{os.sep}model"
                 )
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
