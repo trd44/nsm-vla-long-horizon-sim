@@ -1,7 +1,7 @@
 # config.yaml
 vlm_agent:
   api_key: "your_api_key"
-  model: "o1-preview"
+  model: "o1"
   temperature: 0.5
 # seting for image observation
 image_path: "images/agent_view.jpg"
@@ -44,6 +44,7 @@ learning:
         pi: [512, 512, 256] # default [64, 64]
         vf: [512, 512, 256] # default [64, 64]
     seed: 0
+
   # model: # for DDPG
   #   batch_size: 100 # default
   #   buffer_size: 1000000 # default
@@ -61,6 +62,7 @@ learning:
   #     sigma: 0.2
   #     theta: 0.15
   #     dt: 1e-2
+
   # model: # for SAC
   #   batch_size: 256 # default
   #   buffer_size: 1000000 # not for PPO
@@ -83,7 +85,6 @@ learning:
     total_timesteps: 5000000
   learn_subgoal:
     timesteps_per_iter: 50000
-  subgoal_eval_iterations: 10
   reward_shaping_fn:
     num_candidates: 3
   
