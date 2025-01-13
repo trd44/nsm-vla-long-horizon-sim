@@ -1,4 +1,5 @@
 import copy
+import time
 import dill
 import os
 import detection.detector
@@ -264,7 +265,10 @@ class OperatorWrapper(gym.Wrapper):
                     # reward shaping for this subgoal has not been specifically set yet. Use the previously useful reward shaping function that helped the robot achieve the last subgoal
                     llm_reward_shaping_fn = last_useful_reward_shaping_fn
                     self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = llm_reward_shaping_fn
-                sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
+                try: # the llm reward shaping function may not be error-free. In that case, raise an error
+                    sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
+                except Exception as e:
+                    raise Exception(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
@@ -371,6 +375,8 @@ class Learner:
                 # create a file with the operator's name and save the function in it
                 with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}_{i}.py", 'w') as f:
                     f.write(func)
+                # wait 5 seconds for the file to be saved
+                time.sleep(5)
                 llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.domain}.{op_name}_{i}")
                 llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
                 reward_fn_candidates.append(llm_reward_shaping_func)
@@ -513,14 +519,21 @@ class Learner:
         subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
-            for active_model_path, env, eval_callback in active_model_data:
+            model_indices_to_pop = []
+            
+            for i, (active_model_path, env, eval_callback) in enumerate(active_model_data):
                 model = self.rl_algo.load(path=active_model_path, env=env)
                 logger.info(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
-                model.learn(
-                    total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
-                    callback=eval_callback,
-                    reset_num_timesteps=False
-                )
+                try: # try to train the model with llm reward shaping function
+                    model.learn(
+                        total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
+                        callback=eval_callback,
+                        reset_num_timesteps=False
+                    )
+                except Exception as e: # if the llm reward shaping function is not error-free, catch the error, log it, and eliminate this model from the active models
+                    logger.error(e)
+                    model_indices_to_pop.append(i)
+                # save the model after however much training has been done
                 model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
@@ -529,7 +542,11 @@ class Learner:
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
                 logger.info(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
-                active_model_data.pop(worst_performing_model_idx)
+                model_indices_to_pop.append(worst_performing_model_idx)
+            
+            # pop the models that need to be terminated
+            for i in model_indices_to_pop:
+                active_model_data.pop(i)
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
 
