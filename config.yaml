@@ -37,7 +37,7 @@ learning:
     gamma: 0.99 # default
     learning_rate: 0.0003
     verbose: 1
-    n_steps: 2 # default 2048, make sure this matches with `timesteps_per_iter` below. Otherwise this will take precedence
+    n_steps: 2048 #default 2048, make sure this is smaller than or equal to `timesteps_per_iter` below. Otherwise this will take precedence
     policy_kwargs:
       net_arch:
         pi: [512, 512, 256] # default [64, 64]
