@@ -12,3 +12,4 @@ config.yaml
 **/eval_logs/
 **/tensorboard_logs/
 **/monitor_logs.csv
+MUJOCO_LOG.TXT

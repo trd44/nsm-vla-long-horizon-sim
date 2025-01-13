@@ -2,17 +2,20 @@
 
 ## Dependencies
 
-Clone MimicGen in /OpLearn
+Clone MimicGen in /OpLearn directory
 ```bash
-gh repo clone https://github.com/helenlu66/mimicgen
+git clone https://github.com/helenlu66/mimicgen
 ```
 
-Clone RoboSuite in /OpLearn
+Clone RoboSuite in /OpLearn directory
 ```bash
-gh repo clone https://github.com/ARISE-Initiative/robosuite.git
+git clone https://github.com/ARISE-Initiative/robosuite.git
 ```
 
-Install tarski - coming soon
+Install tarski in /OpLearn directory
+```bash
+git clone https://github.com/ARISE-Initiative/tarski.git
+```
 
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
@@ -39,6 +42,17 @@ Closing runaway containers. If you get an error on a subsequent docker build. It
 docker compose down -v
 ```
 
+### Add your OpenAI API key to the container as an environment variable
+Replace ```YOUR_API_KEY``` with the API key you get from OpenAI
+```bash
+echo 'export OPENAI_API_KEY="YOUR_API_KEY"' >> ~/.bashrc
+```
+
+Source your .bashrc file for the changes to take effect
+```bash
+source ~/.bashrc
+```
+
 ### Connecting to VS Code (Optional)
 Install the dev containers extension in VS Code
 
@@ -48,7 +62,7 @@ Select the running container. In my case it says "/oplearn_oplearn_1"
 
 Open the /home/user/oplearn directory to start working on the files from within the container.
 
-## Run Demo
+## Test Installation
 You can test your mujoco installation first with 
 ```bash
 python test_mujoco.py
@@ -63,3 +77,20 @@ You can test your MimicGen installation with
 ```bash
 python mimicgen/mimicgen/scripts/demo_random_action.py
 ```
+
+## Testing Environments
+You can test our environments and control the manipulator with your keyboard with:
+```bash
+python keboard_control_envs.py
+```
+
+Follow the instructios to chose the environment and robot you want. The keyboard controls will be displayed after running this script also.
+
+## Running the Hybrid Planning and Learning Agent
+```bash
+python hybrid_planning_learning_agent.py
+```
+
+Use config.yaml to edit the configuration of the agent.
+
+Use visualize_policy.py to view the policy the agent learned.
