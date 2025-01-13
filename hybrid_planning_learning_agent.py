@@ -96,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='config.yaml', help='path to the config file')
     parser.add_argument('--domain', type=str, help='name of the domain. Can be either `nut_assembly`, `coffee` or `cleanup`', required=True)
     parser.add_argument('--rl_algorithm', type=str, help='name of the reinforcement learning algorithm to use. Can be either `PPO`, `DDPG`, `SAC`', required=True)
+    parser.add_argument('--seed', type=int, default=0, help='random seed for the learning algorithm')
     args = parser.parse_args()
 
     agent = HybridPlanningLearningAgent(args)
