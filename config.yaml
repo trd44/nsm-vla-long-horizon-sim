@@ -1,7 +1,7 @@
 # config.yaml
 vlm_agent:
   api_key: "your_api_key"
-  model: "o1"
+  model: "o1-preview"
   temperature: 0.5
 # seting for image observation
 image_path: "images/agent_view.jpg"
@@ -42,7 +42,6 @@ learning:
       net_arch:
         pi: [512, 512, 256] # default [64, 64]
         vf: [512, 512, 256] # default [64, 64]
-    seed: 5
   DDPG:
     batch_size: 100 # default
     buffer_size: 1000000 # default
@@ -52,7 +51,6 @@ learning:
     verbose: 1
     policy_kwargs:
       net_arch: [512, 512, 256] # default [400, 300]
-    seed: 5
     tau: 0.005 # default
     action_noise: "OrnsteinUhlenbeckActionNoise" # default
     action_noise_kwargs:
@@ -69,7 +67,6 @@ learning:
     verbose: 1
     policy_kwargs:
       net_arch: [512, 512, 256]
-    seed: 5
     tau: 0.005 # default
   eval:
     eval_freq: 2 # for debugging default 10000

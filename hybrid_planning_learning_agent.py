@@ -20,6 +20,8 @@ class HybridPlanningLearningAgent:
     def __init__(self, args:dict, config_file='config.yaml'):
         self.config:dict = load_config(config_file)
         self.domain:str = args.domain
+        # add the seed to the config file
+        self.config['learning'][self.domain]['seed'] = args.seed
         self.planner = HybridSymbolicLLMPlanner(self.config['planning'][self.domain])
         self.env = load_env(self.domain, self.config['simulation'])
         self.detector = load_detector(self.config, self.domain, self.env)
