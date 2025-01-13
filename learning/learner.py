@@ -15,6 +15,7 @@ from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopT
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
@@ -23,13 +24,14 @@ from VLM.LlmApi import chat_completion
 
 
 class OperatorWrapper(gym.Wrapper):
-    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
         super().__init__(env)
-        self.detector = load_detector(config=config, env=env)
+        self.detector = load_detector(config=config, domain=domain, env=env)
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
-        self.domain = self.config['planning']['domain']
+        self.domain = domain
+        self.rl_algo_name = rl_algo
         self.curr_subgoal = curr_subgoal
         self.last_subgoal_successes, self.subgoal_reward_shaping_fn_mapping = self._init_subgoal_dicts()
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
@@ -41,7 +43,7 @@ class OperatorWrapper(gym.Wrapper):
         self.record_rollouts = record_rollouts
 
         if self.record_rollouts:
-            self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}"
+            self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning'][self.rl_algo_name]['seed']}"
             _, largest_file_number = find_file_with_largest_number(self.rollout_save_dir, 'rollout')
             if largest_file_number is None:
                 largest_file_number = 0
@@ -165,6 +167,14 @@ class OperatorWrapper(gym.Wrapper):
             info[f'{subgoal}_subgoal'] = success
         # overall goal success is if all subgoals are achieved
         info['goal_success'] = all(self.last_subgoal_successes.values())
+        info['is_success'] = info['goal_success'] # for compatibility with the stable_baselines3's update_info_buffer
+        info['episode'] = { # for compatibility with the stable_baselines3's update_info_buffer
+            'ep_cumu_r_shaping': self.episode_r_shaping,
+            'ep_cumu_col_penalty': self.episode_collision_penalty,
+            'ep_cumu_collisions': self.episode_num_collisions,
+            'subgoal_success': self.last_subgoal_successes[self.curr_subgoal.pddl_repr()],
+        }
+
         return obs, info
 
     def check_effect_satisfied(self, effect:fs.SingleEffect, binary_obs:dict) -> bool:
@@ -322,16 +332,17 @@ class OperatorWrapper(gym.Wrapper):
     
         
 class Learner:
-    def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+    def __init__(self, env:MujocoEnv, domain:str, rl_algo:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
         self.domain = domain
+        self.rl_algo_name = rl_algo
         # from stable_baselines3 import the learning algorithm
-        self.RL_algorithm = importlib.import_module(f"stable_baselines3.{self.config['learning']['algorithm'].lower()}").__dict__[self.config['learning']['algorithm']]
+        self.rl_algo = importlib.import_module(f"stable_baselines3.{self.rl_algo_name.lower()}").__dict__[self.rl_algo_name]
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
         self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
-        np.random.seed(self.config['learning']['model']['seed'])
+        np.random.seed(self.config['learning'][self.rl_algo_name]['seed'])
     
     
     def _load_llm_reward_fn_candidates(self) -> List[Callable]:
@@ -344,7 +355,7 @@ class Learner:
         reward_fn_candidates = []
         for i in range(self.config['learning']['reward_shaping_fn']['num_candidates']):
             try:
-                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}_{i}")
+                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.domain}.{op_name}_{i}")
                 llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
                 reward_fn_candidates.append(llm_reward_shaping_func)
             except:
@@ -367,7 +378,7 @@ class Learner:
             execution.executor.Executor_RL: an RL executor for the operator
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}"
+        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}"
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
         model_data = None
         for effect in self.grounded_operator.effects:
@@ -376,15 +387,16 @@ class Learner:
             model_data = self.learn_subgoal(effect, save_path, prev_subgoal_model_data=model_data)
         # load the model to re-save it in the model save_path
         model_path, _, _ = model_data
-        model = self.RL_algorithm.load(path=model_path)
+        model = self.rl_algo.load(path=model_path)
         model.save(path=f"{save_path}{os.sep}final_model")
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
-            operator_name=op_name, alg=self.config['learning']['algorithm'],
-            policy=model_path, 
+            operator_name=op_name,
+            alg=self.rl_algo_name,
+            policy=model_path
         )
         # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
-        with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}{os.sep}executor.pkl", 'wb') as f:
+        with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}{os.sep}executor.pkl", 'wb') as f:
             dill.dump(executor, f)
         return executor
 
@@ -405,7 +417,8 @@ class Learner:
 
         for i, reward_fn in enumerate(self.llm_reward_candidates):
             if prev_subgoal_model_data is not None:
-                reward_fn_save_path = f"{prev_model_path}{i}"
+                # drop the '{os.sep}model' from the path and add '{i}' to the end
+                reward_fn_save_path = prev_model_path[:prev_model_path.rfind(f'{os.sep}model')] + f"{os.sep}{i}"
             else:
                 reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fn_{i}"
 
@@ -418,32 +431,59 @@ class Learner:
             if prev_subgoal_model_data is not None:
                 # make a copy of the model
                 env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
-                model = self.RL_algorithm.load(path=prev_model_path, env=env)
+                model = self.rl_algo.load(path=prev_model_path, env=env)
                 eval_env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
-                eval_callback = CustomEvalCallback(
-                    eval_env=eval_env,
-                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
-                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
-                    **self.config['learning']['eval']
-                )
             else:
-                model = self.RL_algorithm(
-                    "MlpPolicy",    
-                    env = env,
-                    tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-                    **self.config['learning']['model']
+                model_kwargs = dict(self.config['learning'][self.rl_algo_name])  # copy so we can modify
+                noise_type = model_kwargs.pop("action_noise", None)
+                noise_kwargs = model_kwargs.pop("action_noise_kwargs", None)
+                
+                action_noise = None
+                if noise_type == "OrnsteinUhlenbeckActionNoise" and noise_kwargs is not None:
+                    n_actions = env.action_space.shape[-1]
+                    action_noise = OrnsteinUhlenbeckActionNoise(
+                        mean=np.full(n_actions, noise_kwargs["mean"]),
+                        sigma=noise_kwargs["sigma"] * np.ones(n_actions),
+                        theta=noise_kwargs["theta"],
+                        dt=noise_kwargs["dt"],
                 )
-                eval_callback = CustomEvalCallback(
-                    eval_env=eval_env,
-                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
-                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
-                    **self.config['learning']['eval']
+                if action_noise == None:
+                    model = self.rl_algo(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        **model_kwargs
+                    )
+                else:
+                    model = self.rl_algo(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        action_noise=action_noise,
+                        **model_kwargs
+                    )
+            eval_callback = CustomEvalCallback(
+                eval_env=eval_env,
+                best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                log_path=f"{reward_fn_save_path}_eval{os.sep}eval_logs",
+                **self.config['learning']['eval']
                 )
+                # model = self.RL_algorithm(
+                #     "MlpPolicy",    
+                #     env = env,
+                #     tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                #     **self.config['learning'][self.rl_algo_name]['model']
+                # )
+                # eval_callback = CustomEvalCallback(
+                #     eval_env=eval_env,
+                #     best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                #     log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
+                #     **self.config['learning']['eval']
+                # )
             model_save_path = f"{reward_fn_save_path}{os.sep}model"
             model.save(
                 path = model_save_path
             )
-
             # set the reward shaping function for the subgoal
             env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
@@ -459,20 +499,20 @@ class Learner:
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
             for active_model_path, env, eval_callback in active_model_data:
-                model = self.RL_algorithm.load(path=active_model_path, env=env)
+                model = self.rl_algo.load(path=active_model_path, env=env)
+                print(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
                 model.learn(
-                total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
-                callback=eval_callback
+                    total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
+                    callback=eval_callback,
                 )
-                model.save(
-                path = f"{reward_fn_save_path}{os.sep}model"
-                )
+                model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
             subgoal_success_rates = [eval_callback.get_recent_subgoal_success_rate() for _, _, eval_callback in active_model_data]
             worst_performing_model_idx = np.argmin(subgoal_success_rates)
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
+                print(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
                 active_model_data.pop(worst_performing_model_idx)
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
@@ -530,7 +570,16 @@ class Learner:
             gym.Wrapper: the wrapped environment
         """
         env = GymWrapper(env)
-        env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, curr_subgoal=subgoal, record_rollouts=record_rollouts)
+        env = OperatorWrapper(
+            env=env,
+            rl_algo=self.rl_algo_name,
+            domain=self.domain,
+            grounded_operator=self.grounded_operator, 
+            executed_operators=self.executed_operators, 
+            config=self.config, 
+            curr_subgoal=subgoal, 
+            record_rollouts=record_rollouts,
+        )
         subgoals = []
         for eff in self.grounded_operator.effects:
             if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():

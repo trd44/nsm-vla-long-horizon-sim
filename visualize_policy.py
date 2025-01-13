@@ -27,7 +27,7 @@ def find_grounded_operator(plan:List[fs.Action], operator_name:str) -> Union[fs.
             prior_ops.append(grounded_operator)
     raise Exception(f"Operator {operator_name} not found in the plan")
 
-def choose_policy(config:dict) -> Tuple[SAC, GymWrapper]:
+def choose_policy(config:dict, domain:str) -> Tuple[SAC, GymWrapper]:
     """Prints out the RL policies available in stable_baselines3, and returns the selected policy choice
     Args:
         config (dict): the configuration dictionary containig the domain and planning information
@@ -35,8 +35,7 @@ def choose_policy(config:dict) -> Tuple[SAC, GymWrapper]:
         SAC: the selected policy
         GymWrapper: the environment for the selected policy
     """
-    plan = load_plan(config)
-    domain = config['planning']['domain']
+    plan = load_plan(config[domain])
     # read directories under `learning/policies` to get the list of policies
     policies_dir = f"learning{os.sep}policies"
 
@@ -85,12 +84,12 @@ def choose_policy(config:dict) -> Tuple[SAC, GymWrapper]:
     model = SAC.load(f"{policies_dir}{os.sep}{domain}{os.sep}{chosen_operator}{os.sep}{chosen_seed}{os.sep}best_model{os.sep}best_model.zip", env=env)
     return model, env
 
-def visualize_policy(config:dict):
+def visualize_policy(config:dict, domain:str):
     """Visualize the learned policy
     Args:
         config (dict): the configuration dictionary containig the domain and planning information
     """
-    model, env = choose_policy(config)
+    model, env = choose_policy(config, domain)
     obs, _ = env.reset()
     n_success = 0
     for _ in range(config['learning']['eval']['n_eval_episodes']):
@@ -106,5 +105,6 @@ def visualize_policy(config:dict):
     print(f"ran {config['learning']['eval']['n_eval_episodes']} episodes, was successful in {n_success} episodes")
 
 if __name__ == "__main__":
+    domain = 'nut_assembly'
     config = load_config("config.yaml")
-    visualize_policy(config)
+    visualize_policy(config, domain)

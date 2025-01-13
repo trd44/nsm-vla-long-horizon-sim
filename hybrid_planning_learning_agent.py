@@ -4,17 +4,21 @@ import importlib
 import learning.learner
 import planning.hybrid_symbolic_llm_planner
 import planning.planning_utils
+from planning.hybrid_symbolic_llm_planner import HybridSymbolicLLMPlanner
 from utils import *
 from tarski import fstrips as fs
 from execution.executor import Executor
 
+# add comand line arguments
+import argparse
+
 class HybridPlanningLearningAgent:
-    def __init__(self, config_file='config.yaml'):
+    def __init__(self, args:dict, config_file='config.yaml'):
         self.config:dict = load_config(config_file)
-        self.domain:str = self.config['planning']['domain']
-        self.planner:planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner = planning.hybrid_symbolic_llm_planner.HybridSymbolicLLMPlanner(self.config)
+        self.domain:str = args.domain
+        self.planner = HybridSymbolicLLMPlanner(self.config['planning'][self.domain])
         self.env = load_env(self.domain, self.config['simulation'])
-        self.detector = load_detector(self.config, self.env)
+        self.detector = load_detector(self.config, self.domain, self.env)
     
     def plan_learn_execute(self):
         """generate a plan to achieve the goal based on the domain and problem files whose paths are specified in the config file, learn a policy for each of the newly defined operators and execute each operator in the plan
@@ -45,7 +49,7 @@ class HybridPlanningLearningAgent:
             List[fs.Action]: a list a sequence of actions to achieve the goal a.k.a the plans
         """
         # try loading the plan from the planning directory in case it has already been generated
-        plan = load_plan(config=self.config)
+        plan = load_plan(config=self.config['planning'][self.domain])
         if plan is not None:
             return plan
         
@@ -64,7 +68,7 @@ class HybridPlanningLearningAgent:
         Returns:
             Tuple[bool, bool, execution.executor.Executor]: a tuple containing a boolean indicating whether the operator has an executor, a boolean indicating whether the operator was executed successfully, and the executor object of the operator.
         """
-        executor = load_executor(self.config, grounded_operator=grounded_operator)
+        executor = load_executor(self.config, self.domain, grounded_operator=grounded_operator)
         if executor is None:
             return False, False, None # no executor found, not executed successfully, no executor object
         execution_successful = executor.execute(self.detector, grounded_operator)
@@ -79,12 +83,18 @@ class HybridPlanningLearningAgent:
         """
         # deep copy env and detector to avoid modifying the original env and detector
         env_copy = deepcopy_env(self.env, self.config['simulation'])
-        learner = learning.learner.Learner(env_copy, self.domain, grounded_operator, executed_operators, self.config)
+        learner = learning.learner.Learner(env=env_copy, domain=self.domain, rl_algo=args.rl_algorithm, grounded_operator_to_learn=grounded_operator, executed_operators=executed_operators, config=self.config)
         learner.learn_operator()
 
 
 if __name__ == '__main__':
-    agent = HybridPlanningLearningAgent()
+    parser = argparse.ArgumentParser(description='Hybrid Planning Learning Agent')
+    parser.add_argument('--config', type=str, default='config.yaml', help='path to the config file')
+    parser.add_argument('--domain', type=str, help='name of the domain. Can be either `nut_assembly`, `coffee` or `cleanup`', required=True)
+    parser.add_argument('--rl_algorithm', type=str, help='name of the reinforcement learning algorithm to use. Can be either `PPO`, `DDPG`, `SAC`', required=True)
+    args = parser.parse_args()
+
+    agent = HybridPlanningLearningAgent(args)
     agent.plan_learn_execute()
     
 
