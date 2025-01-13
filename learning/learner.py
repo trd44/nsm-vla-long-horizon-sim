@@ -504,6 +504,7 @@ class Learner:
                 model.learn(
                     total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
                     callback=eval_callback,
+                    reset_num_timesteps=False
                 )
                 model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
