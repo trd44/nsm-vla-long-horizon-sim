@@ -1,3 +1,7 @@
+import warnings
+
+# Suppress all UserWarning messages
+warnings.filterwarnings("ignore", category=UserWarning)
 import os
 import dill
 import importlib

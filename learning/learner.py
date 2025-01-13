@@ -8,6 +8,7 @@ import importlib
 import numpy as np
 import csv
 import stable_baselines3
+import logging
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC, PPO, DDPG
@@ -21,7 +22,9 @@ from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
 from VLM.LlmApi import chat_completion
 
-
+# set up a logger here to log the terminal printouts for the training of each subgoal
+logger = logging.getLogger('learning')
+logger.setLevel(logging.INFO)
 
 class OperatorWrapper(gym.Wrapper):
     def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
@@ -368,7 +371,9 @@ class Learner:
                 # create a file with the operator's name and save the function in it
                 with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}_{i}.py", 'w') as f:
                     f.write(func)
-                
+                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.domain}.{op_name}_{i}")
+                llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
+                reward_fn_candidates.append(llm_reward_shaping_func)
         return reward_fn_candidates
     
     def learn_operator(self) -> execution.executor.Executor_RL:
@@ -411,6 +416,16 @@ class Learner:
         """
         subgoal_name:str = subgoal.pddl_repr().replace(' ', '_')
         subgoal_save_path = f"{save_path}{os.sep}{subgoal_name}"
+        if not os.path.exists(subgoal_save_path):
+            os.makedirs(subgoal_save_path)
+        # Remove duplicate handlers
+        if logger.hasHandlers():
+            logger.handlers.clear()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler = logging.FileHandler(f"{subgoal_save_path}{os.sep}rw_fn_candidates_train_logs.log")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
         if prev_subgoal_model_data is not None:
             prev_model_path, prev_env, prev_eval_callback = prev_subgoal_model_data
         active_model_data = []
@@ -500,7 +515,7 @@ class Learner:
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
             for active_model_path, env, eval_callback in active_model_data:
                 model = self.rl_algo.load(path=active_model_path, env=env)
-                print(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
+                logger.info(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
                 model.learn(
                     total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
                     callback=eval_callback,
@@ -513,7 +528,7 @@ class Learner:
             worst_performing_model_idx = np.argmin(subgoal_success_rates)
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
-                print(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
+                logger.info(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
                 active_model_data.pop(worst_performing_model_idx)
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
@@ -526,7 +541,7 @@ class Learner:
             str: the reward shaping function candidate
         """
         grounded_op = self._grounded_operator_repr()
-        dummy_detector = load_detector(self.config, self.unwrapped_env)
+        dummy_detector = load_detector(self.config, self.domain, self.unwrapped_env)
         observation_with_semantics = dummy_detector.get_obs()
         # keep only the keys that include the parameters of the grounded operator
         op_name, grounded_params = extract_name_params_from_grounded(self.grounded_operator.ident())
@@ -728,44 +743,44 @@ class CustomEvalCallback(EvalCallback):
             if len(self._is_success_buffer) > 0:
                 success_rate = np.mean(self._is_success_buffer)
                 if self.verbose > 0:
-                    print(f"Mean Success rate per episode: {100 * success_rate:.2f}%")
+                    logger.info(f"Mean Success rate per episode: {100 * success_rate:.2f}%")
             self.logger.record("eval/mean_goal_success_rate_per_ep", success_rate)
             
             subgoal_success_rate = 0
             if len(self._subgoal_successes_buffer) > 0:
                 subgoal_success_rate = np.mean(self._subgoal_successes_buffer)
                 if self.verbose > 0:
-                    print(f"Mean subgoals success rate per episode: {100 * subgoal_success_rate:.2f}%")
+                    logger.info(f"Mean subgoals success rate per episode: {100 * subgoal_success_rate:.2f}%")
             self.logger.record("eval/mean_ep_subgoal_success_rate", subgoal_success_rate)
             
             mean_ep_r_shaping = None
             if len(self._ep_r_shaping_buffer) > 0:
                 mean_ep_r_shaping = np.mean(self._ep_r_shaping_buffer)
                 if self.verbose > 0:
-                    print(f"Mean episode reward shaping per episode: {mean_ep_r_shaping:.2f}")
+                    logger.info(f"Mean episode reward shaping per episode: {mean_ep_r_shaping:.2f}")
             self.logger.record("eval/mean_ep_r_shaping", mean_ep_r_shaping)
 
             mean_col_penalty = None
             if len(self._ep_col_penalty_buffer) > 0:
                 mean_col_penalty = np.mean(self._ep_col_penalty_buffer)
                 if self.verbose > 0:
-                    print(f"Mean episode collision penalty per episode: {mean_col_penalty:.2f}")
+                    logger.info(f"Mean episode collision penalty per episode: {mean_col_penalty:.2f}")
             self.logger.record("eval/mean_ep_col_penalty", mean_col_penalty)
 
             mean_num_collisions = None
             if len(self._ep_num_collisions_buffer) > 0:
                 mean_num_collisions = np.mean(self._ep_num_collisions_buffer)
                 if self.verbose > 0:
-                    print(f"Mean episode number of collisions per episode: {mean_num_collisions:.2f}")
+                    logger.info(f"Mean episode number of collisions per episode: {mean_num_collisions:.2f}")
             self.logger.record("eval/mean_ep_num_collisions", mean_num_collisions)
 
             # Dump log so the evaluation results are printed with the correct timestep
             if self.verbose > 0:
-                print(f"Eval num_timesteps={self.num_timesteps}, " f"mean episode reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                logger.info(f"Eval num_timesteps={self.num_timesteps}, " f"mean episode reward={mean_reward:.2f} +/- {std_reward:.2f}")
                 # get the min and max episode reward too
-                print(f"Min episode reward: {np.min(episode_rewards)}, " f"Max episode reward: {np.max(episode_rewards)}")
-                print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
-                print(f"Min episode length: {np.min(episode_lengths)}, " f"Max episode length: {np.max(episode_lengths)}")
+                logger.info(f"Min episode reward: {np.min(episode_rewards)}, " f"Max episode reward: {np.max(episode_rewards)}")
+                logger.info(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                logger.info(f"Min episode length: {np.min(episode_lengths)}, " f"Max episode length: {np.max(episode_lengths)}")
             # Add to current Logger
             self.logger.record("eval/mean_ep_reward", float(mean_reward))
             self.logger.record("eval/mean_ep_length", mean_ep_length)           
@@ -774,7 +789,7 @@ class CustomEvalCallback(EvalCallback):
 
             if mean_reward > self.best_mean_reward:
                 if self.verbose > 0:
-                    print("New best mean reward!")
+                    logger.info("New best mean reward!")
                 if self.best_model_save_path is not None:
                     self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = mean_reward
