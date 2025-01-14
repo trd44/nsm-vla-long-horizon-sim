@@ -43,7 +43,7 @@ def choose_mimicgen_environment():
     # keep only envs that correspond to the different reset distributions from the paper
     # only keep envs that end with "Novelty"
     envs = sorted([x for x in all_envs if x[-7:] == "Novelty"])
-    domain = config['planning']['domain']
+    domain = config['planning']['coffee']['domain']
     lower_case_domain = domain.lower().replace('_', '')
     envs = [env for env in envs if (lower_case_domain in env.lower() or domain in env) and 'pre_novelty' not in env.lower()]
 
@@ -92,15 +92,17 @@ if __name__ == "__main__":
         hard_reset=False,
     )
     # Wrap this environment in a visualization wrapper
-    config = load_config("config.yaml") # make sure planning is set to the nut_assembly domain
-    plan = load_plan(config)
-    grounded_op = plan[0] # a hack to get the pick-up-nut-from-peg operator
-    dummy_executed_operators = OrderedDict()
+    # config = load_config("config.yaml") # make sure planning is set to the nut_assembly domain
+    # config = config['planning']['coffee']
+    # domain = config['domain']
+    # plan = load_plan(config)
+    # grounded_op = plan[0] # a hack to get the pick-up-nut-from-peg operator
+    # dummy_executed_operators = OrderedDict()
     visual_env = VisualizationWrapper(env, indicator_configs=None)
     wrapped_env = GymWrapper(visual_env)
-    wrapped_env = OperatorWrapper(wrapped_env, grounded_op, dummy_executed_operators, config, record_rollouts=False)
+    # wrapped_env = OperatorWrapper(wrapped_env, grounded_op, dummy_executed_operators, config, domain=domain, rl_algo=PPO, curr_subgoal= record_rollouts=False)
     wrapped_env.reset()
-    wrapped_env.viewer.set_camera(camera_id=0)
+    # wrapped_env.viewer.set_camera(camera_id=0)
 
     # keyboard control
     from robosuite.devices import Keyboard
