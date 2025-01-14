@@ -389,7 +389,7 @@ class Learner:
             execution.executor.Executor_RL: an RL executor for the operator
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}"
+        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}{self.rl_algo_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}"
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
         model_data = None
         for effect in self.grounded_operator.effects:
