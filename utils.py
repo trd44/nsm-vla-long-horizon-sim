@@ -30,7 +30,7 @@ def load_config(config_file):
         config = yaml.safe_load(file)
     return config
 
-def load_detector(config:dict, env:MujocoEnv) -> detection.detector.Detector:
+def load_detector(config:dict, domain:str, env:MujocoEnv) -> detection.detector.Detector:
     """load the detector based on the domain specified in the config file
     Args:
         config (dict): the configuration dictionary
@@ -38,7 +38,7 @@ def load_detector(config:dict, env:MujocoEnv) -> detection.detector.Detector:
     Returns:
         Detector: the detector object
     """
-    domain = config['planning']['domain']
+
     detector_module = importlib.import_module(config['detection_dir']+'.'+domain+'_detector')
     camel_case_domain = ''.join([word.capitalize() for word in domain.split('_')])     
     detector = getattr(detector_module, camel_case_domain+'Detector')
@@ -98,7 +98,7 @@ def deepcopy_env(env, config) -> MujocoEnv:
     env_copy.sim.forward()
     return env_copy
 
-def load_executor(config:dict, grounded_operator:Union[str, fs.Action]):
+def load_executor(config:dict, domain:str, grounded_operator:Union[str, fs.Action]):
     """load the executor based on the domain and the grounded operator
 
     Args:
@@ -108,7 +108,6 @@ def load_executor(config:dict, grounded_operator:Union[str, fs.Action]):
     Returns:
         Executor: the executor object for the grounded operator
     """
-    domain = config['planning']['domain']
     # find the current root directory
     executor_module = importlib.import_module(f"{config['execution_dir']}.{domain}.{domain}_executor")
 
@@ -169,7 +168,7 @@ def load_plan(config):
     """
     # search the `planning_dir` for the latest goal node pkl file i.e. the one with the largest number
     
-    goal_node_pkl, _ = find_file_with_largest_number(config['planning']['planning_dir'], config['planning']['planning_goal_node'])
+    goal_node_pkl, _ = find_file_with_largest_number(config['planning_dir'], config['planning_goal_node'])
     if goal_node_pkl is None:
         return None
     goal_node:planning.planning_utils.SearchNode = planning.planning_utils.unpickle_goal_node(goal_node_pkl)

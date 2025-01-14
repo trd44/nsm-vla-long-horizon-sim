@@ -3,7 +3,7 @@ from robosuite.wrappers import GymWrapper
 import gymnasium as gym
 from utils import *
 
-from stable_baselines3 import DDPG
+from stable_baselines3 import DDPG, SAC
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.noise import NormalActionNoise
 import numpy as np
@@ -16,7 +16,7 @@ detector = load_detector(config, robosuite_env)
 gym_env = GymWrapper(robosuite_env)
 env = Monitor(gym_env)
 
-model = DDPG.load("ddpg_robosuite", env=env)
+model = SAC.load("sac_test", env=env)
 
 obs, _ = env.reset()
 while True:

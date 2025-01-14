@@ -8,7 +8,7 @@ The observation_with_semantics dictionary:
 ```
 {observation_with_semantics}
 ```
-Output the reward shaping function by finishing the following reward function. To calculate the reward for the given grounded effect, you should extract the relevant information from the observation_with_semantics dictionary. You should then use the values to calculate progress towards the grounded effect. Do not make up any numbers.
+Output the reward shaping function by finishing the following reward function. To calculate the reward for the given grounded effect, you should identify the keys of the relevant information in the observation_with_semantics dictionary. You should write code that gets the values associated with the keys and calculate progress towards the grounded effect using the values. Do not make up any numbers.
 The template:
 ```
 # llm generated reward shaping function
