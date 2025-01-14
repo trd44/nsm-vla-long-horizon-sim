@@ -1,4 +1,5 @@
 import copy
+import time
 import dill
 import os
 import detection.detector
@@ -7,35 +8,46 @@ import gymnasium as gym
 import importlib
 import numpy as np
 import csv
+import stable_baselines3
+import logging
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, PPO, DDPG
 from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
 from VLM.LlmApi import chat_completion
 
+# set up a logger here to log the terminal printouts for the training of each subgoal
+logger = logging.getLogger('learning')
+logger.setLevel(logging.INFO)
+
 class OperatorWrapper(gym.Wrapper):
-    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
         super().__init__(env)
-        self.detector = load_detector(config=config, env=env)
+        self.detector = load_detector(config=config, domain=domain, env=env)
         self.grounded_operator = grounded_operator
         self.executed_operators:Dict[fs.Action:execution.executor.Executor] = executed_operators
         self.config = config
-        self.domain = self.config['planning']['domain']
+        self.domain = domain
+        self.rl_algo_name = rl_algo
         self.curr_subgoal = curr_subgoal
         self.last_subgoal_successes, self.subgoal_reward_shaping_fn_mapping = self._init_subgoal_dicts()
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+        self.episode_r_shaping = 0
+        self.episode_collision_penalty = 0
+        self.episode_num_collisions = 0
         self.time_step = 0
-        self.episode = 0
+        self.episode = -1
         self.record_rollouts = record_rollouts
 
         if self.record_rollouts:
-            self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning']['model']['seed']}"
+            self.rollout_save_dir = f"learning/policies/{self.domain}/{op_name}/seed_{self.config['learning'][self.rl_algo_name]['seed']}"
             _, largest_file_number = find_file_with_largest_number(self.rollout_save_dir, 'rollout')
             if largest_file_number is None:
                 largest_file_number = 0
@@ -93,17 +105,35 @@ class OperatorWrapper(gym.Wrapper):
         obs_with_semantics:dict = self.detector.get_obs()
         binary_obs:dict = self.detector.detect_binary_states(self.env)
         reward = self.compute_reward(obs_with_semantics, binary_obs)
+        penalties, collision_points = self.collision_penalty(obs_with_semantics)
+        # save reward and penalties separately
+        self.episode_r_shaping += reward
+        self.episode_collision_penalty += sum(penalties)
+        self.episode_num_collisions += len(collision_points)
+        info['ep_cumu_r_shaping'] = self.episode_r_shaping
+        info['ep_cumu_col_penalty'] = self.episode_collision_penalty
+        info['ep_cumu_collisions'] = self.episode_num_collisions
         
-        # save subgoal successes as an array in info
+        # save subgoal successes
         info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
+        # save additional subgoal success info for each subgoal
+        for subgoal, success in self.last_subgoal_successes.items():
+            info[f'{subgoal}_subgoal'] = success
         # overall goal success is if all subgoals are achieved
         info['goal_success'] = all(self.last_subgoal_successes.values())
         # episode is done also if the current subgoal we are focusing on is achieved
         done = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()] or done
+
+        # save info to the csv file, one row per each collision point
+        # save every 10 episodes every 10 timesteps
+        if self.record_rollouts and self.time_step % 100 == 0:
+            for collision_point, penalty in zip(collision_points, penalties):
+                g_pos = obs_with_semantics['gripper1_pos']
+                self.csv_writer.writerow([g_pos[0], g_pos[1], g_pos[2], collision_point[0], collision_point[1], collision_point[2], penalty, reward, sum(list(self.last_subgoal_successes.values())), reward + sum(penalties) == 0, self.time_step, self.episode])
+            self.csv_file.flush()
         
         self.time_step += 1
-        self.episode += 1 if done or truncated else 0
-        return obs, reward, done, truncated, obs_with_semantics
+        return obs, reward + sum(penalties), done, truncated, info
 
     def reset(self, **kwargs):
         reset_success = False
@@ -121,9 +151,34 @@ class OperatorWrapper(gym.Wrapper):
                 if not ex_success:
                     reset_success = False
                     break
-
+        # reset the episode rewards and penalties
+        self.episode_r_shaping = 0
+        self.episode_collision_penalty = 0
+        self.episode_num_collisions = 0
+        # reset the success of the subgoals
+        self.last_subgoal_successes, _ = self._init_subgoal_dicts()
         self.detector.update_obs()
         self.episode += 1
+        # reset the infos
+        info['ep_cumu_r_shaping'] = self.episode_r_shaping
+        info['ep_cumu_col_penalty'] = self.episode_collision_penalty
+        info['ep_cumu_collisions'] = self.episode_num_collisions
+        
+        # save subgoal successes
+        info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
+        # save additional subgoal success info for each subgoal
+        for subgoal, success in self.last_subgoal_successes.items():
+            info[f'{subgoal}_subgoal'] = success
+        # overall goal success is if all subgoals are achieved
+        info['goal_success'] = all(self.last_subgoal_successes.values())
+        info['is_success'] = info['goal_success'] # for compatibility with the stable_baselines3's update_info_buffer
+        info['episode'] = { # for compatibility with the stable_baselines3's update_info_buffer
+            'ep_cumu_r_shaping': self.episode_r_shaping,
+            'ep_cumu_col_penalty': self.episode_collision_penalty,
+            'ep_cumu_collisions': self.episode_num_collisions,
+            'subgoal_success': self.last_subgoal_successes[self.curr_subgoal.pddl_repr()],
+        }
+
         return obs, info
 
     def check_effect_satisfied(self, effect:fs.SingleEffect, binary_obs:dict) -> bool:
@@ -158,6 +213,19 @@ class OperatorWrapper(gym.Wrapper):
             elif effect.atom.predicate.name == 'exclusively-occupying-gripper':
                 exclusively_occupying_gripper_effect_present = True
         return not_free_gripper_effect_present and exclusively_occupying_gripper_effect_present
+    
+    def reward(self, reward:float):
+        """reward the agent with a reward. Overwrites the reward function in the environment. Duplicates part of the logic in :meth:`step` to compute the reward based on the observation with semantics in case the reward function is called outside of the step function by the learning algorithm
+
+        Args:
+            reward (float): the reward to give to the agent
+        """
+        # compute the reward based on the observation with semantics
+        obs_with_semantics:dict = self.detector.get_obs()
+        binary_obs:dict = self.detector.detect_binary_states(self.env)
+        reward = self.compute_reward(obs_with_semantics, binary_obs)
+        penalties, _= self.collision_penalty(obs_with_semantics)
+        return reward + sum(penalties)
 
     def compute_reward(self, numeric_obs_with_semantics:dict, binary_obs:dict) -> float:
         """compute the reward by calling a LLM generated reward function on an observation with semantics
@@ -172,7 +240,6 @@ class OperatorWrapper(gym.Wrapper):
         
         # there is a step cost of -1 regardless
         step_cost = -1
-        penalties, collision_points = self.collision_penalty(numeric_obs_with_semantics)
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
@@ -193,24 +260,18 @@ class OperatorWrapper(gym.Wrapper):
                 last_useful_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
-                # check if the robot's collision distances with objects
                 llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
                 if llm_reward_shaping_fn is None:
                     # reward shaping for this subgoal has not been specifically set yet. Use the previously useful reward shaping function that helped the robot achieve the last subgoal
                     llm_reward_shaping_fn = last_useful_reward_shaping_fn
                     self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = llm_reward_shaping_fn
-                sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
+                try: # the llm reward shaping function may not be error-free. In that case, raise an error
+                    sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
+                except Exception as e:
+                    raise Exception(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
-        total_reward = step_cost + sum(penalties) + sub_goal_reward
-        # save info to the csv file, one row per each collision point
-        # save every 10 episodes every 10 timesteps
-        if self.record_rollouts and self.time_step % 100 == 0:
-            for collision_point, penalty in zip(collision_points, penalties):
-                g_pos = numeric_obs_with_semantics['gripper1_pos']
-                self.csv_writer.writerow([g_pos[0], g_pos[1], g_pos[2], collision_point[0], collision_point[1], collision_point[2], penalty, step_cost + sub_goal_reward, num_subgoals_achieved, total_reward==0, self.time_step, self.episode])
-            self.csv_file.flush()
-        return total_reward
+        return step_cost + sub_goal_reward
     
     def collision_penalty(self, numeric_obs_with_semantics:dict) -> Tuple[float, List[np.array]]:
         """Penalize the robot for getting too close to objects it is not supposed to collide with
@@ -224,7 +285,7 @@ class OperatorWrapper(gym.Wrapper):
         """
         # find objects that the robot is allowed to collide with. These are objects that the robot grasps either in the precondition or the effects of the grounded operator
         allowed_objects = []
-        collision_threshold = 0.02 # getting closer than this distance will incur a penalty
+        collision_threshold = 0.01 # getting closer than this distance will incur a penalty
         for effect in self.grounded_operator.effects:
             if effect.atom.predicate.name == 'exclusively-occupying-gripper':
                 for arg in effect.atom.subterms:
@@ -244,9 +305,6 @@ class OperatorWrapper(gym.Wrapper):
             if 'collision_dist' in key and not any(obj in key for obj in allowed_objects):
                 if obs[0] <= collision_threshold: # the first element is the collision distance.
                     penalties.append(-1/(obs[0]+0.001)) # the closer the robot gets to the object, the higher the penalty. Add a small value to avoid division by zero
-                    collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
-                elif obs[0] < 0.03: # only care about the collision points if the robot is closer than the threshold of 0.1 m
-                    penalties.append(0) # no penalty if the robot is not close to the object
                     collision_points.append(obs[1:]) # the rest of the elements are the 3D collision point coordinates
         return penalties, collision_points
     
@@ -281,13 +339,17 @@ class OperatorWrapper(gym.Wrapper):
     
         
 class Learner:
-    def __init__(self, env:MujocoEnv, domain:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+    def __init__(self, env:MujocoEnv, domain:str, rl_algo:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
         self.domain = domain
+        self.rl_algo_name = rl_algo
+        # from stable_baselines3 import the learning algorithm
+        self.rl_algo = importlib.import_module(f"stable_baselines3.{self.rl_algo_name.lower()}").__dict__[self.rl_algo_name]
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
         self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
+        np.random.seed(self.config['learning'][self.rl_algo_name]['seed'])
     
     
     def _load_llm_reward_fn_candidates(self) -> List[Callable]:
@@ -300,7 +362,7 @@ class Learner:
         reward_fn_candidates = []
         for i in range(self.config['learning']['reward_shaping_fn']['num_candidates']):
             try:
-                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}_{i}")
+                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.domain}.{op_name}_{i}")
                 llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
                 reward_fn_candidates.append(llm_reward_shaping_func)
             except:
@@ -313,7 +375,11 @@ class Learner:
                 # create a file with the operator's name and save the function in it
                 with open(f"learning{os.sep}reward_functions{os.sep}{self.domain}{os.sep}{op_name}_{i}.py", 'w') as f:
                     f.write(func)
-                
+                # wait 5 seconds for the file to be saved
+                time.sleep(5)
+                llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.domain}.{op_name}_{i}")
+                llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
+                reward_fn_candidates.append(llm_reward_shaping_func)
         return reward_fn_candidates
     
     def learn_operator(self) -> execution.executor.Executor_RL:
@@ -323,7 +389,7 @@ class Learner:
             execution.executor.Executor_RL: an RL executor for the operator
         """
         op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}"
+        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}"
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
         model_data = None
         for effect in self.grounded_operator.effects:
@@ -332,15 +398,16 @@ class Learner:
             model_data = self.learn_subgoal(effect, save_path, prev_subgoal_model_data=model_data)
         # load the model to re-save it in the model save_path
         model_path, _, _ = model_data
-        model = SAC.load(path=model_path)
+        model = self.rl_algo.load(path=model_path)
         model.save(path=f"{save_path}{os.sep}final_model")
         # create an Executor_RL object associated with the newly learned policy.
         executor = execution.executor.Executor_RL(
-            operator_name=op_name, alg='SAC',
-            policy=model_path, 
+            operator_name=op_name,
+            alg=self.rl_algo_name,
+            policy=model_path
         )
         # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
-        with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning']['model']['seed']}{os.sep}executor.pkl", 'wb') as f:
+        with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}{os.sep}executor.pkl", 'wb') as f:
             dill.dump(executor, f)
         return executor
 
@@ -355,13 +422,24 @@ class Learner:
         """
         subgoal_name:str = subgoal.pddl_repr().replace(' ', '_')
         subgoal_save_path = f"{save_path}{os.sep}{subgoal_name}"
+        if not os.path.exists(subgoal_save_path):
+            os.makedirs(subgoal_save_path)
+        # Remove duplicate handlers
+        if logger.hasHandlers():
+            logger.handlers.clear()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler = logging.FileHandler(f"{subgoal_save_path}{os.sep}rw_fn_candidates_train_logs.log")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
         if prev_subgoal_model_data is not None:
             prev_model_path, prev_env, prev_eval_callback = prev_subgoal_model_data
         active_model_data = []
 
         for i, reward_fn in enumerate(self.llm_reward_candidates):
             if prev_subgoal_model_data is not None:
-                reward_fn_save_path = f"{prev_model_path}{i}"
+                # drop the '{os.sep}model' from the path and add '{i}' to the end
+                reward_fn_save_path = prev_model_path[:prev_model_path.rfind(f'{os.sep}model')] + f"{os.sep}{i}"
             else:
                 reward_fn_save_path = f"{subgoal_save_path}{os.sep}reward_fn_{i}"
 
@@ -374,32 +452,59 @@ class Learner:
             if prev_subgoal_model_data is not None:
                 # make a copy of the model
                 env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
-                model = SAC.load(path=prev_model_path, env=env)
+                model = self.rl_algo.load(path=prev_model_path, env=env)
                 eval_env.env.subgoal_reward_shaping_fn_mapping = copy.deepcopy(prev_env.env.subgoal_reward_shaping_fn_mapping)
-                eval_callback = CustomEvalCallback(
-                    eval_env=eval_env,
-                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
-                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
-                    **self.config['learning']['eval']
-                )
             else:
-                model = SAC(
-                    "MlpPolicy",    
-                    env = env,
-                    tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
-                    **self.config['learning']['model']
+                model_kwargs = dict(self.config['learning'][self.rl_algo_name])  # copy so we can modify
+                noise_type = model_kwargs.pop("action_noise", None)
+                noise_kwargs = model_kwargs.pop("action_noise_kwargs", None)
+                
+                action_noise = None
+                if noise_type == "OrnsteinUhlenbeckActionNoise" and noise_kwargs is not None:
+                    n_actions = env.action_space.shape[-1]
+                    action_noise = OrnsteinUhlenbeckActionNoise(
+                        mean=np.full(n_actions, noise_kwargs["mean"]),
+                        sigma=noise_kwargs["sigma"] * np.ones(n_actions),
+                        theta=noise_kwargs["theta"],
+                        dt=noise_kwargs["dt"],
                 )
-                eval_callback = CustomEvalCallback(
-                    eval_env=eval_env,
-                    best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
-                    log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
-                    **self.config['learning']['eval']
+                if action_noise == None:
+                    model = self.rl_algo(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        **model_kwargs
+                    )
+                else:
+                    model = self.rl_algo(
+                        "MlpPolicy",    
+                        env = env,
+                        tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                        action_noise=action_noise,
+                        **model_kwargs
+                    )
+            eval_callback = CustomEvalCallback(
+                eval_env=eval_env,
+                best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                log_path=f"{reward_fn_save_path}_eval{os.sep}eval_logs",
+                **self.config['learning']['eval']
                 )
+                # model = self.RL_algorithm(
+                #     "MlpPolicy",    
+                #     env = env,
+                #     tensorboard_log=f"{reward_fn_save_path}{os.sep}tensorboard_logs",
+                #     **self.config['learning'][self.rl_algo_name]['model']
+                # )
+                # eval_callback = CustomEvalCallback(
+                #     eval_env=eval_env,
+                #     best_model_save_path=f"{reward_fn_save_path}{os.sep}best_model",
+                #     log_path=f"{reward_fn_save_path}{os.sep}eval_logs",
+                #     **self.config['learning']['eval']
+                # )
             model_save_path = f"{reward_fn_save_path}{os.sep}model"
             model.save(
                 path = model_save_path
             )
-
             # set the reward shaping function for the subgoal
             env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
@@ -414,22 +519,34 @@ class Learner:
         subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
-            for active_model_path, env,eval_callback in active_model_data:
-                model = SAC.load(path=active_model_path, env=env)
-                model.learn(
-                total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
-                callback=eval_callback
-                )
-                model.save(
-                path = f"{reward_fn_save_path}{os.sep}model"
-                )
+            model_indices_to_pop = []
+            
+            for i, (active_model_path, env, eval_callback) in enumerate(active_model_data):
+                model = self.rl_algo.load(path=active_model_path, env=env)
+                logger.info(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
+                try: # try to train the model with llm reward shaping function
+                    model.learn(
+                        total_timesteps=self.config['learning']['learn_subgoal']['timesteps_per_iter'],
+                        callback=eval_callback,
+                        reset_num_timesteps=False
+                    )
+                except Exception as e: # if the llm reward shaping function is not error-free, catch the error, log it, and eliminate this model from the active models
+                    logger.error(e)
+                    model_indices_to_pop.append(i)
+                # save the model after however much training has been done
+                model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
             # terminate the worst performing model
-            subgoal_success_rates = [eval_callback.get_recent_mean_subgoal_success_rate() for _, _, eval_callback in active_model_data]
+            subgoal_success_rates = [eval_callback.get_recent_subgoal_success_rate() for _, _, eval_callback in active_model_data]
             worst_performing_model_idx = np.argmin(subgoal_success_rates)
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
-                active_model_data.pop(worst_performing_model_idx)
+                logger.info(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
+                model_indices_to_pop.append(worst_performing_model_idx)
+            
+            # pop the models that need to be terminated
+            for i in model_indices_to_pop:
+                active_model_data.pop(i)
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
 
@@ -441,7 +558,7 @@ class Learner:
             str: the reward shaping function candidate
         """
         grounded_op = self._grounded_operator_repr()
-        dummy_detector = load_detector(self.config, self.unwrapped_env)
+        dummy_detector = load_detector(self.config, self.domain, self.unwrapped_env)
         observation_with_semantics = dummy_detector.get_obs()
         # keep only the keys that include the parameters of the grounded operator
         op_name, grounded_params = extract_name_params_from_grounded(self.grounded_operator.ident())
@@ -486,11 +603,27 @@ class Learner:
             gym.Wrapper: the wrapped environment
         """
         env = GymWrapper(env)
-        env = OperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, curr_subgoal=subgoal, record_rollouts=record_rollouts)
+        env = OperatorWrapper(
+            env=env,
+            rl_algo=self.rl_algo_name,
+            domain=self.domain,
+            grounded_operator=self.grounded_operator, 
+            executed_operators=self.executed_operators, 
+            config=self.config, 
+            curr_subgoal=subgoal, 
+            record_rollouts=record_rollouts,
+        )
+        subgoals = []
+        for eff in self.grounded_operator.effects:
+            if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
+                continue
+            else:
+                subgoals.append(f'{eff.pddl_repr()}_subgoal')
         env = Monitor(
             env=env, 
             filename=f"{save_path}{os.sep}monitor_logs",
-            allow_early_resets=True
+            allow_early_resets=True,
+            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_r_shaping', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
         )
         return env
     
@@ -529,9 +662,15 @@ class CustomEvalCallback(EvalCallback):
     def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super(CustomEvalCallback, self).__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
         self.eval_env.render_mode = render_mode
-        self._subgoal_successes_buffer: List[bool] = []
-        self.evaluations_subgoal_successes: List[List[bool]] = []
-    
+        self._subgoal_successes_buffer: List[bool] = [] # stores the per episode subgoal successes
+        self.evaluations_subgoal_successes: List[List[bool]] = [] # stores the subgoal successes for each round of evaluation i.e a few episodes per evaluation
+        self._ep_r_shaping_buffer: List[float] = [] # stores the per episode reward shaping values
+        self.evaluations_r_shaping: List[List[float]] = [] # stores the reward shaping values for each round of evaluation i.e a few episodes per evaluation
+        self._ep_col_penalty_buffer: List[float] = [] # stores the per episode collision penalties
+        self.evaluations_col_penalties: List[List[float]] = [] # stores the collision penalties for each round of evaluation i.e a few episodes per evaluation
+        self._ep_num_collisions_buffer: List[int] = [] # stores the per episode number of collisions
+        self.evaluations_num_collisions: List[List[int]] = [] # stores the number of collisions for each round of evaluation i.e a few episodes per evaluation
+
     def get_recent_subgoal_success_rate(self):
         """Return the recent subgoal success rate
         """
@@ -539,7 +678,6 @@ class CustomEvalCallback(EvalCallback):
             return 0
         return np.mean(self.evaluations_subgoal_successes[-1])
         
-
     def _on_step(self) -> bool:
 
         continue_training = True
@@ -557,11 +695,14 @@ class CustomEvalCallback(EvalCallback):
                         "and warning above."
                     ) from e
 
-            # Reset success rate buffer
+            # Reset buffers
             self._is_success_buffer = []
             self._subgoal_successes_buffer = []
+            self._ep_r_shaping_buffer = []
+            self._ep_col_penalty_buffer = []
+            self._ep_num_collisions_buffer = []
 
-            episode_rewards, episode_lengths = evaluate_policy(
+            episode_rewards, episode_lengths = evaluate_policy( # this evaluates the model for a few policies
                 self.model,
                 self.eval_env,
                 n_eval_episodes=self.n_eval_episodes,
@@ -576,6 +717,9 @@ class CustomEvalCallback(EvalCallback):
                 self.evaluations_timesteps.append(self.num_timesteps)
                 self.evaluations_results.append(episode_rewards)
                 self.evaluations_length.append(episode_lengths)
+                self.evaluations_r_shaping.append(self._ep_r_shaping_buffer)
+                self.evaluations_col_penalties.append(self._ep_col_penalty_buffer)
+                self.evaluations_num_collisions.append(self._ep_num_collisions_buffer)
 
                 kwargs = {}
                 # Save success log if present
@@ -585,6 +729,18 @@ class CustomEvalCallback(EvalCallback):
                 if len(self._subgoal_successes_buffer) > 0:
                     self.evaluations_subgoal_successes.append(self._subgoal_successes_buffer)
                     kwargs['subgoal_successes'] = self.evaluations_subgoal_successes
+                # save the per episode reward shaping values
+                if len(self._ep_r_shaping_buffer) > 0:
+                    self.evaluations_r_shaping.append(self._ep_r_shaping_buffer)
+                    kwargs['r_shaping'] = self.evaluations_r_shaping
+                # save the per episode collision penalties
+                if len(self._ep_col_penalty_buffer) > 0:
+                    self.evaluations_col_penalties.append(self._ep_col_penalty_buffer)
+                    kwargs['col_penalties'] = self.evaluations_col_penalties
+                # save the per episode number of collisions
+                if len(self._ep_num_collisions_buffer) > 0:
+                    self.evaluations_num_collisions.append(self._ep_num_collisions_buffer)
+                    kwargs['num_collisions'] = self.evaluations_num_collisions
  
 
                 np.savez(
@@ -599,33 +755,58 @@ class CustomEvalCallback(EvalCallback):
             mean_ep_length, std_ep_length = np.mean(episode_lengths), np.std(episode_lengths)
             self.last_mean_reward = mean_reward
 
+            # Log the evaluation values
             success_rate = 0
             if len(self._is_success_buffer) > 0:
                 success_rate = np.mean(self._is_success_buffer)
                 if self.verbose > 0:
-                    print(f"Success rate: {100 * success_rate:.2f}%")
-                self.logger.record("eval/goal_success_rate", success_rate)
+                    logger.info(f"Mean Success rate per episode: {100 * success_rate:.2f}%")
+            self.logger.record("eval/mean_goal_success_rate_per_ep", success_rate)
             
             subgoal_success_rate = 0
             if len(self._subgoal_successes_buffer) > 0:
                 subgoal_success_rate = np.mean(self._subgoal_successes_buffer)
                 if self.verbose > 0:
-                    print(f"Subgoals success rate: {100 * subgoal_success_rate:.2f}%")
-                self.logger.record("eval/subgoal_success_rate", subgoal_success_rate)
+                    logger.info(f"Mean subgoals success rate per episode: {100 * subgoal_success_rate:.2f}%")
+            self.logger.record("eval/mean_ep_subgoal_success_rate", subgoal_success_rate)
+            
+            mean_ep_r_shaping = None
+            if len(self._ep_r_shaping_buffer) > 0:
+                mean_ep_r_shaping = np.mean(self._ep_r_shaping_buffer)
+                if self.verbose > 0:
+                    logger.info(f"Mean episode reward shaping per episode: {mean_ep_r_shaping:.2f}")
+            self.logger.record("eval/mean_ep_r_shaping", mean_ep_r_shaping)
+
+            mean_col_penalty = None
+            if len(self._ep_col_penalty_buffer) > 0:
+                mean_col_penalty = np.mean(self._ep_col_penalty_buffer)
+                if self.verbose > 0:
+                    logger.info(f"Mean episode collision penalty per episode: {mean_col_penalty:.2f}")
+            self.logger.record("eval/mean_ep_col_penalty", mean_col_penalty)
+
+            mean_num_collisions = None
+            if len(self._ep_num_collisions_buffer) > 0:
+                mean_num_collisions = np.mean(self._ep_num_collisions_buffer)
+                if self.verbose > 0:
+                    logger.info(f"Mean episode number of collisions per episode: {mean_num_collisions:.2f}")
+            self.logger.record("eval/mean_ep_num_collisions", mean_num_collisions)
 
             # Dump log so the evaluation results are printed with the correct timestep
             if self.verbose > 0:
-                print(f"Eval num_timesteps={self.num_timesteps}, " f"episode_reward={mean_reward:.2f} +/- {std_reward:.2f}")
-                print(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                logger.info(f"Eval num_timesteps={self.num_timesteps}, " f"mean episode reward={mean_reward:.2f} +/- {std_reward:.2f}")
+                # get the min and max episode reward too
+                logger.info(f"Min episode reward: {np.min(episode_rewards)}, " f"Max episode reward: {np.max(episode_rewards)}")
+                logger.info(f"Episode length: {mean_ep_length:.2f} +/- {std_ep_length:.2f}")
+                logger.info(f"Min episode length: {np.min(episode_lengths)}, " f"Max episode length: {np.max(episode_lengths)}")
             # Add to current Logger
-            self.logger.record("eval/mean_reward", float(mean_reward))
+            self.logger.record("eval/mean_ep_reward", float(mean_reward))
             self.logger.record("eval/mean_ep_length", mean_ep_length)           
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
             if mean_reward > self.best_mean_reward:
                 if self.verbose > 0:
-                    print("New best mean reward!")
+                    logger.info("New best mean reward!")
                 if self.best_model_save_path is not None:
                     self.model.save(os.path.join(self.best_model_save_path, "best_model"))
                 self.best_mean_reward = mean_reward
@@ -637,7 +818,16 @@ class CustomEvalCallback(EvalCallback):
             # Split the log_path to get the second to last directory
             csv_path = os.path.split(self.log_path)[0]
             with open(os.path.join(csv_path, 'results_eval.csv'), 'a') as f:
-                f.write("{},{},{},{}\n".format(self.num_timesteps, success_rate, mean_reward, mean_ep_length))
+                f.write("{},{},{},{},{},{},{},{}\n".format(
+                    self.num_timesteps,  
+                    subgoal_success_rate,
+                    success_rate, 
+                    mean_ep_length,
+                    mean_reward,  
+                    mean_ep_r_shaping, 
+                    mean_num_collisions,
+                    mean_col_penalty,  
+                ))
                 f.close()
 
             # Trigger callback after every evaluation, if needed
@@ -656,8 +846,14 @@ class CustomEvalCallback(EvalCallback):
         """
         info = locals_["info"]
         if locals_["done"]:
+            # store the episode reward shaping values and collision penalties
+            self._ep_r_shaping_buffer.append(info.get('ep_cumu_r_shaping'))
+            self._ep_col_penalty_buffer.append(info.get('ep_cumu_col_penalty'))
+            self._ep_num_collisions_buffer.append(info.get('ep_cumu_collisions'))
             maybe_is_success = info.get("goal_success")
             subgoal_success = info.get("subgoal_success")
+            #subgoals = [key for key in info.keys() if '_subgoal' in key]
             self._subgoal_successes_buffer.append(subgoal_success)
             if maybe_is_success is not None:
                 self._is_success_buffer.append(maybe_is_success)
+            
