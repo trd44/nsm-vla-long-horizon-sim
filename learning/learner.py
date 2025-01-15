@@ -786,9 +786,11 @@ class LLMLearner(BaseLearner):
         subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
-            model_indices_to_pop = []
+            model_indices_to_exclude = []
             
             for i, (active_model_path, env, eval_callback) in enumerate(active_model_data):
+                if i in model_indices_to_exclude: # don't keep training the models that have been excluded
+                    continue
                 model = self.rl_algo.load(path=active_model_path, env=env)
                 logger.info(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
                 try: # try to train the model with llm reward shaping function
@@ -799,7 +801,7 @@ class LLMLearner(BaseLearner):
                     )
                 except Exception as e: # if the llm reward shaping function is not error-free, catch the error, log it, and eliminate this model from the active models
                     logger.error(e)
-                    model_indices_to_pop.append(i)
+                    model_indices_to_exclude.append(i)
                 # save the model after however much training has been done
                 model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
@@ -809,12 +811,8 @@ class LLMLearner(BaseLearner):
             best_performing_model_idx = np.argmax(subgoal_success_rates)
             if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
                 logger.info(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
-                model_indices_to_pop.append(worst_performing_model_idx)
+                model_indices_to_exclude.append(worst_performing_model_idx)
             
-            # pop the models that need to be terminated
-            for i in model_indices_to_pop:
-                active_model_data.pop(i)
-            model_indices_to_pop = []
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
 
