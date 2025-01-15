@@ -22,19 +22,14 @@ from VLM.LlmApi import *
 from VLM.TreeOfThoughtsPrompts import *
 from utils import *
 
-
-class HybridSymbolicLLMPlanner:
+class SymbolicPlanner:
     def __init__(self, config:dict):
         self.config = config
         self.reader = FstripsReader(raise_on_error=True)
         self.parse_domain()
         self.starting_problem = self.parse_problem()
-        self.max_new_operators_branching_factor = self.config['max_new_operators_branching_factor']
-        self.llm_calls = 0
         self.max_depth = self.config['max_depth']
-        self.max_num_llm_calls = self.config['max_num_llm_calls']
-        self.novel_objects = self.config['novel_objects']
-    
+
     def parse_domain(self):
         """parses the initial domain file
         """
@@ -47,6 +42,66 @@ class HybridSymbolicLLMPlanner:
         problem_file_path = self.config['planning_dir'] + os.sep + self.config['planning_problem']
         problem = self.reader.parse_instance(problem_file_path)
         return problem
+    
+    
+    def search(self) -> List[fs.Action]:
+        """BFS ahead from the current node for a solution to the problem's goal
+
+        Returns:
+            List[fs.Action]: the plan found if any
+        """
+        # create obj to track state space
+        space = SearchSpace()
+        stats = SearchStats()
+
+        model = GroundForwardSearchModel(self.starting_problem, ground_problem_schemas_into_plain_operators(self.starting_problem))
+        open_list = deque()
+        start_node = make_root_node(model.init())
+        open_list.append(start_node)
+        closed = {start_node}
+        while open_list:
+            stats.iterations += 1
+            # logging.debug("dfs: Iteration {}, #unexplored={}".format(iteration, len(open_)))
+
+            node = open_list.popleft()
+            if model.is_goal(node.state): # found a plan
+                stats.num_goals += 1
+                plan = reverse_engineer_plan(node)
+                logging.info(f"Goal found after {stats.nexpansions} expansions from node {start_node}. {stats.num_goals} goal states found.")
+                logging.info(f"found plan from {start_node} to {node}. The plan is {plan}")
+                return plan # early return if a plan is found since we only care about plan with the shortest length
+
+            if 0 <= self.max_depth <= node.depth: # reached max depth
+                logging.info(f"Max. expansions reached on one branch. # expanded: {stats.nexpansions} from node {start_node}, # goals: {stats.num_goals}.")
+                continue
+            else: # expand the node and add its children to the open list
+                for operator, successor_state in model.successors(node.state):
+                    if successor_state not in closed:
+                        open_list.append(make_child_node(node, operator, successor_state))
+                        closed.add(successor_state)
+                        stats.nexpansions += 1
+
+        logging.info(f"Search space exhausted. # expanded: {stats.nexpansions}, # goals: {stats.num_goals}.")
+        space.complete = True
+        return None
+
+class HybridSymbolicLLMPlanner(SymbolicPlanner):
+    def __init__(self, config:dict):
+        super().__init__(config)
+        self.max_new_operators_branching_factor = self.config['max_new_operators_branching_factor']
+        self.llm_calls = 0
+        self.max_num_llm_calls = self.config['max_num_llm_calls']
+        self.novel_objects = self.config['novel_objects']
+    
+    def write_domain(self, problem:fs.problem.Problem, domain_file:str):
+        """writes the domain to a file
+
+        Args:
+            problem (fs.problem.Problem): the problem to write
+            domain_file (str): the file to write the domain to
+        """
+        writer = FstripsWriter(problem)
+        writer.write_domain(domain_file, constant_objects=None)
     
     def parse_operator(self, operator:str) -> OperatorCandidate:
         """parse the operators string into a dictionary
@@ -193,15 +248,6 @@ class HybridSymbolicLLMPlanner:
         )
         return operator.name
     
-    def write_domain(self, problem:fs.problem.Problem, domain_file:str):
-        """writes the domain to a file
-
-        Args:
-            problem (fs.problem.Problem): the problem to write
-            domain_file (str): the file to write the domain to
-        """
-        writer = FstripsWriter(problem)
-        writer.write_domain(domain_file, constant_objects=None)
 
     def prompt_llm_for_new_operator(self, problem:fs.problem.Problem, state:Model) -> OperatorCandidate:
         """prompts the LLM for new operators
@@ -599,5 +645,5 @@ class HybridSymbolicLLMPlanner:
     
 if __name__ == '__main__':
     # testing
-    planner = HybridSymbolicLLMPlanner(config=load_config('config.yaml'))
+    planner = SymbolicPlanner(config=load_config('config.yaml')['planning']['nut_assembly'])
     planner.search()
