@@ -249,6 +249,10 @@ class OperatorWrapper(gym.Wrapper):
         sub_goal_reward = 0
         num_subgoals_achieved = 0
         last_useful_reward_shaping_fn = None
+        # reset subgoal successes
+        for effect in effects:
+            self.last_subgoal_successes[effect.pddl_repr()] = False
+
         for effect in effects:
             if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects: # if the effect is `not (free gripper1)`, skip it since it is the same effect as `exclusively-occupying-gripper ?object gripper1`
                 continue
@@ -336,9 +340,112 @@ class OperatorWrapper(gym.Wrapper):
         return action
     
 
-    
+class LLMAblatedOperatorWrapper(OperatorWrapper):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
+        super().__init__(env, grounded_operator, executed_operators, config, domain, rl_algo, curr_subgoal, record_rollouts)
         
-class Learner:
+    
+    def compute_reward(self, numeric_obs_with_semantics:dict, binary_obs:dict) -> float:
+        """compute the reward by calling a LLM generated reward function on an observation with semantics
+
+        Args:
+            numeric_obs_with_semantics: the observation in which the keys have semantics and the values are arrays of numeric values
+            binary_obs: the binary observation whose keys are predicates and values are True/False
+
+        Returns:
+            float: the reward between -1, 0
+        """
+        
+        # there is a step cost of -1 regardless
+        step_cost = -1
+        effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
+        # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
+
+        duplicate_grasp_effects = self.check_duplicate_grasp_effects()
+        num_effects = len(effects) if not duplicate_grasp_effects else len(effects) - 1
+         
+        sub_goal_reward = 0
+        num_subgoals_achieved = 0
+        
+        # reset subgoal successes
+        for effect in effects:
+            self.last_subgoal_successes[effect.pddl_repr()] = False
+
+        for effect in effects:
+            if effect.pddl_repr() == 'not (free gripper1)' and duplicate_grasp_effects: # if the effect is `not (free gripper1)`, skip it since it is the same effect as `exclusively-occupying-gripper ?object gripper1`
+                continue
+            # in addition to the step cost, the robot gets a reward in the range of [0, 1]. The reward is given based on sub-goals achieved. Each effect of the operator is a sub-goal. Therefore, the robot would get `1/len(effects)` reward for each effect achieved.
+            if self.check_effect_satisfied(effect, binary_obs):
+                self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
+                num_subgoals_achieved += 1
+                sub_goal_reward += 1/num_effects
+            else:
+                self.last_subgoal_successes[effect.pddl_repr()] = False
+                break # return the reward as soon as one effect is not satisfied. Assume later effects are not satisfied.
+        
+        return step_cost + sub_goal_reward
+    
+
+class CollisionAblatedOperatorWrapper(OperatorWrapper):
+    def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
+        super().__init__(env, grounded_operator, executed_operators, config, domain, rl_algo, curr_subgoal, record_rollouts)
+    
+    def reward(self, reward:float):
+        """reward the agent with a reward. Overwrites the reward function in the environment. Duplicates part of the logic in :meth:`step` to compute the reward based on the observation with semantics in case the reward function is called outside of the step function by the learning algorithm
+
+        Args:
+            reward (float): the reward to give to the agent
+        """
+        # compute the reward based on the observation with semantics
+        obs_with_semantics:dict = self.detector.get_obs()
+        binary_obs:dict = self.detector.detect_binary_states(self.env)
+        reward = self.compute_reward(obs_with_semantics, binary_obs)
+        return reward
+    
+    def step(self, action) -> Tuple[np.array, float, bool, bool, dict]:
+        """step function that steps the environment and computes the reward based on the observation with semantics
+
+        Args:
+            action (array): 7 dimensional array representing the action to take
+
+        Returns:
+            Tuple[np.array, float, bool, bool, dict]: the observation, reward, done, truncated, and info
+        """
+        # discretize the gripper opening action into 3 discrete actions: open, close, and do nothing
+        action = self._discretize_gripper_action(action)
+        try:
+            obs, reward, done, truncated, info = self.env.step(action)
+        except:
+            obs, reward, done, info = self.env.step(action)
+        truncated = truncated or self.env.done
+        # compute the reward based on the observation with semantics
+        obs_with_semantics:dict = self.detector.get_obs()
+        binary_obs:dict = self.detector.detect_binary_states(self.env)
+        reward = self.compute_reward(obs_with_semantics, binary_obs)
+        # save reward and penalties separately
+        self.episode_r_shaping += reward
+        self.episode_collision_penalty += 0 # assume no collision
+        self.episode_num_collisions += 0 # assume no collision
+        info['ep_cumu_r_shaping'] = self.episode_r_shaping
+        info['ep_cumu_col_penalty'] = self.episode_collision_penalty
+        info['ep_cumu_collisions'] = self.episode_num_collisions
+        
+        # save subgoal successes
+        info['subgoal_success'] = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()]
+        # save additional subgoal success info for each subgoal
+        for subgoal, success in self.last_subgoal_successes.items():
+            info[f'{subgoal}_subgoal'] = success
+        # overall goal success is if all subgoals are achieved
+        info['goal_success'] = all(self.last_subgoal_successes.values())
+        # episode is done also if the current subgoal we are focusing on is achieved
+        done = self.last_subgoal_successes[self.curr_subgoal.pddl_repr()] or done
+
+        self.time_step += 1
+        return obs, reward, done, truncated, info
+
+class BaseLearner:
+    """Learner class that learns the grounded operator using an RL algorithm without the LLM
+    """
     def __init__(self, env:MujocoEnv, domain:str, rl_algo:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
         self.config = config
         self.domain = domain
@@ -348,8 +455,168 @@ class Learner:
         self.executed_operators = executed_operators
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
-        self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
         np.random.seed(self.config['learning'][self.rl_algo_name]['seed'])
+    
+    def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str) -> Monitor:
+        """Wrap the environment with the OperatorWrapper
+
+        Args:
+            env (MujocoEnv): the environment to wrap
+            subgoal (fs.SingleEffect): the subgoal to learn
+            save_path (str): the path to save the model
+
+        Returns:
+            Monitor: the wrapped environment
+        """
+        return LLMAblatedOperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, self.domain, self.rl_algo_name, subgoal, record_rollouts=self.config['learning']['record_rollouts'])
+
+    def learn_operator(self) -> execution.executor.Executor_RL:
+        """Train an RL agent to learn the grounded operator
+
+        Returns:
+            execution.executor.Executor_RL: an RL executor for the operator
+        """
+        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
+        save_path = f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}{self.rl_algo_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}"
+        
+        # create the logger
+        if logger.hasHandlers(): # Remove duplicate handlers
+            logger.handlers.clear()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler = logging.FileHandler(f"{save_path}{os.sep}base_learner_train_logs.log")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+        # configure the model
+        model_kwargs = dict(self.config['learning'][self.rl_algo_name])  # copy so we can modify
+        noise_type = model_kwargs.pop("action_noise", None)
+        noise_kwargs = model_kwargs.pop("action_noise_kwargs", None)
+        
+        action_noise = None
+        if noise_type == "OrnsteinUhlenbeckActionNoise" and noise_kwargs is not None:
+            n_actions = self.unwrapped_env.action_space.shape[-1]
+            action_noise = OrnsteinUhlenbeckActionNoise(
+                mean=np.full(n_actions, noise_kwargs["mean"]),
+                sigma=noise_kwargs["sigma"] * np.ones(n_actions),
+                theta=noise_kwargs["theta"],
+                dt=noise_kwargs["dt"],
+        )
+        if action_noise == None:
+            model = self.rl_algo(
+                "MlpPolicy",    
+                env = self.unwrapped_env,
+                tensorboard_log=f"{save_path}{os.sep}tensorboard_logs",
+                **model_kwargs
+            )
+        else:
+            model = self.rl_algo(
+                "MlpPolicy",    
+                env = self.unwrapped_env,
+                tensorboard_log=f"{save_path}{os.sep}tensorboard_logs",
+                action_noise=action_noise,
+                **model_kwargs
+            )
+        # create the eval env
+        last_subgoal = self.grounded_operator.effects[-1]
+        eval_env:Monitor = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['eval_simulation']), subgoal=last_subgoal, save_path=f"{save_path}_eval", record_rollouts=False)
+        eval_callback = CustomEvalCallback(
+            eval_env=eval_env,
+            best_model_save_path=f"{save_path}{os.sep}best_model",
+            log_path=f"{save_path}_eval{os.sep}eval_logs",
+            **self.config['learning']['eval']
+            )
+        
+        # train the model
+        model.learn(
+            total_timesteps=self.config['learning']['learn_operator']['total_timesteps'],
+            callback=eval_callback
+        )
+        # save the model
+        model_path = f"{save_path}{os.sep}final_model"
+        model.save(path=model_path)
+        # create an Executor_RL object associated with the newly learned policy.
+        executor = execution.executor.Executor_RL(
+            operator_name=op_name,
+            alg=self.rl_algo_name,
+            policy=model_path
+        )
+        # Pickle the Executor_RL object and save it to a file. Return the Executor_RL object
+        with open(f"learning{os.sep}policies{os.sep}{self.domain}{os.sep}{op_name}{os.sep}seed_{self.config['learning'][self.rl_algo_name]['seed']}{os.sep}executor.pkl", 'wb') as f:
+            dill.dump(executor, f)
+        return executor
+
+    def check_duplicate_grasp_effects(self) -> bool:
+        """check if the grounded operator has both `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` effects. If so, they should count as one effect
+
+        Returns:
+            bool: True if both effects are present, False otherwise
+        """
+        effects:List[fs.SingleEffect] = self.grounded_operator.effects
+        # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
+        not_free_gripper_effect_present = False
+        exclusively_occupying_gripper_effect_present = False
+        for effect in effects:
+            if effect.atom.pddl_repr() == 'free gripper1' and isinstance(effect, fs.DelEffect): # `not (free gripper1)` is present
+                not_free_gripper_effect_present = True
+            elif effect.atom.predicate.name == 'exclusively-occupying-gripper':
+                exclusively_occupying_gripper_effect_present = True
+        return not_free_gripper_effect_present and exclusively_occupying_gripper_effect_present
+
+    def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str, record_rollouts=False) -> gym.Wrapper:
+        """Wrap the environment in multiple wrappers.
+
+        Args:
+            env (gym environment): the environment to wrap
+            subgoal (fs.SingleEffect): the subgoal to learn
+            save_path (str): the path to save the monitor logs
+            record_rollouts (bool): whether to record rollouts
+
+        Returns:
+            gym.Wrapper: the wrapped environment
+        """
+        env = GymWrapper(env)
+        env = LLMAblatedOperatorWrapper(
+            env=env,
+            rl_algo=self.rl_algo_name,
+            domain=self.domain,
+            grounded_operator=self.grounded_operator, 
+            executed_operators=self.executed_operators, 
+            config=self.config, 
+            curr_subgoal=subgoal, 
+            record_rollouts=record_rollouts,
+        )
+        subgoals = []
+        for eff in self.grounded_operator.effects:
+            if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
+                continue
+            else:
+                subgoals.append(f'{eff.pddl_repr()}_subgoal')
+        env = Monitor(
+            env=env, 
+            filename=f"{save_path}{os.sep}monitor_logs",
+            allow_early_resets=True,
+            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_r_shaping', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
+        )
+        return env
+    
+    def _grounded_operator_repr(self) -> str:
+        """Return a string representation of the grounded operator
+
+        Returns:
+            str: the string representation of the grounded operator
+        """
+        effects:list = [eff.pddl_repr() for eff in self.grounded_operator.effects]
+        if self.check_duplicate_grasp_effects():
+            effects.remove('not (free gripper1)')
+        effects_str:str = ' '.join(f'({eff})' for eff in effects)
+        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects: and {effects_str}"
+
+class LLMLearner(BaseLearner):
+    """prompts the LLM for reward shaping function candidates for the grounded operator and learns the grounded operator using the reward shaping function candidates
+    """
+    def __init__(self, env:MujocoEnv, domain:str, rl_algo:str, grounded_operator_to_learn:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict):
+        super().__init__(env, domain, rl_algo, grounded_operator_to_learn, executed_operators, config)
+        self.llm_reward_candidates = self._load_llm_reward_fn_candidates()
     
     
     def _load_llm_reward_fn_candidates(self) -> List[Callable]:
@@ -551,7 +818,6 @@ class Learner:
         return active_model_data[np.argmax(subgoal_success_rates)]
 
 
-
     def prompt_llm_for_reward_shaping_fn_candidate(self) -> str:
         """Prompt the LLM to generate reward shaping functions candidates for the grounded operator
         Returns
@@ -573,71 +839,6 @@ class Learner:
         fn = out[fn_start:fn_end]
         return fn
     
-    def check_duplicate_grasp_effects(self) -> bool:
-        """check if the grounded operator has both `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` effects. If so, they should count as one effect
-
-        Returns:
-            bool: True if both effects are present, False otherwise
-        """
-        effects:List[fs.SingleEffect] = self.grounded_operator.effects
-        # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
-        not_free_gripper_effect_present = False
-        exclusively_occupying_gripper_effect_present = False
-        for effect in effects:
-            if effect.atom.pddl_repr() == 'free gripper1' and isinstance(effect, fs.DelEffect): # `not (free gripper1)` is present
-                not_free_gripper_effect_present = True
-            elif effect.atom.predicate.name == 'exclusively-occupying-gripper':
-                exclusively_occupying_gripper_effect_present = True
-        return not_free_gripper_effect_present and exclusively_occupying_gripper_effect_present
-
-    def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str, record_rollouts=False) -> gym.Wrapper:
-        """Wrap the environment in multiple wrappers.
-
-        Args:
-            env (gym environment): the environment to wrap
-            subgoal (fs.SingleEffect): the subgoal to learn
-            save_path (str): the path to save the monitor logs
-            record_rollouts (bool): whether to record rollouts
-
-        Returns:
-            gym.Wrapper: the wrapped environment
-        """
-        env = GymWrapper(env)
-        env = OperatorWrapper(
-            env=env,
-            rl_algo=self.rl_algo_name,
-            domain=self.domain,
-            grounded_operator=self.grounded_operator, 
-            executed_operators=self.executed_operators, 
-            config=self.config, 
-            curr_subgoal=subgoal, 
-            record_rollouts=record_rollouts,
-        )
-        subgoals = []
-        for eff in self.grounded_operator.effects:
-            if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
-                continue
-            else:
-                subgoals.append(f'{eff.pddl_repr()}_subgoal')
-        env = Monitor(
-            env=env, 
-            filename=f"{save_path}{os.sep}monitor_logs",
-            allow_early_resets=True,
-            info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_r_shaping', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
-        )
-        return env
-    
-    def _grounded_operator_repr(self) -> str:
-        """Return a string representation of the grounded operator
-
-        Returns:
-            str: the string representation of the grounded operator
-        """
-        effects:list = [eff.pddl_repr() for eff in self.grounded_operator.effects]
-        if self.check_duplicate_grasp_effects():
-            effects.remove('not (free gripper1)')
-        effects_str:str = ' '.join(f'({eff})' for eff in effects)
-        return f"{self.grounded_operator.name}\nprecondition: {self.grounded_operator.precondition.pddl_repr()}\neffects: and {effects_str}"
     
     def _load_llm_subgoal_reward_shaping_fn(self, i) -> Callable:
         """Load the ith LLM generated subgoal reward shaping function for the grounded operator
