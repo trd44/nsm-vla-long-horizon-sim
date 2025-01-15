@@ -701,7 +701,7 @@ class LLMLearner(BaseLearner):
 
         if prev_subgoal_model_data is not None:
             prev_model_path, prev_env, prev_eval_callback = prev_subgoal_model_data
-        active_model_data = []
+        model_data = []
 
         for i, reward_fn in enumerate(self.llm_reward_candidates):
             if prev_subgoal_model_data is not None:
@@ -776,21 +776,16 @@ class LLMLearner(BaseLearner):
             env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             eval_env.env.set_subgoal_reward_shaping_fn(subgoal, reward_fn)
             
-            active_model_data.append((model_save_path, env, eval_callback))
+            model_data.append((model_save_path, env, eval_callback))
         
-        duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        if duplicate_grasp_effects:
-            num_subgoals = len(self.grounded_operator.effects) - 1
-        else:
-            num_subgoals = len(self.grounded_operator.effects)
-        subgoal_total_timesteps = self.config['learning']['learn_operator']['total_timesteps'] // num_subgoals
+        subgoal_total_timesteps = self.config['learning']['learn_subgoal']['total_timesteps']
         subgoal_timesteps_so_far = 0
         while subgoal_timesteps_so_far < subgoal_total_timesteps: # train each reward function candidate until the total timesteps are reached
+            model_indices_to_train = list(range(len(model_data)))
             model_indices_to_exclude = []
             
-            for i, (active_model_path, env, eval_callback) in enumerate(active_model_data):
-                if i in model_indices_to_exclude: # don't keep training the models that have been excluded
-                    continue
+            for i in model_indices_to_train:
+                active_model_path, env, eval_callback = model_data[i]
                 model = self.rl_algo.load(path=active_model_path, env=env)
                 logger.info(f"\n{'='*40}\nTraining model {active_model_path} for {subgoal.pddl_repr()} for {self.config['learning']['learn_subgoal']['timesteps_per_iter']} timesteps, already trained for {subgoal_timesteps_so_far} timesteps\n{'='*40}\n")
                 try: # try to train the model with llm reward shaping function
@@ -805,16 +800,32 @@ class LLMLearner(BaseLearner):
                 # save the model after however much training has been done
                 model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
-            # terminate the worst performing model
-            subgoal_success_rates = [eval_callback.get_recent_subgoal_success_rate() for _, _, eval_callback in active_model_data]
-            worst_performing_model_idx = np.argmin(subgoal_success_rates)
-            best_performing_model_idx = np.argmax(subgoal_success_rates)
-            if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
-                logger.info(f"Terminating the worst performing model {active_model_data[worst_performing_model_idx][0]}")
-                model_indices_to_exclude.append(worst_performing_model_idx)
             
+            # find the worst and best performing model
+            subgoal_success_rates = {}
+            worst_performance = 1
+            worst_performing_model_idx = None
+            best_performance = 0
+            best_performing_model_idx = None
+            for i in model_indices_to_train:
+                eval_callback = model_data[i][2]
+                subgoal_success_rate = eval_callback.get_recent_subgoal_success_rate()
+                if subgoal_success_rate < worst_performance:
+                    worst_performance = subgoal_success_rate
+                    worst_performing_model_idx = i
+                if subgoal_success_rate > best_performance:
+                    best_performance = subgoal_success_rate
+                    best_performing_model_idx = i
+                subgoal_success_rates[i] =  subgoal_success_rate
+
+            if best_performing_model_idx != worst_performing_model_idx and subgoal_success_rates[best_performing_model_idx] > 0.5: # start dropping the worst performing model if at least one model has a success rate of over 50%
+                logger.info(f"Terminating the worst performing model {model_data[worst_performing_model_idx][0]}")
+                model_indices_to_exclude.append(worst_performing_model_idx)
+            # remove the excluded models from the active models
+            for i in model_indices_to_exclude:
+                model_indices_to_train.remove(i)
         # return the best performing model
-        return active_model_data[np.argmax(subgoal_success_rates)]
+        return model_data[np.argmax(subgoal_success_rates)]
 
 
     def prompt_llm_for_reward_shaping_fn_candidate(self) -> str:
