@@ -814,6 +814,7 @@ class LLMLearner(BaseLearner):
             # pop the models that need to be terminated
             for i in model_indices_to_pop:
                 active_model_data.pop(i)
+            model_indices_to_pop = []
         # return the best performing model
         return active_model_data[np.argmax(subgoal_success_rates)]
 
