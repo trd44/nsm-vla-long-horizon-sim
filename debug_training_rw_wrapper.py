@@ -105,7 +105,7 @@ if __name__ == '__main__':
     print("Observation space:", env.observation_space)
 
 
-    model = PPO("MlpPolicy", env, seed=0, tensorboard_log=f"./ppo_rw_approach_{domain}_tensorboard/")
+    model = PPO("MlpPolicy", env, seed=0, **config['learning']['PPO'], tensorboard_log=f"./ppo_rw_approach_{domain}_tensorboard/")
 
     model.learn(total_timesteps=1_000_000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_rw_approach_{domain}_best_model/", log_path=f"./ppo_rw_approach_{domain}_logs/", eval_freq=1000, deterministic=True, render=False, n_eval_episodes=2, verbose=1))
 
