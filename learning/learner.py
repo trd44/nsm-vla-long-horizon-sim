@@ -103,7 +103,7 @@ class OperatorWrapper(gym.Wrapper):
         truncated = truncated or self.env.done
         # compute the reward based on the observation with semantics
         obs_with_semantics:dict = self.detector.get_obs()
-        binary_obs:dict = self.detector.detect_binary_states(self.env)
+        binary_obs:dict = self.detector.detect_binary_states(self.env.unerapped)
         reward = self.compute_reward(obs_with_semantics, binary_obs)
         penalties, collision_points = self.collision_penalty(obs_with_semantics)
         # save reward and penalties separately
@@ -456,19 +456,6 @@ class BaseLearner:
         self.grounded_operator = grounded_operator_to_learn
         self.unwrapped_env = env
         np.random.seed(self.config['learning'][self.rl_algo_name]['seed'])
-    
-    def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str) -> Monitor:
-        """Wrap the environment with the OperatorWrapper
-
-        Args:
-            env (MujocoEnv): the environment to wrap
-            subgoal (fs.SingleEffect): the subgoal to learn
-            save_path (str): the path to save the model
-
-        Returns:
-            Monitor: the wrapped environment
-        """
-        return LLMAblatedOperatorWrapper(env, self.grounded_operator, self.executed_operators, self.config, self.domain, self.rl_algo_name, subgoal, record_rollouts=self.config['learning']['record_rollouts'])
 
     def learn_operator(self) -> execution.executor.Executor_RL:
         """Train an RL agent to learn the grounded operator
@@ -491,6 +478,17 @@ class BaseLearner:
         model_kwargs = dict(self.config['learning'][self.rl_algo_name])  # copy so we can modify
         noise_type = model_kwargs.pop("action_noise", None)
         noise_kwargs = model_kwargs.pop("action_noise_kwargs", None)
+
+        # create the eval env
+        last_subgoal = self.grounded_operator.effects[-1]
+        env = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['learn_simulation']), subgoal=last_subgoal, save_path=save_path, record_rollouts=False)
+        eval_env:Monitor = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['eval_simulation']), subgoal=last_subgoal, save_path=f"{save_path}_eval", record_rollouts=False)
+        eval_callback = CustomEvalCallback(
+            eval_env=eval_env,
+            best_model_save_path=f"{save_path}{os.sep}best_model",
+            log_path=f"{save_path}_eval{os.sep}eval_logs",
+            **self.config['learning']['eval']
+            )
         
         action_noise = None
         if noise_type == "OrnsteinUhlenbeckActionNoise" and noise_kwargs is not None:
@@ -504,26 +502,17 @@ class BaseLearner:
         if action_noise == None:
             model = self.rl_algo(
                 "MlpPolicy",    
-                env = self.unwrapped_env,
+                env = env,
                 tensorboard_log=f"{save_path}{os.sep}tensorboard_logs",
                 **model_kwargs
             )
         else:
             model = self.rl_algo(
                 "MlpPolicy",    
-                env = self.unwrapped_env,
+                env = env,
                 tensorboard_log=f"{save_path}{os.sep}tensorboard_logs",
                 action_noise=action_noise,
                 **model_kwargs
-            )
-        # create the eval env
-        last_subgoal = self.grounded_operator.effects[-1]
-        eval_env:Monitor = self._wrap_env(deepcopy_env(self.unwrapped_env, self.config['eval_simulation']), subgoal=last_subgoal, save_path=f"{save_path}_eval", record_rollouts=False)
-        eval_callback = CustomEvalCallback(
-            eval_env=eval_env,
-            best_model_save_path=f"{save_path}{os.sep}best_model",
-            log_path=f"{save_path}_eval{os.sep}eval_logs",
-            **self.config['learning']['eval']
             )
         
         # train the model
@@ -800,7 +789,7 @@ class LLMLearner(BaseLearner):
                 # save the model after however much training has been done
                 model.save(path = active_model_path)
             subgoal_timesteps_so_far += self.config['learning']['learn_subgoal']['timesteps_per_iter']
-            
+
             # find the worst and best performing model
             subgoal_success_rates = {}
             worst_performance = 1
@@ -867,7 +856,42 @@ class LLMLearner(BaseLearner):
             llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
         return llm_reward_shaping_func
 
+    def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str, record_rollouts=False) -> gym.Wrapper:
+            """Wrap the environment in multiple wrappers.
 
+            Args:
+                env (gym environment): the environment to wrap
+                subgoal (fs.SingleEffect): the subgoal to learn
+                save_path (str): the path to save the monitor logs
+                record_rollouts (bool): whether to record rollouts
+
+            Returns:
+                gym.Wrapper: the wrapped environment
+            """
+            env = GymWrapper(env)
+            env = OperatorWrapper(
+                env=env,
+                rl_algo=self.rl_algo_name,
+                domain=self.domain,
+                grounded_operator=self.grounded_operator, 
+                executed_operators=self.executed_operators, 
+                config=self.config, 
+                curr_subgoal=subgoal, 
+                record_rollouts=record_rollouts,
+            )
+            subgoals = []
+            for eff in self.grounded_operator.effects:
+                if eff.pddl_repr() == 'not (free gripper1)' and self.check_duplicate_grasp_effects():
+                    continue
+                else:
+                    subgoals.append(f'{eff.pddl_repr()}_subgoal')
+            env = Monitor(
+                env=env, 
+                filename=f"{save_path}{os.sep}monitor_logs",
+                allow_early_resets=True,
+                info_keywords=('subgoal_success', 'goal_success', 'ep_cumu_r_shaping', 'ep_cumu_col_penalty', 'ep_cumu_collisions') + tuple(subgoals)
+            )
+            return env
 
 class CustomEvalCallback(EvalCallback):
     def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
