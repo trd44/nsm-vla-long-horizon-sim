@@ -18,6 +18,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import sync_envs_normalization
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
+from stable_baselines3.common.vec_env import DummyVecEnv
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
@@ -93,6 +94,7 @@ if __name__ == '__main__':
     rw_wrapped_env = GraspRewardWrapper(action_wrapped_env, config, domain)
     env = Monitor(rw_wrapped_env, filename=f'ppo_rw_{domain}_approach_monitor', allow_early_resets=True)
 
+
     eval_robosuite_env = load_env(domain, config['simulation'])
     eval_gym_env = GymWrapper(eval_robosuite_env)
     eval_action_wrapped_env = DiscreteGripperWrapper(eval_gym_env)
@@ -105,14 +107,6 @@ if __name__ == '__main__':
 
     model = PPO("MlpPolicy", env, seed=0, tensorboard_log=f"./ppo_rw_approach_{domain}_tensorboard/")
 
-    model.learn(total_timesteps=100000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_rw_approach_{domain}_best_model/", log_path=f"./ppo_rw_approach_{domain}_logs/", eval_freq=1000, deterministic=True, render=False, n_eval_episodes=2, verbose=1))
+    model.learn(total_timesteps=1_000_000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_rw_approach_{domain}_best_model/", log_path=f"./ppo_rw_approach_{domain}_logs/", eval_freq=1000, deterministic=True, render=False, n_eval_episodes=2, verbose=1))
 
     model.save(f"ppo_rw_approach_{domain}")
-    obs = env.reset()
-    for i in range(1000):
-        action, _states = model.predict(obs, deterministic=True)
-        obs, rewards, dones, info = env.step(action)
-        env.render()
-        if dones:
-            obs = env.reset()
-    env.close()
