@@ -54,7 +54,7 @@ class GraspRewardWrapper(gym.RewardWrapper):
         self.env = env
         self.config = config
         self.domain = domain
-        self.detector = load_detector(config=config, domain=domain, env=env)
+        self.detector = load_detector(config=config, domain=domain, env=env.unwrapped)
 
 
     
