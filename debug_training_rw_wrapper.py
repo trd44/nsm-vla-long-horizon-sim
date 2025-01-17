@@ -61,7 +61,7 @@ class GraspRewardWrapper(gym.RewardWrapper):
     def reward(self, reward):
         obs_from_detector = self.detector.get_obs()
         obs_from_unwrapped = self.env.unwrapped._get_observations()
-        binary_obs = self.detector.detect_binary_states(self.env)
+        binary_obs = self.detector.detect_binary_states(self.env.unwrapped)
         dist = np.linalg.norm(obs_from_unwrapped['gripper1_pos'] - obs_from_detector['mug1_pos'])
         dist2 = np.linalg.norm(obs_from_detector['gripper1_pos'] - obs_from_detector['mug1_pos'])
         normalized = dist / np.linalg.norm(obs_from_unwrapped['gripper1_to_obj_max_possible_dist'])
@@ -77,7 +77,7 @@ class GraspRewardWrapper(gym.RewardWrapper):
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
         reward = self.reward(reward)
-        binary_obs = self.detector.detect_binary_states(self.env)
+        binary_obs = self.detector.detect_binary_states(self.env.unwrapped)
         grasp = binary_obs['exclusively-occupying-gripper mug1 gripper1']
         done = done or grasp # end early if the gripper has grasped the mug
         return obs, reward, done, info
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     gym_env = GymWrapper(robosuite_env)
     action_wrapped_env = DiscreteGripperWrapper(gym_env)
     rw_wrapped_env = GraspRewardWrapper(action_wrapped_env, config, domain)
-    env = Monitor(rw_wrapped_env, filename='ppo_rw_{domain}_approach_monitor', allow_early_resets=True)
+    env = Monitor(rw_wrapped_env, filename=f'ppo_rw_{domain}_approach_monitor', allow_early_resets=True)
 
     eval_robosuite_env = load_env(domain, config['simulation'])
     eval_gym_env = GymWrapper(eval_robosuite_env)
