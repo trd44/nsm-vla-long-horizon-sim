@@ -75,12 +75,12 @@ class GraspRewardWrapper(gym.RewardWrapper):
         return reward + step_cost
     
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, done, truncated, info = self.env.step(action)
         reward = self.reward(reward)
         binary_obs = self.detector.detect_binary_states(self.env.unwrapped)
         grasp = binary_obs['exclusively-occupying-gripper mug1 gripper1']
         done = done or grasp # end early if the gripper has grasped the mug
-        return obs, reward, done, info
+        return obs, reward, done, truncated, info
      
 
 
