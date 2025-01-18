@@ -15,7 +15,7 @@ plan_learn_execute:
 
 simulation:
   robots: "Kinova3"
-  has_renderer: False
+  has_renderer: True
   has_offscreen_renderer: False
   use_camera_obs: False
   control_freq: 20
@@ -33,15 +33,15 @@ eval_simulation:
 # parameters for RL
 learning:
   PPO:
-    batch_size: 64 # default
+    batch_size: 128 # default
     gamma: 0.99 # default
-    learning_rate: 0.0003
+    learning_rate: 0.0003 # default
     verbose: 1
     n_steps: 2048 #default 2048, make sure this is smaller than or equal to `timesteps_per_iter` below. Otherwise this will take precedence
     policy_kwargs:
       net_arch:
-        pi: [512, 512, 256] # default [64, 64]
-        vf: [512, 512, 256] # default [64, 64]
+        pi: [128, 128] # default [64, 64]
+        vf: [128, 128] # default [64, 64]
   DDPG:
     batch_size: 100 # default
     buffer_size: 1000000 # default

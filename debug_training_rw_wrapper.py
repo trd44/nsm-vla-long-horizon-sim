@@ -104,9 +104,12 @@ if __name__ == '__main__':
     print("Action space:", env.action_space)
     print("Observation space:", env.observation_space)
 
+    # load model if it exists
+    if os.path.exists(f"./ppo_approach_{domain}_best_model/best_model.zip"):
+        model = PPO.load(f"./ppo_rw_approach_{domain}_best_model/best_model.zip", env)
+    else:
+        model = PPO("MlpPolicy", env, seed=0, **config['learning']['PPO'], tensorboard_log=f"./ppo_rw_approach_{domain}_tensorboard/")
 
-    model = PPO("MlpPolicy", env, seed=0, **config['learning']['PPO'], tensorboard_log=f"./ppo_rw_approach_{domain}_tensorboard/")
-
-    model.learn(total_timesteps=1_000_000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_rw_approach_{domain}_best_model/", log_path=f"./ppo_rw_approach_{domain}_logs/", eval_freq=1000, deterministic=True, render=False, n_eval_episodes=2, verbose=1))
+    model.learn(total_timesteps=1_000_000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_rw_approach_{domain}_best_model/", log_path=f"./ppo_rw_approach_{domain}_logs/", eval_freq=10_000, deterministic=True, render=False, n_eval_episodes=2, verbose=1))
 
     model.save(f"ppo_rw_approach_{domain}")
