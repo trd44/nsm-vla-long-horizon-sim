@@ -11,6 +11,7 @@ import csv
 import stable_baselines3
 import logging
 import argparse
+import json
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC, PPO, DDPG
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_freq', type=int, default=10_000)
     parser.add_argument('--n_eval_episodes', type=int, default=5)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--net_arch', type=list, default=[64, 64])
+    parser.add_argument('--net_arch', type=str, default='[64, 64]')
     parser.add_argument('--learning_rate', type=float, default=3e-4)
     parser.add_argument('--lr_schedule', type=bool, default=False)
     args = parser.parse_args()
@@ -125,7 +126,7 @@ if __name__ == '__main__':
             print(f"{arg}: {vars(args)[arg]}")
 
     eval_kwargs = {'n_eval_episodes': args.n_eval_episodes, 'eval_freq': args.eval_freq}
-    model_kwargs = {'n_steps': args.n_steps, 'batch_size': args.batch_size, 'learning_rate': args.learning_rate, 'policy_kwargs': {'net_arch': args.net_arch}}
+    model_kwargs = {'n_steps': args.n_steps, 'batch_size': args.batch_size, 'learning_rate': args.learning_rate, 'policy_kwargs': {'net_arch': json.loads(args.net_arch)}}
     if args.lr_schedule:
         model_kwargs['learning_rate'] = linear_schedule(args.learning_rate) 
     
