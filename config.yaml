@@ -33,11 +33,11 @@ eval_simulation:
 # parameters for RL
 learning:
   PPO:
-    batch_size: 128 # default
+    batch_size: 128 # default. The n_steps taken per VectorEnv will be divided into `batch_size` minibatches for training the policy
     gamma: 0.99 # default
     learning_rate: 0.0003 # default
     verbose: 1
-    n_steps: 2048 #default 2048, make sure this is smaller than or equal to `timesteps_per_iter` below. Otherwise this will take precedence
+    n_steps: 2048 #default 2048, make sure this is smaller than or equal to `timesteps_per_iter` below. Otherwise this will take precedence. The agent takes `n_steps` steps in the environment per VectorEnv before updating the policy.
     policy_kwargs:
       net_arch:
         pi: [128, 128] # default [64, 64]
@@ -79,7 +79,6 @@ learning:
     total_timesteps: 5000000
   learn_subgoal:
     total_timesteps: 2500000
-  learn_subgoal:
     timesteps_per_iter: 50000
   reward_shaping_fn:
     num_candidates: 3

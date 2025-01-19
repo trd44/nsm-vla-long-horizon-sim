@@ -10,6 +10,7 @@ import numpy as np
 import csv
 import stable_baselines3
 import logging
+import argparse
 from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
 from stable_baselines3 import SAC, PPO, DDPG
@@ -21,6 +22,7 @@ from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from stable_baselines3.common.vec_env import DummyVecEnv
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
+from learning.learning_utils import *
 from utils import *
 
 # set up a logger here to log the terminal printouts for the training of each subgoal
@@ -83,22 +85,47 @@ if __name__ == '__main__':
     visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
     gym_env = GymWrapper(robosuite_env)
     wrapped_env = MinimalWrapper(gym_env, config, domain)
-    env = Monitor(wrapped_env, filename=f'ppo_{domain}_approach_monitor', allow_early_resets=True)
+    env = Monitor(wrapped_env, filename=f'ppo_approach_{domain}{os.sep}approach_monitor', allow_early_resets=True)
 
     eval_robosuite_env = load_env(domain, config['simulation'])
     eval_gym_env = GymWrapper(eval_robosuite_env)
     eval_wrapped_env = MinimalWrapper(eval_gym_env, config, domain)
-    eval_env = Monitor(eval_wrapped_env, filename=f'ppo_{domain}_approach_eval_monitor', allow_early_resets=True)
+    eval_env = Monitor(eval_wrapped_env, filename=f'ppo_approach_{domain}{os.sep}approach_eval_monitor', allow_early_resets=True)
 
     print("Action space:", env.action_space)
     print("Observation space:", env.observation_space)
 
-    # load the model if it exists
-    if os.path.exists(f"./ppo_approach_{domain}_best_model/best_model.zip"):
-        model = PPO.load(f"./ppo_approach_{domain}_best_model/best_model.zip", env)
+    # parse model commandline args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--total_timesteps', type=int, default=2_500_000)
+    parser.add_argument('--n_steps', type=int, default=2048)
+    parser.add_argument('--eval_freq', type=int, default=10_000)
+    parser.add_argument('--n_eval_episodes', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--net_arch', type=list, default=[64, 64])
+    parser.add_argument('--learning_rate', type=float, default=3e-4)
+    parser.add_argument('--lr_schedule', type=bool, default=False)
+    args = parser.parse_args()
+
+    # print the non-default commandline args
+    for arg in vars(args):
+        if vars(args)[arg] != parser.get_default(arg):
+            print(f"{arg}: {vars(args)[arg]}")
+
+    eval_kwargs = {'n_eval_episodes': args.n_eval_episodes, 'eval_freq': args.eval_freq}
+    model_kwargs = {'n_steps': args.n_steps, 'batch_size': args.batch_size, 'learning_rate': args.learning_rate, 'policy_kwargs': {'net_arch': args.net_arch}}
+    if args.lr_schedule:
+        model_kwargs['learning_rate'] = linear_schedule(args.learning_rate)    
+
+    # load model if it exists
+    if os.path.exists(f"./ppo_approach_{domain}{os.sep}best_model{os.sep}best_model.zip"):
+        model = PPO.load(f"./ppo_approach_{domain}{os.sep}best_model{os.sep}best_model.zip", env)
     else:
-        model = PPO("MlpPolicy", env, seed=0, tensorboard_log=f"./ppo_approach_{domain}_tensorboard/")
+        # create model based on commandline args
+        model = PPO("MlpPolicy", env, seed=0, **model_kwargs, tensorboard_log=f"./ppo_approach_{domain}{os.sep}tensorboard/")
 
-    model.learn(total_timesteps=2_500_000, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_approach_{domain}_best_model/", log_path=f"./ppo_approach_{domain}_logs/", eval_freq=10_000, deterministic=True, render=False, n_eval_episodes=5, verbose=1))
 
-    model.save(f"ppo_approach_{domain}")
+    model.learn(args.total_timesteps, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_approach_{domain}{os.sep}best_model/", log_path=f"./ppo_approach_{domain}{os.sep}logs/", deterministic=True, render=False, verbose=1, **eval_kwargs))
+
+    model.save(f"./ppo_approach_{domain}{os.sep}model")
