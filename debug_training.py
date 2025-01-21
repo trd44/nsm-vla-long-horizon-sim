@@ -82,19 +82,6 @@ class MinimalWrapper(gym.Wrapper):
 if __name__ == '__main__':
     config:dict = load_config("config.yaml")
     domain:str = 'cleanup'
-    robosuite_env = load_env(domain, config['simulation'])
-    visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
-    gym_env = GymWrapper(robosuite_env)
-    wrapped_env = MinimalWrapper(gym_env, config, domain)
-    env = Monitor(wrapped_env, filename=f'ppo_approach_{domain}{os.sep}approach_monitor', allow_early_resets=True)
-
-    eval_robosuite_env = load_env(domain, config['simulation'])
-    eval_gym_env = GymWrapper(eval_robosuite_env)
-    eval_wrapped_env = MinimalWrapper(eval_gym_env, config, domain)
-    eval_env = Monitor(eval_wrapped_env, filename=f'ppo_approach_{domain}{os.sep}approach_eval_monitor', allow_early_resets=True)
-
-    print("Action space:", env.action_space)
-    print("Observation space:", env.observation_space)
 
     # parse model commandline args
     parser = argparse.ArgumentParser()
@@ -110,23 +97,40 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # print the non-default commandline args
-    for arg in vars(args):
-        if vars(args)[arg] != parser.get_default(arg):
-            print(f"{arg}: {vars(args)[arg]}")
+    save_path = f"./ppo_approach_{domain}"
+    for arg, val in vars(args).items():
+        if val != parser.get_default(arg):
+            print(f"{arg}: {val}")
+            save_path += f"_{arg}_{val}"
+    
+    
+    robosuite_env = load_env(domain, config['simulation'])
+    visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
+    gym_env = GymWrapper(robosuite_env)
+    wrapped_env = MinimalWrapper(gym_env, config, domain)
+    env = Monitor(wrapped_env, filename=f'{save_path}{os.sep}approach_monitor', allow_early_resets=True)
+
+    eval_robosuite_env = load_env(domain, config['simulation'])
+    eval_gym_env = GymWrapper(eval_robosuite_env)
+    eval_wrapped_env = MinimalWrapper(eval_gym_env, config, domain)
+    eval_env = Monitor(eval_wrapped_env, filename=f'{save_path}{os.sep}approach_eval_monitor', allow_early_resets=True)
+
+    print("Action space:", env.action_space)
+    print("Observation space:", env.observation_space)
 
     eval_kwargs = {'n_eval_episodes': args.n_eval_episodes, 'eval_freq': args.eval_freq}
-    model_kwargs = {'n_steps': args.n_steps, 'batch_size': args.batch_size, 'learning_rate': args.learning_rate, 'policy_kwargs': {'net_arch': json.loads(args.net_arch)}}
+    model_kwargs = {'n_steps': args.n_steps, 'batch_size': args.batch_size, 'learning_rate': args.learning_rate, 'policy_kwargs': {'net_arch': {'pi': json.loads(args.net_arch), 'vi': json.loads(args.net_arch)}}}
     if args.lr_schedule:
         model_kwargs['learning_rate'] = linear_schedule(args.learning_rate)    
 
     # load model if it exists
-    if os.path.exists(f"./ppo_approach_{domain}{os.sep}best_model{os.sep}best_model.zip"):
-        model = PPO.load(f"./ppo_approach_{domain}{os.sep}best_model{os.sep}best_model.zip", env)
+    if os.path.exists(f"./{save_path}{os.sep}best_model{os.sep}best_model.zip"):
+        model = PPO.load(f"./{save_path}{os.sep}best_model{os.sep}best_model.zip", env)
     else:
         # create model based on commandline args
-        model = PPO("MlpPolicy", env, seed=0, **model_kwargs, tensorboard_log=f"./ppo_approach_{domain}{os.sep}tensorboard/")
+        model = PPO("MlpPolicy", env, seed=0, **model_kwargs, tensorboard_log=f"./{save_path}{os.sep}tensorboard/")
 
 
-    model.learn(args.total_timesteps, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./ppo_approach_{domain}{os.sep}best_model/", log_path=f"./ppo_approach_{domain}{os.sep}logs/", deterministic=True, render=False, verbose=1, **eval_kwargs))
+    model.learn(args.total_timesteps, callback=EvalCallback(eval_env=eval_env, best_model_save_path=f"./{save_path}{os.sep}best_model/", log_path=f"./{save_path}{os.sep}logs/", deterministic=True, render=False, verbose=1, **eval_kwargs))
 
-    model.save(f"./ppo_approach_{domain}{os.sep}model")
+    model.save(f"./{save_path}{os.sep}model")
