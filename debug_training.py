@@ -110,7 +110,7 @@ if __name__ == '__main__':
     # print the non-default commandline args and construct kwargs for model and eval
     model_kwargs = {}
     eval_kwargs = {}
-    save_path = f"./{algo}_approach_{domain}"
+    save_path = f"{algo}_approach_{domain}"
     # print the algorithm name and save path
     print(f"#######Training Algorithm: {algo} at {save_path}#######")
     for arg, val in vars(args).items():
@@ -170,11 +170,11 @@ if __name__ == '__main__':
     # load the algo from stable_baselines3
     rl_algo = importlib.import_module(f"stable_baselines3.{algo.lower()}").__dict__[algo.upper()]
     # load model if it exists
-    if os.path.exists(f"./{save_path}{os.sep}best_model{os.sep}best_model.zip"):
-        model = rl_algo.load(f"./{save_path}{os.sep}best_model{os.sep}best_model.zip", env)
+    if os.path.exists(f"{save_path}{os.sep}best_model{os.sep}best_model.zip"):
+        model = rl_algo.load(f"{save_path}{os.sep}best_model{os.sep}best_model.zip", env)
     else:
         # create model based on commandline args
-        model = rl_algo("MlpPolicy", env, **model_kwargs, tensorboard_log=f"./{save_path}{os.sep}tensorboard/")
+        model = rl_algo("MlpPolicy", env, **model_kwargs, tensorboard_log=f"{save_path}{os.sep}tensorboard/")
 
     # create the logger
     # set up a logger here to log the terminal printouts for the training of each subgoal
@@ -187,6 +187,6 @@ if __name__ == '__main__':
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    model.learn(total_timesteps=args.total_timesteps, callback=CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"./{save_path}{os.sep}best_model/", log_path=f"./{save_path}{os.sep}logs/", **eval_kwargs))
+    model.learn(total_timesteps=args.total_timesteps, callback=CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"{save_path}{os.sep}best_model/", log_path=f"{save_path}{os.sep}logs/", **eval_kwargs))
 
-    model.save(f"./{save_path}{os.sep}model")
+    model.save(f"{save_path}{os.sep}model")
