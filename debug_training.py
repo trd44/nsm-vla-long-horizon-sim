@@ -104,17 +104,6 @@ if __name__ == '__main__':
     parser.add_argument('--lr_schedule', type=bool, default=False)
     parser.add_argument('--op_wrap', type=bool, default=False, help='whether to wrap the environment with the operator wrapper')
     parser.add_argument('--rw_shaping', type=int, default=0, help='the reward shaping function candidate to use. Usually from 0 - 2.')
-    # parser.add_argument('--domain', type=str, default='cleanup')
-    # parser.add_argument('--rl_algorithm', type=str, default='PPO')
-    # parser.add_argument('--seed', type=int, default=0)
-    # parser.add_argument('--total_timesteps', type=int, default=2_500_000)
-    # parser.add_argument('--n_steps', type=int, default=2048)
-    # parser.add_argument('--eval_freq', type=int, default=10_000)
-    # parser.add_argument('--n_eval_episodes', type=int, default=5)
-    # parser.add_argument('--batch_size', type=int, default=64)
-    # parser.add_argument('--net_arch', type=str, default='[64, 64]')
-    # parser.add_argument('--learning_rate', type=float, default=3e-4)
-    # parser.add_argument('--lr_schedule', type=bool, default=False)
     args = parser.parse_args()
 
     domain = args.domain
@@ -153,7 +142,9 @@ if __name__ == '__main__':
             reward_fn_candidates.append(llm_reward_shaping_func)
         except:
             raise Exception(f"Reward function {op_name}_{i} not found")
-        
+    
+    # set seed for env too
+    np.random.seed(model_kwargs['seed'])
     robosuite_env = load_env(domain, config['simulation'])
     visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
     gym_env = GymWrapper(robosuite_env)
@@ -183,7 +174,7 @@ if __name__ == '__main__':
         model = rl_algo.load(f"./{save_path}{os.sep}best_model{os.sep}best_model.zip", env)
     else:
         # create model based on commandline args
-        model = rl_algo("MlpPolicy", env, seed=0, **model_kwargs, tensorboard_log=f"./{save_path}{os.sep}tensorboard/")
+        model = rl_algo("MlpPolicy", env, **model_kwargs, tensorboard_log=f"./{save_path}{os.sep}tensorboard/")
 
     # create the logger
     # set up a logger here to log the terminal printouts for the training of each subgoal
