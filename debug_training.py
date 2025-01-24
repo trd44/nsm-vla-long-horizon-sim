@@ -1,31 +1,19 @@
-import copy
-import time
-import dill
 import os
-import detection.detector
-import execution.executor
 import gymnasium as gym
 import importlib
 import numpy as np
-import csv
-import stable_baselines3
 import logging
 import argparse
 import json
-from tarski import fstrips as fs
 from robosuite.wrappers import GymWrapper
-from stable_baselines3 import SAC, PPO, DDPG
-from stable_baselines3.common.callbacks import EvalCallback, CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
+from gymnasium.wrappers.time_limit import TimeLimit
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import sync_envs_normalization
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.callbacks import CallbackList
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from learning.learning_utils import *
 from learning.custom_gym_wrapper import *
-from learning.custom_eval_callback import CustomEvalCallback
+from learning.custom_callback import *
 from utils import *
 
 # set up a logger here to log the terminal printouts for the training of each subgoal
@@ -99,6 +87,8 @@ if __name__ == '__main__':
         if type(val) == list:
             parser.add_argument(f'--{arg}', type=json.loads, default=val)
     parser.add_argument('--total_timesteps', type=int, default=config['learning']['learn_subgoal']['total_timesteps'])
+    parser.add_argument('--ep_len', type=int, default=1000)
+    parser.add_argument('--render_training', type=bool, default=False)
     parser.add_argument('--domain', type=str, default='cleanup')
     parser.add_argument('--net_arch', type=json.loads, default=config['learning'][algo]['policy_kwargs']['net_arch'])
     parser.add_argument('--lr_schedule', type=bool, default=False)
@@ -148,20 +138,23 @@ if __name__ == '__main__':
     robosuite_env = load_env(domain, config['simulation'])
     visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
     gym_env = GymWrapper(robosuite_env)
+    time_limit_env = TimeLimit(gym_env, max_episode_steps=args.ep_len)
+
     if args.op_wrap:
-        wrapped_env = CollisionAblatedOperatorWrapper(gym_env, grounded_operator=grounded_op, executed_operators={}, config=config, domain=domain, rl_algo=algo, curr_subgoal=curr_subgoal)
+        wrapped_env = CollisionAblatedOperatorWrapper(time_limit_env, grounded_operator=grounded_op, executed_operators={}, config=config, domain=domain, rl_algo=algo, curr_subgoal=curr_subgoal)
         wrapped_env.set_subgoal_reward_shaping_fn(curr_subgoal, reward_fn_candidates[args.rw_shaping])
     else:
-        wrapped_env = MinimalWrapper(gym_env, config, domain)
+        wrapped_env = MinimalWrapper(time_limit_env, config, domain)
     env = Monitor(wrapped_env, filename=f'{save_path}{os.sep}approach_monitor', allow_early_resets=True)
 
     eval_robosuite_env = load_env(domain, config['simulation'])
     eval_gym_env = GymWrapper(eval_robosuite_env)
+    eval_time_limit_env = TimeLimit(eval_gym_env, max_episode_steps=args.ep_len)
     if args.op_wrap:
-        eval_wrapped_env = CollisionAblatedOperatorWrapper(gym_env, grounded_operator=grounded_op, executed_operators={}, config=config, domain=domain, rl_algo=algo, curr_subgoal=curr_subgoal)
+        eval_wrapped_env = CollisionAblatedOperatorWrapper(eval_time_limit_env, grounded_operator=grounded_op, executed_operators={}, config=config, domain=domain, rl_algo=algo, curr_subgoal=curr_subgoal)
         eval_wrapped_env.set_subgoal_reward_shaping_fn(curr_subgoal, reward_fn_candidates[args.rw_shaping])
     else:
-        eval_wrapped_env = MinimalWrapper(eval_gym_env, config, domain)
+        eval_wrapped_env = MinimalWrapper(eval_time_limit_env, config, domain)
     eval_env = Monitor(eval_wrapped_env, filename=f'{save_path}{os.sep}approach_eval_monitor', allow_early_resets=True)
 
     print("Action space:", env.action_space)
@@ -170,10 +163,10 @@ if __name__ == '__main__':
     # load the algo from stable_baselines3
     rl_algo = importlib.import_module(f"stable_baselines3.{algo.lower()}").__dict__[algo.upper()]
     # load model if it exists
+    
     if os.path.exists(f"{save_path}{os.sep}best_model{os.sep}best_model.zip"):
         model = rl_algo.load(f"{save_path}{os.sep}best_model{os.sep}best_model.zip", env)
     else:
-        # create model based on commandline args
         model = rl_algo("MlpPolicy", env, **model_kwargs, tensorboard_log=f"{save_path}{os.sep}tensorboard/")
 
     # create the logger
@@ -187,6 +180,12 @@ if __name__ == '__main__':
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    model.learn(total_timesteps=args.total_timesteps, callback=CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"{save_path}{os.sep}best_model/", log_path=f"{save_path}{os.sep}logs/", **eval_kwargs))
+   
+    eval_callback = CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"{save_path}{os.sep}best_model/", log_path=f"{save_path}{os.sep}logs/", **eval_kwargs)
 
+    if args.render_training:
+        train_callback = RenderCallback()
+        callbacks = CallbackList([train_callback, eval_callback])
+
+    model.learn(total_timesteps=args.total_timesteps, callback=callbacks)
     model.save(f"{save_path}{os.sep}model")
