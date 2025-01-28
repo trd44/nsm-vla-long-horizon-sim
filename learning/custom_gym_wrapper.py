@@ -230,7 +230,7 @@ class OperatorWrapper(gym.Wrapper):
             binary_obs: the binary observation whose keys are predicates and values are True/False
 
         Returns:
-            float: the reward between -1, 0
+            float: the reward between [-1, + number of effects - 1]
         """
         
         # there is a step cost of -1 regardless
@@ -255,7 +255,7 @@ class OperatorWrapper(gym.Wrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
                 num_subgoals_achieved += 1
-                sub_goal_reward += 1/num_effects
+                sub_goal_reward += 1
                 last_useful_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
@@ -265,7 +265,7 @@ class OperatorWrapper(gym.Wrapper):
                     llm_reward_shaping_fn = last_useful_reward_shaping_fn
                     self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = llm_reward_shaping_fn
                 try: # the llm reward shaping function may not be error-free. In that case, raise an error
-                    sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 1/num_effects
+                    sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})")
                 except Exception as e:
                     raise Exception(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
@@ -348,7 +348,7 @@ class LLMAblatedOperatorWrapper(OperatorWrapper):
             binary_obs: the binary observation whose keys are predicates and values are True/False
 
         Returns:
-            float: the reward between -1, 0
+            float: the reward between [-1, number of effects - 1]
         """
         
         # there is a step cost of -1 regardless
@@ -373,7 +373,7 @@ class LLMAblatedOperatorWrapper(OperatorWrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
                 num_subgoals_achieved += 1
-                sub_goal_reward += 1/num_effects
+                sub_goal_reward += 1
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are not satisfied.
@@ -452,7 +452,7 @@ class CollisionLLMAblatedOperatorWrapper(CollisionAblatedOperatorWrapper):
             binary_obs: the binary observation whose keys are predicates and values are True/False
 
         Returns:
-            float: the reward between -1, 0
+            float: the reward between [-1, number of effects - 1]
         """
         
         # there is a step cost of -1 regardless
@@ -477,7 +477,7 @@ class CollisionLLMAblatedOperatorWrapper(CollisionAblatedOperatorWrapper):
             if self.check_effect_satisfied(effect, binary_obs):
                 self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
                 num_subgoals_achieved += 1
-                sub_goal_reward += 1/num_effects
+                sub_goal_reward += 1
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are not satisfied.
