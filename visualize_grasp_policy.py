@@ -28,6 +28,7 @@ from debug_training import MinimalWrapper
 
 
 if __name__ == '__main__':
+    np.random.seed(0)
     config:dict = load_config("config.yaml")
     domain:str = 'cleanup'
     robosuite_env = load_env(domain, config['simulation'])
@@ -37,13 +38,16 @@ if __name__ == '__main__':
     env = Monitor(wrapped_env, filename=f'ppo_{domain}_approach_visualize_monitor', allow_early_resets=True)
 
 
-    model = PPO.load(f"ppo_approach_{domain}", env=env)
+    model = PPO.load(f'./ppo_approach_{domain}/best_model/best_model.zip', env=env)
 
     obs, info = env.reset()
-    for i in range(1000):
-        action, _states = model.predict(obs, deterministic=True)
-        obs, reward, done, truncated, info = env.step(action)
-        env.render()
-        if done:
-            obs = env.reset()
+    for _ in range(config['learning']['eval']['n_eval_episodes']):
+        for i in range(1000):
+            action, _states = model.predict(obs, deterministic=True)
+            obs, reward, done, truncated, info = env.step(action)
+            env.render()
+            if done:
+                obs, info = env.reset()
+                break
+        obs, info = env.reset()
     env.close()

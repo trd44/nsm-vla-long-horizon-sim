@@ -19,7 +19,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
-from learning.custom_eval_callback import CustomEvalCallback
+from learning.custom_callback import CustomEvalCallback
 from learning.custom_gym_wrapper import *
 from utils import *
 from VLM.LlmApi import chat_completion
@@ -430,23 +430,6 @@ class LLMLearner(BaseLearner):
         fn = out[fn_start:fn_end]
         return fn
     
-    
-    def _load_llm_subgoal_reward_shaping_fn(self, i) -> Callable:
-        """Load the ith LLM generated subgoal reward shaping function for the grounded operator
-
-        Returns:
-            Callable: the sub-goal reward shaping function. Creates the function if it does not exist
-        """
-        op_name, _ = extract_name_params_from_grounded(self.grounded_operator.ident())
-        # if the file exists, import the function and return it. Otherwise, prompt the LLM to write the function
-        try:
-            llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
-            llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
-        except:
-            self.prompt_llm_for_reward_shaping_fn_candidates()
-            llm_reward_func_module = importlib.import_module(f"learning.reward_functions.{self.config['planning']['domain']}.{op_name}")
-            llm_reward_shaping_func = getattr(llm_reward_func_module, 'reward_shaping_fn')
-        return llm_reward_shaping_func
 
     def _wrap_env(self, env:MujocoEnv, subgoal:fs.SingleEffect, save_path:str, record_rollouts=False) -> gym.Wrapper:
             """Wrap the environment in multiple wrappers.

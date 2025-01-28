@@ -84,12 +84,21 @@ def choose_policy(config:dict, domain:str) -> Tuple[SAC, GymWrapper]:
     model = SAC.load(f"{policies_dir}{os.sep}{domain}{os.sep}{chosen_operator}{os.sep}{chosen_seed}{os.sep}best_model{os.sep}best_model.zip", env=env)
     return model, env
 
-def visualize_policy(config:dict, domain:str):
+
+def visualize_policy(config:dict, domain:str, rl_algo_name:str, model_path:os.PathLike=None):
     """Visualize the learned policy
     Args:
         config (dict): the configuration dictionary containig the domain and planning information
+        domain (str): the domain to visualize
+        rl_algo_name (str): the name of the RL algorithm to use
+        model_path (os.PathLike, optional): the path to the model to visualize. Defaults
     """
-    model, env = choose_policy(config, domain)
+    if model_path:
+        rl_algo = importlib.import_module(f"stable_baselines3.{rl_algo_name.lower()}")
+        env = load_env(domain, config['eval_simulation'])
+
+    else:
+        model, env = choose_policy(config, domain)
     obs, _ = env.reset()
     n_success = 0
     for _ in range(config['learning']['eval']['n_eval_episodes']):

@@ -4,7 +4,10 @@ from robosuite.environments.base import MujocoEnv
 
 class Detector:
     def __init__(self, env, return_int=False):
-        self.env = env
+        if hasattr(env, 'unwrapped'): # make sure that the environment is unwrapped
+            self.env = env.unwrapped
+        else:
+            self.env = env
         self.obs = self.env.viewer._get_observations() if self.env.viewer_get_obs else self.env._get_observations() # detect objects' state using the observation
         self.return_int = return_int
 
