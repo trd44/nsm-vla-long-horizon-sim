@@ -235,11 +235,10 @@ class OperatorWrapper(gym.Wrapper):
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        num_effects = len(effects) if not duplicate_grasp_effects else len(effects) - 1
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
-        last_useful_reward_shaping_fn = None
+
         # reset subgoal successes
         for effect in effects:
             self.last_subgoal_successes[effect.pddl_repr()] = False
@@ -252,18 +251,13 @@ class OperatorWrapper(gym.Wrapper):
                 self.last_subgoal_successes[effect.pddl_repr()] = True # record the subgoal success
                 num_subgoals_achieved += 1
                 sub_goal_reward += 1
-                last_useful_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
                 llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
-                if llm_reward_shaping_fn is None:
-                    # reward shaping for this subgoal has not been specifically set yet. Use the previously useful reward shaping function that helped the robot achieve the last subgoal
-                    llm_reward_shaping_fn = last_useful_reward_shaping_fn
-                    self.subgoal_reward_shaping_fn_mapping[effect.pddl_repr()] = llm_reward_shaping_fn
-                try: # the llm reward shaping function may not be error-free. In that case, raise an error
+                try: # the llm reward shaping function may not be error-free. In that case, print error
                     sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})")
                 except Exception as e:
-                    raise Exception(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
+                    print(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
@@ -353,7 +347,6 @@ class LLMAblatedOperatorWrapper(OperatorWrapper):
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        num_effects = len(effects) if not duplicate_grasp_effects else len(effects) - 1
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
@@ -457,7 +450,6 @@ class CollisionLLMAblatedOperatorWrapper(CollisionAblatedOperatorWrapper):
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
 
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
-        num_effects = len(effects) if not duplicate_grasp_effects else len(effects) - 1
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
