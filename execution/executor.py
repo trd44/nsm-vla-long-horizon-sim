@@ -4,6 +4,7 @@ from detection.detector import Detector
 from tarski import fstrips as fs
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3 import SAC, PPO, DDPG
 from planning.planning_utils import *
 from utils import *
 
@@ -101,9 +102,10 @@ class Executor():
 		return True, []
 
 class Executor_RL(Executor):
-	def __init__(self, operator_name:str, alg:str, policy:Union[str, os.PathLike], model:SAC=None):
+	def __init__(self, operator_name:str, alg:str, policy:Union[str, os.PathLike], model=None):
 		super().__init__("RL", operator_name=operator_name, policy=policy)
-		self.alg = alg
+		self.rl_algo_name = alg
+		self.rl_algo = importlib.import_module(f"stable_baselines3.{self.rl_algo_name.lower()}").__dict__[self.rl_algo_name]
 		self.model = model
 
 	def execute(self, detector:Detector, grounded_operator:fs.Action, render=False):
@@ -138,10 +140,10 @@ class Executor_RL(Executor):
 				env.render()
 		return obs, success
 	
-	def load_policy(env, path, lr=0.0003, log_dir=None, seed=0):
+	def load_policy(self, env, path, lr=0.0003, log_dir=None, seed=0):
 		# Load the model
 		set_random_seed(seed, using_cuda=True)
-		model = SAC.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
+		model = self.rl_algo.load(path, env=env, learning_rate=lr, tensorboard_log=log_dir, seed=seed)
 		return model
 	
 	
