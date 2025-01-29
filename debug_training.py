@@ -183,6 +183,7 @@ if __name__ == '__main__':
 
    
     eval_callback = CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"{save_path}{os.sep}best_model/", log_path=f"{save_path}{os.sep}logs/", **eval_kwargs)
+    callbacks = CallbackList([eval_callback])
 
     if args.render_training:
         train_callback = RenderCallback()
