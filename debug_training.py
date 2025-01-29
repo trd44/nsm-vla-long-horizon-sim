@@ -186,5 +186,5 @@ if __name__ == '__main__':
         train_callback = RenderCallback()
         callbacks = CallbackList([train_callback, eval_callback])
 
-    model.learn(total_timesteps=args.total_timesteps, callback=callbacks)
+    model.learn(total_timesteps=args.total_timesteps, callback=callbacks, reset_num_timesteps=False)
     model.save(f"{save_path}{os.sep}model")
