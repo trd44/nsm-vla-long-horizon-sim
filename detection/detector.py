@@ -21,7 +21,10 @@ class Detector:
         return self.obs
     
     def set_env(self, env):
-        self.env = env
+        if hasattr(env, 'unwrapped'): # make sure that the environment is unwrapped
+            self.env = env.unwrapped
+        else:
+            self.env = env
 
     def update_obs(self, obs=None):
         """update the observation
