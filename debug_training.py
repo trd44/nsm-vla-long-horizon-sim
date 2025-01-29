@@ -109,10 +109,7 @@ if __name__ == '__main__':
             print(f"{arg}: {val}")
             save_path += f"_{arg}_{val}"
         if arg == 'net_arch': # special case for net_arch
-            if algo == 'PPO':
-                model_kwargs['policy_kwargs'] = {'net_arch': {'pi': val, 'vi': val}}
-            else:
-                model_kwargs['policy_kwargs'] = {'net_arch': val}
+            model_kwargs['policy_kwargs'] = {'net_arch': val}
         if arg in config['learning'][algo]:
             model_kwargs[arg] = val
         elif arg in config['learning']['eval']:
