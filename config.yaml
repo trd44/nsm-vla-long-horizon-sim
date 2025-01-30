@@ -33,7 +33,7 @@ eval_simulation:
 # parameters for RL
 learning:
   PPO:
-    batch_size: 128 # default 64. The n_steps taken per VectorEnv will be divided into `batch_size` minibatches for training the policy
+    batch_size: 64 # default 64. The n_steps taken per VectorEnv will be divided into `batch_size` minibatches for training the policy
     gamma: 0.99 # default
     learning_rate: 0.0003 # default
     verbose: 1
