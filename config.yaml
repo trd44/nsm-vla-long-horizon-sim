@@ -33,15 +33,15 @@ eval_simulation:
 # parameters for RL
 learning:
   PPO:
-    batch_size: 128 # default. The n_steps taken per VectorEnv will be divided into `batch_size` minibatches for training the policy
+    batch_size: 128 # default 64. The n_steps taken per VectorEnv will be divided into `batch_size` minibatches for training the policy
     gamma: 0.99 # default
     learning_rate: 0.0003 # default
     verbose: 1
     n_steps: 2048 #default 2048, make sure this is smaller than or equal to `timesteps_per_iter` below. Otherwise this will take precedence. The agent takes `n_steps` steps in the environment per VectorEnv before updating the policy.
     policy_kwargs:
       net_arch:
-        pi: [128, 128] # default [64, 64]
-        vf: [128, 128] # default [64, 64]
+        pi: [64, 64] # default [64, 64]
+        vf: [64, 64] # default [64, 64]
     seed: 0 # 0 by default unless overwriten by command line argument
   DDPG:
     batch_size: 100 # default
@@ -51,7 +51,7 @@ learning:
     learning_starts: 100 # default
     verbose: 1
     policy_kwargs:
-      net_arch: [512, 512, 256] # default [400, 300]
+      net_arch: [400, 300] # default [400, 300]
     tau: 0.005 # default
     action_noise: "OrnsteinUhlenbeckActionNoise" # default
     action_noise_kwargs:
@@ -68,7 +68,7 @@ learning:
     learning_starts: 10000 # default 10000
     verbose: 1
     policy_kwargs:
-      net_arch: [512, 512, 256] # [256, 256]
+      net_arch: [256, 256] # [256, 256]
     tau: 0.005 # default
     seed: 0 # 0 by default unless overwriten by command line argument
   eval:
