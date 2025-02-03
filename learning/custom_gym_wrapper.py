@@ -228,13 +228,13 @@ class OperatorWrapper(gym.Wrapper):
         Returns:
             float: the reward between [-1, + number of effects - 1]
         """
-        
-        # there is a step cost of -1 regardless
-        step_cost = -1
+
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
-
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
+        num_subgoals = len(effects) -1 if duplicate_grasp_effects else len(effects)
+        # there is a step cost of -1 regardless
+        step_cost = -num_subgoals
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
@@ -254,10 +254,13 @@ class OperatorWrapper(gym.Wrapper):
             else:
                 self.last_subgoal_successes[effect.pddl_repr()] = False
                 llm_reward_shaping_fn = self.subgoal_reward_shaping_fn_mapping.get(effect.pddl_repr())
-                try: # the llm reward shaping function may not be error-free. In that case, print error
-                    sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})")
-                except Exception as e:
-                    print(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
+                if llm_reward_shaping_fn is None:
+                    print(f"LLM reward shaping function for the effect {effect.pddl_repr()} not set")
+                else:
+                    try: # the llm reward shaping function may not be error-free. In that case, print error
+                        sub_goal_reward += llm_reward_shaping_fn(numeric_obs_with_semantics, f"({effect.pddl_repr()})") * 0.99 # the reward shaping function should return a progress in the range of [0, 1]. However, we want to clip it so that the max progress is 0.99 without actually satisfying the subgoal. This is to avoid the robot getting the full reward before actually satisfying the subgoal. This ensures that the total reward returned by this function is negative without satisfying all the subgoals.
+                    except Exception as e:
+                        raise(f"Error in the LLM reward shaping function for the effect {effect.pddl_repr()}: {e}")
                 break # return the reward as soon as one effect is not satisfied. Assume later effects are at 0% progress therefore would get a shaping reward of 0 anyway.
         
         return step_cost + sub_goal_reward
@@ -341,12 +344,12 @@ class LLMAblatedOperatorWrapper(OperatorWrapper):
             float: the reward between [-1, number of effects - 1]
         """
         
-        # there is a step cost of -1 regardless
-        step_cost = -1
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
-
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
+        num_subgoals = len(effects) -1 if duplicate_grasp_effects else len(effects)
+        # there is a step cost of -1 regardless
+        step_cost = -num_subgoals
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
@@ -444,12 +447,12 @@ class CollisionLLMAblatedOperatorWrapper(CollisionAblatedOperatorWrapper):
             float: the reward between [-1, number of effects - 1]
         """
         
-        # there is a step cost of -1 regardless
-        step_cost = -1
         effects:List[fs.SingleEffect] = self.grounded_operator.effects # the effects have been ordered by the LLM
         # check if `not (free gripper1)` and `exclusively-occupying-gripper ?object gripper1` are both in the effects. If so, they should count as one effect
-
         duplicate_grasp_effects = self.check_duplicate_grasp_effects()
+        num_subgoals = len(effects) -1 if duplicate_grasp_effects else len(effects)
+        # there is a step cost of -1 regardless
+        step_cost = -num_subgoals
          
         sub_goal_reward = 0
         num_subgoals_achieved = 0
