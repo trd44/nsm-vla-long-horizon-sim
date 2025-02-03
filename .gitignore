@@ -8,8 +8,8 @@ Planning/HDDL/lilotane/
 .DS_Store
 __pycache__/
 .vscode/
-config.yaml
 **/eval_logs/
 **/tensorboard_logs/
 **/monitor_logs.csv
+docs/
 MUJOCO_LOG.TXT
