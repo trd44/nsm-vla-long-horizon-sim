@@ -88,7 +88,7 @@ if __name__ == '__main__':
         if type(val) == list:
             parser.add_argument(f'--{arg}', type=json.loads, default=val)
     parser.add_argument('--total_timesteps', type=int, default=config['learning']['learn_subgoal']['total_timesteps'])
-    parser.add_argument('--ep_len', type=int, default=200)
+    parser.add_argument('--ep_len', type=int, default=100)
     parser.add_argument('--render_training', type=bool, default=False)
     parser.add_argument('--domain', type=str, default='cleanup')
     parser.add_argument('--net_arch', type=json.loads, default=config['learning'][algo]['policy_kwargs']['net_arch'])

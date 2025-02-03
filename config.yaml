@@ -72,7 +72,7 @@ learning:
     tau: 0.005 # default
     seed: 0 # 0 by default unless overwriten by command line argument
   eval:
-    eval_freq: 10000
+    eval_freq: 1000
     n_eval_episodes: 5
     deterministic: True
     render: False # if True, make sure `render_mode` below is set to "human" and `eval_simulation` above is set up with `has_renderer` as True
