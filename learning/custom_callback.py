@@ -28,9 +28,10 @@ class RenderCallback(EventCallback):
         return True
 
 class CustomEvalCallback(EvalCallback):
-    def __init__(self, eval_env, logger, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
+    def __init__(self, eval_env, logger, best_model_save_path, log_path, recent_model_save_path=None, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super().__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
         self.eval_env.render_mode = render_mode
+        self.recent_model_save_path = recent_model_save_path
         self.custom_logger = logger
         self._subgoal_successes_buffer: List[bool] = [] # stores the per episode subgoal successes
         self.evaluations_subgoal_successes: List[List[bool]] = [] # stores the subgoal successes for each round of evaluation i.e a few episodes per evaluation
@@ -174,7 +175,7 @@ class CustomEvalCallback(EvalCallback):
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
-            if success_rate > self.best_success_rate:
+            if success_rate >= self.best_success_rate:
                 if self.verbose > 0:
                     self.custom_logger.info("New best success rate!")
                 if mean_reward > self.best_mean_reward:
@@ -188,6 +189,8 @@ class CustomEvalCallback(EvalCallback):
                 self.best_success_rate = success_rate
                 self.best_mean_reward = mean_reward
             
+            if self.recent_model_save_path is not None:
+                self.model.save(os.path.join(self.recent_model_save_path, "recent_model"))
             # Save the results in a csv file located in the second to last directory of log_path
             # Split the log_path to get the second to last directory
             csv_path = os.path.split(self.log_path)[0]

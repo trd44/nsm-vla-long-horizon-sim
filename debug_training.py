@@ -179,7 +179,7 @@ if __name__ == '__main__':
     logger.addHandler(file_handler)
 
    
-    eval_callback = CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=f"{save_path}{os.sep}best_model/", log_path=f"{save_path}{os.sep}logs/", **eval_kwargs)
+    eval_callback = CustomEvalCallback(eval_env=eval_env, logger=logger, best_model_save_path=save_path, log_path=f"{save_path}{os.sep}logs/", recent_model_save_path=save_path, **eval_kwargs)
     callbacks = CallbackList([eval_callback])
 
     if args.render_training:
