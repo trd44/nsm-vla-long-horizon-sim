@@ -72,7 +72,7 @@ learning:
     tau: 0.005 # default
     seed: 0 # 0 by default unless overwriten by command line argument
   eval:
-    eval_freq: 1000
+    eval_freq: 10000
     n_eval_episodes: 5
     deterministic: True
     render: False # if True, make sure `render_mode` below is set to "human" and `eval_simulation` above is set up with `has_renderer` as True
@@ -81,7 +81,7 @@ learning:
   learn_operator:
     total_timesteps: 5000000
   learn_subgoal:
-    total_timesteps: 2500000
+    total_timesteps: 1000000
     timesteps_per_iter: 50000
   reward_shaping_fn:
     num_candidates: 3
