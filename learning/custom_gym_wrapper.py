@@ -301,7 +301,8 @@ class OperatorWrapper(gym.Wrapper):
         return penalties, collision_points
     
     def close(self):
-        self.csv_file.close()
+        if self.csv_file:
+            self.csv_file.close()
         return super().close()
     
     def _discretize_gripper_action(self, action:np.array) -> np.array:

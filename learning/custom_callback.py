@@ -174,15 +174,19 @@ class CustomEvalCallback(EvalCallback):
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
-            if mean_reward > self.best_mean_reward:
+            if success_rate > self.best_success_rate:
                 if self.verbose > 0:
-                    self.custom_logger.info("New best mean reward!")
-                if self.best_model_save_path is not None:
-                    self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    self.custom_logger.info("New best success rate!")
+                if mean_reward > self.best_mean_reward:
+                    if self.verbose > 0:
+                        self.custom_logger.info("New best mean reward!")
+                    if self.best_model_save_path is not None:
+                        self.model.save(os.path.join(self.best_model_save_path, "best_model"))
+                    # Trigger callback on new best model, if needed
+                    if self.callback_on_new_best is not None:
+                        continue_training = self.callback_on_new_best.on_step()
+                self.best_success_rate = success_rate
                 self.best_mean_reward = mean_reward
-                # Trigger callback on new best model, if needed
-                if self.callback_on_new_best is not None:
-                    continue_training = self.callback_on_new_best.on_step()
             
             # Save the results in a csv file located in the second to last directory of log_path
             # Split the log_path to get the second to last directory

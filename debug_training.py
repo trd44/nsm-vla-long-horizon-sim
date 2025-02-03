@@ -40,18 +40,16 @@ class MinimalWrapper(gym.Wrapper):
             obs, reward, done, info = self.env.step(action)
         
         obs_from_detector = self.detector.get_obs()
-        obs_from_unwrapped = self.env.unwrapped._get_observations()
         binary_obs = self.detector.detect_binary_states(self.env)
-        dist = np.linalg.norm(obs_from_unwrapped['gripper1_pos'] - obs_from_detector['mug1_pos'])
-        dist2 = np.linalg.norm(obs_from_detector['gripper1_pos'] - obs_from_detector['mug1_pos'])
-        normalized = dist / np.linalg.norm(obs_from_unwrapped['gripper1_to_obj_max_possible_dist'])
+        dist = np.linalg.norm(obs_from_detector['gripper1_pos'] - obs_from_detector['mug1_pos'])
+        normalized_progress = 1 - np.clip(dist / 1.0, 0, 1) # assume a normalization factor of 1.0
         grasp = binary_obs['exclusively-occupying-gripper mug1 gripper1']
         if grasp:
             reward = 1
         else:
-            reward = 1 - normalized
+            reward = normalized_progress * 0.99 # without fully grasping the mug, the reward is capped at 0.99
         done = done or grasp
-        step_cost = - 1
+        step_cost = - 4
         return obs, reward + step_cost, done, truncated, info
     
     
@@ -92,8 +90,10 @@ if __name__ == '__main__':
     parser.add_argument('--render_training', type=bool, default=False)
     parser.add_argument('--domain', type=str, default='cleanup')
     parser.add_argument('--net_arch', type=json.loads, default=config['learning'][algo]['policy_kwargs']['net_arch'])
-    parser.add_argument('--lr_schedule', type=bool, default=False)
-    parser.add_argument('--op_wrap', type=bool, default=True, help='whether to wrap the environment with the operator wrapper')
+    parser.add_argument('--lr_schedule', action='store_true')
+    parser.set_defaults(lr_schedule=False)  # Default value
+    parser.add_argument('--op_wrap', action='store_true', help='Enable operator wrapper')
+    parser.set_defaults(op_wrap=False)  # Default value
     parser.add_argument('--rw_shaping', type=int, default=0, help='the reward shaping function candidate to use. Usually from 0 - 2.')
     args = parser.parse_args()
 
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     np.random.seed(model_kwargs['seed'])
     robosuite_env = load_env(domain, config['simulation'])
     visual_env = VisualizationWrapper(robosuite_env, indicator_configs=None)
-    gym_env = GymWrapper(robosuite_env)
+    gym_env = GymWrapper(robosuite_env, keys=['gripper1_pos', 'mug1_pos'])
     time_limit_env = TimeLimit(gym_env, max_episode_steps=args.ep_len)
 
     if args.op_wrap:
@@ -146,7 +146,7 @@ if __name__ == '__main__':
     env = Monitor(wrapped_env, filename=f'{save_path}{os.sep}approach_monitor', allow_early_resets=True)
 
     eval_robosuite_env = load_env(domain, config['simulation'])
-    eval_gym_env = GymWrapper(eval_robosuite_env)
+    eval_gym_env = GymWrapper(eval_robosuite_env, keys=['gripper1_pos', 'mug1_pos'])
     eval_time_limit_env = TimeLimit(eval_gym_env, max_episode_steps=args.ep_len)
     if args.op_wrap:
         eval_wrapped_env = CollisionAblatedOperatorWrapper(eval_time_limit_env, grounded_operator=grounded_op, executed_operators={}, config=config, domain=domain, rl_algo=algo, curr_subgoal=curr_subgoal)

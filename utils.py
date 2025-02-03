@@ -76,7 +76,7 @@ def load_env(domain:Union[str, MujocoEnv], config:dict) -> MujocoEnv:
                 gym_env = suite.make(
                     env_name = env_name,
                     **config,
-                    controller_configs = load_controller_config(default_controller="OSC_POSE"),
+                    controller_configs = load_controller_config(default_controller="OSC_POSITION"),
                 )
                 break
     
