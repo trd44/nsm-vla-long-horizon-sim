@@ -30,6 +30,7 @@ class RenderCallback(EventCallback):
 class CustomEvalCallback(EvalCallback):
     def __init__(self, eval_env, logger, best_model_save_path, log_path, recent_model_save_path=None, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super().__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
+        self.best_success_rate = 0
         self.eval_env.render_mode = render_mode
         self.recent_model_save_path = recent_model_save_path
         self.custom_logger = logger
