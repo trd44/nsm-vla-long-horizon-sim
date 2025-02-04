@@ -28,6 +28,9 @@ class MinimalWrapper(gym.Wrapper):
         self.config = config
         self.domain = domain
         self.detector = load_detector(config=config, domain=domain, env=env)
+        self.episode_r_shaping = 0
+        self.episode_collision_penalty = 0
+        self.episode_num_collisions = 0
     
     def reset(self, **kwargs):
         return self.env.reset(**kwargs)
@@ -48,7 +51,17 @@ class MinimalWrapper(gym.Wrapper):
             reward = 1
         else:
             reward = normalized_progress * 0.99 # without fully grasping the mug, the reward is capped at 0.99
+        self.episode_r_shaping += reward
         done = done or grasp
+        info['ep_cumu_r_shaping'] = self.episode_r_shaping
+        info['ep_cumu_col_penalty'] = self.episode_collision_penalty
+        info['ep_cumu_collisions'] = self.episode_num_collisions
+        
+        # save subgoal successes
+        info['subgoal_success'] = grasp
+        
+        # overall goal success is if all subgoals are achieved
+        info['goal_success'] = grasp
         step_cost = - 4
         return obs, reward + step_cost, done, truncated, info
     
@@ -66,7 +79,13 @@ class MinimalWrapper(gym.Wrapper):
             action[-1] = gripper_opening_max
         else: # do nothing
             action[-1] = 0
-        return action 
+        return action
+    
+    def reset(self, **kwargs):
+        self.episode_r_shaping = 0
+        self.episode_collision_penalty = 0
+        self.episode_num_collisions = 0
+        return self.env.reset(**kwargs)
 
 if __name__ == '__main__':
     config:dict = load_config("config.yaml")
