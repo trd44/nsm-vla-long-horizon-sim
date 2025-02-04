@@ -1,0 +1,261 @@
+2025-02-03 22:57:49,390 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-03 22:57:49,391 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-03 22:57:49,391 - learning - INFO - Mean episode reward shaping per episode: 80.90
+2025-02-03 22:57:49,391 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-03 22:57:49,391 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-03 22:57:49,391 - learning - INFO - Eval num_timesteps=10000, mean episode reward=-319.10 +/- 1.79
+2025-02-03 22:57:49,391 - learning - INFO - Min episode reward: -322.253594, Max episode reward: -317.258219
+2025-02-03 22:57:49,391 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-03 22:57:49,391 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-03 22:57:49,391 - learning - INFO - New best success rate!
+2025-02-03 22:57:49,391 - learning - INFO - New best mean reward!
+2025-02-03 23:14:41,781 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-03 23:14:41,782 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-03 23:14:41,782 - learning - INFO - Mean episode reward shaping per episode: 86.77
+2025-02-03 23:14:41,782 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-03 23:14:41,782 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-03 23:14:41,782 - learning - INFO - Eval num_timesteps=20000, mean episode reward=-313.23 +/- 2.21
+2025-02-03 23:14:41,782 - learning - INFO - Min episode reward: -315.42928, Max episode reward: -309.689296
+2025-02-03 23:14:41,782 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-03 23:14:41,782 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-03 23:14:41,784 - learning - INFO - New best success rate!
+2025-02-03 23:14:41,784 - learning - INFO - New best mean reward!
+2025-02-03 23:33:53,386 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-03 23:33:53,386 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-03 23:33:53,386 - learning - INFO - Mean episode reward shaping per episode: 90.41
+2025-02-03 23:33:53,386 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-03 23:33:53,386 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-03 23:33:53,386 - learning - INFO - Eval num_timesteps=30000, mean episode reward=-309.59 +/- 1.48
+2025-02-03 23:33:53,386 - learning - INFO - Min episode reward: -312.078171, Max episode reward: -307.512557
+2025-02-03 23:33:53,386 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-03 23:33:53,386 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-03 23:33:53,387 - learning - INFO - New best success rate!
+2025-02-03 23:33:53,387 - learning - INFO - New best mean reward!
+2025-02-03 23:54:52,260 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-03 23:54:52,260 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-03 23:54:52,260 - learning - INFO - Mean episode reward shaping per episode: 86.56
+2025-02-03 23:54:52,260 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-03 23:54:52,260 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-03 23:54:52,260 - learning - INFO - Eval num_timesteps=40000, mean episode reward=-313.44 +/- 0.75
+2025-02-03 23:54:52,260 - learning - INFO - Min episode reward: -314.293179, Max episode reward: -312.113784
+2025-02-03 23:54:52,260 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-03 23:54:52,260 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-03 23:54:52,261 - learning - INFO - New best success rate!
+2025-02-04 00:16:33,271 - learning - INFO - Mean Success rate per episode: 60.00%
+2025-02-04 00:16:33,272 - learning - INFO - Mean subgoals success rate per episode: 60.00%
+2025-02-04 00:16:33,272 - learning - INFO - Mean episode reward shaping per episode: 53.79
+2025-02-04 00:16:33,272 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 00:16:33,272 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 00:16:33,272 - learning - INFO - Eval num_timesteps=50000, mean episode reward=-181.41 +/- 102.26
+2025-02-04 00:16:33,272 - learning - INFO - Min episode reward: -306.659691, Max episode reward: -96.772359
+2025-02-04 00:16:33,272 - learning - INFO - Episode length: 58.80 +/- 33.64
+2025-02-04 00:16:33,272 - learning - INFO - Min episode length: 31, Max episode length: 100
+2025-02-04 00:16:33,272 - learning - INFO - New best success rate!
+2025-02-04 00:16:33,273 - learning - INFO - New best mean reward!
+2025-02-04 00:39:32,839 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 00:39:32,839 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 00:39:32,839 - learning - INFO - Mean episode reward shaping per episode: 26.49
+2025-02-04 00:39:32,839 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 00:39:32,840 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 00:39:32,840 - learning - INFO - Eval num_timesteps=60000, mean episode reward=-91.91 +/- 10.23
+2025-02-04 00:39:32,840 - learning - INFO - Min episode reward: -102.29949, Max episode reward: -74.252044
+2025-02-04 00:39:32,840 - learning - INFO - Episode length: 29.60 +/- 3.26
+2025-02-04 00:39:32,840 - learning - INFO - Min episode length: 24, Max episode length: 33
+2025-02-04 00:39:32,841 - learning - INFO - New best success rate!
+2025-02-04 00:39:32,841 - learning - INFO - New best mean reward!
+2025-02-04 01:00:55,832 - learning - INFO - Mean Success rate per episode: 60.00%
+2025-02-04 01:00:55,832 - learning - INFO - Mean subgoals success rate per episode: 60.00%
+2025-02-04 01:00:55,832 - learning - INFO - Mean episode reward shaping per episode: 54.96
+2025-02-04 01:00:55,832 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 01:00:55,832 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 01:00:55,832 - learning - INFO - Eval num_timesteps=70000, mean episode reward=-186.64 +/- 103.47
+2025-02-04 01:00:55,832 - learning - INFO - Min episode reward: -308.490482, Max episode reward: -71.661086
+2025-02-04 01:00:55,832 - learning - INFO - Episode length: 60.40 +/- 33.68
+2025-02-04 01:00:55,832 - learning - INFO - Min episode length: 23, Max episode length: 100
+2025-02-04 01:18:17,921 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-04 01:18:17,922 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-04 01:18:17,922 - learning - INFO - Mean episode reward shaping per episode: 88.23
+2025-02-04 01:18:17,922 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 01:18:17,922 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 01:18:17,923 - learning - INFO - Eval num_timesteps=80000, mean episode reward=-311.77 +/- 2.79
+2025-02-04 01:18:17,923 - learning - INFO - Min episode reward: -316.015011, Max episode reward: -308.624709
+2025-02-04 01:18:17,923 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-04 01:18:17,923 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-04 01:38:55,098 - learning - INFO - Mean Success rate per episode: 20.00%
+2025-02-04 01:38:55,098 - learning - INFO - Mean subgoals success rate per episode: 20.00%
+2025-02-04 01:38:55,098 - learning - INFO - Mean episode reward shaping per episode: 78.06
+2025-02-04 01:38:55,098 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 01:38:55,098 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 01:38:55,098 - learning - INFO - Eval num_timesteps=90000, mean episode reward=-264.34 +/- 88.20
+2025-02-04 01:38:55,098 - learning - INFO - Min episode reward: -309.791025, Max episode reward: -87.961762
+2025-02-04 01:38:55,098 - learning - INFO - Episode length: 85.60 +/- 28.80
+2025-02-04 01:38:55,098 - learning - INFO - Min episode length: 28, Max episode length: 100
+2025-02-04 02:00:31,341 - learning - INFO - Mean Success rate per episode: 40.00%
+2025-02-04 02:00:31,341 - learning - INFO - Mean subgoals success rate per episode: 40.00%
+2025-02-04 02:00:31,342 - learning - INFO - Mean episode reward shaping per episode: 62.88
+2025-02-04 02:00:31,342 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 02:00:31,342 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 02:00:31,342 - learning - INFO - Eval num_timesteps=100000, mean episode reward=-212.32 +/- 117.54
+2025-02-04 02:00:31,342 - learning - INFO - Min episode reward: -308.90787, Max episode reward: -65.223885
+2025-02-04 02:00:31,342 - learning - INFO - Episode length: 68.80 +/- 38.22
+2025-02-04 02:00:31,342 - learning - INFO - Min episode length: 21, Max episode length: 100
+2025-02-04 02:22:43,147 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-04 02:22:43,147 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-04 02:22:43,147 - learning - INFO - Mean episode reward shaping per episode: 91.37
+2025-02-04 02:22:43,147 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 02:22:43,147 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 02:22:43,147 - learning - INFO - Eval num_timesteps=110000, mean episode reward=-308.63 +/- 0.29
+2025-02-04 02:22:43,147 - learning - INFO - Min episode reward: -308.999948, Max episode reward: -308.156518
+2025-02-04 02:22:43,147 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-04 02:22:43,147 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-04 02:46:05,849 - learning - INFO - Mean Success rate per episode: 0.00%
+2025-02-04 02:46:05,849 - learning - INFO - Mean subgoals success rate per episode: 0.00%
+2025-02-04 02:46:05,849 - learning - INFO - Mean episode reward shaping per episode: 91.58
+2025-02-04 02:46:05,849 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 02:46:05,849 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 02:46:05,850 - learning - INFO - Eval num_timesteps=120000, mean episode reward=-308.42 +/- 0.76
+2025-02-04 02:46:05,850 - learning - INFO - Min episode reward: -309.660504, Max episode reward: -307.478997
+2025-02-04 02:46:05,850 - learning - INFO - Episode length: 100.00 +/- 0.00
+2025-02-04 02:46:05,850 - learning - INFO - Min episode length: 100, Max episode length: 100
+2025-02-04 03:08:32,923 - learning - INFO - Mean Success rate per episode: 20.00%
+2025-02-04 03:08:32,924 - learning - INFO - Mean subgoals success rate per episode: 20.00%
+2025-02-04 03:08:32,924 - learning - INFO - Mean episode reward shaping per episode: 75.56
+2025-02-04 03:08:32,924 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 03:08:32,924 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 03:08:32,924 - learning - INFO - Eval num_timesteps=130000, mean episode reward=-255.64 +/- 105.79
+2025-02-04 03:08:32,924 - learning - INFO - Min episode reward: -309.709875, Max episode reward: -44.071639
+2025-02-04 03:08:32,924 - learning - INFO - Episode length: 82.80 +/- 34.40
+2025-02-04 03:08:32,925 - learning - INFO - Min episode length: 14, Max episode length: 100
+2025-02-04 03:30:32,552 - learning - INFO - Mean Success rate per episode: 40.00%
+2025-02-04 03:30:32,552 - learning - INFO - Mean subgoals success rate per episode: 40.00%
+2025-02-04 03:30:32,552 - learning - INFO - Mean episode reward shaping per episode: 59.80
+2025-02-04 03:30:32,552 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 03:30:32,552 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 03:30:32,553 - learning - INFO - Eval num_timesteps=140000, mean episode reward=-205.80 +/- 126.79
+2025-02-04 03:30:32,553 - learning - INFO - Min episode reward: -309.909421, Max episode reward: -44.014194
+2025-02-04 03:30:32,553 - learning - INFO - Episode length: 66.40 +/- 41.17
+2025-02-04 03:30:32,553 - learning - INFO - Min episode length: 14, Max episode length: 100
+2025-02-04 03:51:04,185 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 03:51:04,185 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 03:51:04,185 - learning - INFO - Mean episode reward shaping per episode: 16.95
+2025-02-04 03:51:04,185 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 03:51:04,185 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 03:51:04,185 - learning - INFO - Eval num_timesteps=150000, mean episode reward=-64.65 +/- 8.13
+2025-02-04 03:51:04,185 - learning - INFO - Min episode reward: -76.738611, Max episode reward: -53.304246
+2025-02-04 03:51:04,185 - learning - INFO - Episode length: 20.40 +/- 2.42
+2025-02-04 03:51:04,185 - learning - INFO - Min episode length: 17, Max episode length: 24
+2025-02-04 03:51:04,186 - learning - INFO - New best success rate!
+2025-02-04 03:51:04,186 - learning - INFO - New best mean reward!
+2025-02-04 04:11:36,021 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 04:11:36,021 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 04:11:36,021 - learning - INFO - Mean episode reward shaping per episode: 15.79
+2025-02-04 04:11:36,021 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 04:11:36,021 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 04:11:36,022 - learning - INFO - Eval num_timesteps=160000, mean episode reward=-58.61 +/- 6.22
+2025-02-04 04:11:36,022 - learning - INFO - Min episode reward: -70.316279, Max episode reward: -53.423878
+2025-02-04 04:11:36,022 - learning - INFO - Episode length: 18.60 +/- 1.85
+2025-02-04 04:11:36,022 - learning - INFO - Min episode length: 17, Max episode length: 22
+2025-02-04 04:11:36,023 - learning - INFO - New best success rate!
+2025-02-04 04:11:36,023 - learning - INFO - New best mean reward!
+2025-02-04 04:32:11,466 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 04:32:11,466 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 04:32:11,466 - learning - INFO - Mean episode reward shaping per episode: 17.93
+2025-02-04 04:32:11,466 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 04:32:11,466 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 04:32:11,466 - learning - INFO - Eval num_timesteps=170000, mean episode reward=-65.27 +/- 6.88
+2025-02-04 04:32:11,466 - learning - INFO - Min episode reward: -72.982702, Max episode reward: -55.43368
+2025-02-04 04:32:11,467 - learning - INFO - Episode length: 20.80 +/- 1.94
+2025-02-04 04:32:11,467 - learning - INFO - Min episode length: 18, Max episode length: 23
+2025-02-04 04:32:11,468 - learning - INFO - New best success rate!
+2025-02-04 04:52:58,602 - learning - INFO - Mean Success rate per episode: 20.00%
+2025-02-04 04:52:58,602 - learning - INFO - Mean subgoals success rate per episode: 20.00%
+2025-02-04 04:52:58,603 - learning - INFO - Mean episode reward shaping per episode: 75.69
+2025-02-04 04:52:58,603 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 04:52:58,603 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 04:52:58,603 - learning - INFO - Eval num_timesteps=180000, mean episode reward=-260.31 +/- 98.44
+2025-02-04 04:52:58,603 - learning - INFO - Min episode reward: -310.365974, Max episode reward: -63.431511
+2025-02-04 04:52:58,603 - learning - INFO - Episode length: 84.00 +/- 32.00
+2025-02-04 04:52:58,603 - learning - INFO - Min episode length: 20, Max episode length: 100
+2025-02-04 05:14:16,870 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 05:14:16,871 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 05:14:16,871 - learning - INFO - Mean episode reward shaping per episode: 18.63
+2025-02-04 05:14:16,871 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 05:14:16,871 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 05:14:16,871 - learning - INFO - Eval num_timesteps=190000, mean episode reward=-70.97 +/- 9.80
+2025-02-04 05:14:16,871 - learning - INFO - Min episode reward: -79.9728, Max episode reward: -53.170779
+2025-02-04 05:14:16,871 - learning - INFO - Episode length: 22.40 +/- 2.94
+2025-02-04 05:14:16,872 - learning - INFO - Min episode length: 17, Max episode length: 25
+2025-02-04 05:14:16,873 - learning - INFO - New best success rate!
+2025-02-04 05:35:02,529 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 05:35:02,531 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 05:35:02,531 - learning - INFO - Mean episode reward shaping per episode: 21.26
+2025-02-04 05:35:02,531 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 05:35:02,532 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 05:35:02,532 - learning - INFO - Eval num_timesteps=200000, mean episode reward=-76.34 +/- 5.79
+2025-02-04 05:35:02,532 - learning - INFO - Min episode reward: -86.070619, Max episode reward: -71.442628
+2025-02-04 05:35:02,532 - learning - INFO - Episode length: 24.40 +/- 1.74
+2025-02-04 05:35:02,532 - learning - INFO - Min episode length: 23, Max episode length: 27
+2025-02-04 05:35:02,533 - learning - INFO - New best success rate!
+2025-02-04 05:55:59,386 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 05:55:59,386 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 05:55:59,386 - learning - INFO - Mean episode reward shaping per episode: 19.99
+2025-02-04 05:55:59,386 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 05:55:59,386 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 05:55:59,386 - learning - INFO - Eval num_timesteps=210000, mean episode reward=-72.81 +/- 4.80
+2025-02-04 05:55:59,386 - learning - INFO - Min episode reward: -81.911318, Max episode reward: -68.199974
+2025-02-04 05:55:59,386 - learning - INFO - Episode length: 23.20 +/- 1.47
+2025-02-04 05:55:59,386 - learning - INFO - Min episode length: 22, Max episode length: 26
+2025-02-04 05:55:59,387 - learning - INFO - New best success rate!
+2025-02-04 05:55:59,387 - learning - INFO - New best mean reward!
+2025-02-04 06:16:05,085 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 06:16:05,085 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 06:16:05,085 - learning - INFO - Mean episode reward shaping per episode: 13.26
+2025-02-04 06:16:05,085 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 06:16:05,085 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 06:16:05,085 - learning - INFO - Eval num_timesteps=220000, mean episode reward=-46.74 +/- 5.14
+2025-02-04 06:16:05,085 - learning - INFO - Min episode reward: -56.023617, Max episode reward: -40.69753
+2025-02-04 06:16:05,085 - learning - INFO - Episode length: 15.00 +/- 1.67
+2025-02-04 06:16:05,085 - learning - INFO - Min episode length: 13, Max episode length: 18
+2025-02-04 06:16:05,085 - learning - INFO - New best success rate!
+2025-02-04 06:16:05,086 - learning - INFO - New best mean reward!
+2025-02-04 06:36:14,902 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 06:36:14,902 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 06:36:14,903 - learning - INFO - Mean episode reward shaping per episode: 20.69
+2025-02-04 06:36:14,903 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 06:36:14,903 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 06:36:14,903 - learning - INFO - Eval num_timesteps=230000, mean episode reward=-74.51 +/- 12.59
+2025-02-04 06:36:14,903 - learning - INFO - Min episode reward: -92.584322, Max episode reward: -53.023894
+2025-02-04 06:36:14,903 - learning - INFO - Episode length: 23.80 +/- 4.12
+2025-02-04 06:36:14,904 - learning - INFO - Min episode length: 17, Max episode length: 30
+2025-02-04 06:36:14,905 - learning - INFO - New best success rate!
+2025-02-04 06:56:32,250 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 06:56:32,250 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 06:56:32,250 - learning - INFO - Mean episode reward shaping per episode: 23.61
+2025-02-04 06:56:32,250 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 06:56:32,250 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 06:56:32,250 - learning - INFO - Eval num_timesteps=240000, mean episode reward=-85.99 +/- 8.93
+2025-02-04 06:56:32,250 - learning - INFO - Min episode reward: -102.103618, Max episode reward: -74.955994
+2025-02-04 06:56:32,250 - learning - INFO - Episode length: 27.40 +/- 3.01
+2025-02-04 06:56:32,250 - learning - INFO - Min episode length: 24, Max episode length: 33
+2025-02-04 06:56:32,251 - learning - INFO - New best success rate!
+2025-02-04 07:17:18,560 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 07:17:18,560 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 07:17:18,560 - learning - INFO - Mean episode reward shaping per episode: 17.74
+2025-02-04 07:17:18,560 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 07:17:18,560 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 07:17:18,560 - learning - INFO - Eval num_timesteps=250000, mean episode reward=-65.46 +/- 8.50
+2025-02-04 07:17:18,560 - learning - INFO - Min episode reward: -72.835786, Max episode reward: -49.571398
+2025-02-04 07:17:18,561 - learning - INFO - Episode length: 20.80 +/- 2.56
+2025-02-04 07:17:18,561 - learning - INFO - Min episode length: 16, Max episode length: 23
+2025-02-04 07:17:18,562 - learning - INFO - New best success rate!
+2025-02-04 07:17:18,562 - learning - INFO - New best mean reward!
+2025-02-04 07:37:45,923 - learning - INFO - Mean Success rate per episode: 100.00%
+2025-02-04 07:37:45,923 - learning - INFO - Mean subgoals success rate per episode: 100.00%
+2025-02-04 07:37:45,923 - learning - INFO - Mean episode reward shaping per episode: 20.06
+2025-02-04 07:37:45,923 - learning - INFO - Mean episode collision penalty per episode: 0.00
+2025-02-04 07:37:45,923 - learning - INFO - Mean episode number of collisions per episode: 0.00
+2025-02-04 07:37:45,923 - learning - INFO - Eval num_timesteps=260000, mean episode reward=-71.94 +/- 9.18
+2025-02-04 07:37:45,923 - learning - INFO - Min episode reward: -84.929075, Max episode reward: -58.822124
+2025-02-04 07:37:45,923 - learning - INFO - Episode length: 23.00 +/- 2.76
+2025-02-04 07:37:45,923 - learning - INFO - Min episode length: 19, Max episode length: 27
+2025-02-04 07:37:45,924 - learning - INFO - New best success rate!
