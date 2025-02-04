@@ -30,7 +30,7 @@ class RenderCallback(EventCallback):
 class CustomEvalCallback(EvalCallback):
     def __init__(self, eval_env, logger, best_model_save_path, log_path, recent_model_save_path=None, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, render_mode='human', verbose=1):
         super().__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
-        self.best_success_rate = 0
+        self.best_subgoal_success_rate = 0
         self.eval_env.render_mode = render_mode
         self.recent_model_save_path = recent_model_save_path
         self.custom_logger = logger
@@ -176,7 +176,7 @@ class CustomEvalCallback(EvalCallback):
             self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
             self.logger.dump(self.num_timesteps)
 
-            if success_rate >= self.best_success_rate:
+            if subgoal_success_rate >= self.best_subgoal_success_rate:
                 if self.verbose > 0:
                     self.custom_logger.info("New best success rate!")
                 if mean_reward > self.best_mean_reward:
@@ -187,7 +187,7 @@ class CustomEvalCallback(EvalCallback):
                     # Trigger callback on new best model, if needed
                     if self.callback_on_new_best is not None:
                         continue_training = self.callback_on_new_best.on_step()
-                self.best_success_rate = success_rate
+                self.best_subgoal_success_rate = subgoal_success_rate
                 self.best_mean_reward = mean_reward
             
             if self.recent_model_save_path is not None:
