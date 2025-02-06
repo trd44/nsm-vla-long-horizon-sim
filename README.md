@@ -12,11 +12,16 @@ Clone RoboSuite in /OpLearn directory
 git clone https://github.com/ARISE-Initiative/robosuite.git
 ```
 
-Install tarski in /OpLearn directory
+Clone tarski in /OpLearn directory. This is a symbolic planning parsing library.
 ```bash
 git clone https://github.com/ARISE-Initiative/tarski.git
 ```
-
+Install required libraries
+```bash
+python3.8 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 
