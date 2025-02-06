@@ -1,8 +1,8 @@
-Metaworld/
-mimicgen/
-robosuite/
-robomimic/
-tarski/
+/Metaworld/
+/mimicgen/
+/robosuite/
+/robomimic/
+/tarski/
 Planning/HDDL/lilotane/
 .venv/
 .DS_Store
