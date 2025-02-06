@@ -1,3 +1,5 @@
+###Prompts for the Hybrid LLM Symbolic Planner###
+
 propose_operator_prompt = """You are a robot arm with a gripper that can manipulate tabletop objects. You are capable of understanding the Planning Domain Definition Language (PDDL). Given the current state, a set of objects deemed relevant to the task at hand, novel object(s) of interest, a set of existing operators, and a goal state, propose 1 non-existing operator involving the novel object(s) that is EXECUTABLE in the current state (not in the future) that would help make progress towards the goal. Output `no operator` if no new operator should be proposed. Otherwise, output the proposed operator and the ground parameter objects by imitating the style of the existing operators in the following format. Avoid quantifiers and conditional effects:
 ```
 (:action proposed_non_existing_operator_name

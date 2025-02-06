@@ -19,10 +19,15 @@ from tarski.evaluators.simple import evaluate
 from tarski.model import Model
 from tarski.syntax.builtins import BuiltinPredicateSymbol
 from VLM.LlmApi import *
-from VLM.TreeOfThoughtsPrompts import *
+from planning.TreeOfThoughtsPrompts import *
 from utils import *
 
+class LLMPlanner:
+    """First iteration of a purely LLM planner"""
+    #TODO: implement the LLM planner
+
 class SymbolicPlanner:
+    """A purely symbolic BFS planner"""
     def __init__(self, config:dict):
         self.config = config
         self.reader = FstripsReader(raise_on_error=True)
@@ -86,6 +91,7 @@ class SymbolicPlanner:
         return None
 
 class HybridSymbolicLLMPlanner(SymbolicPlanner):
+    """A hybrid symbolic planner that uses LLM to invent new operators"""
     def __init__(self, config:dict):
         super().__init__(config)
         self.max_new_operators_branching_factor = self.config['max_new_operators_branching_factor']

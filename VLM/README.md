@@ -1,1 +1,1 @@
-This directory contains the VLM services
+This directory contains the OpenAI API setup. Before calling the OpenAI API, make sure you have your OPENAI_API_KEY set up in your environment. 

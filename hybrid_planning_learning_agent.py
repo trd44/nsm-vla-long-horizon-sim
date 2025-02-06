@@ -6,9 +6,9 @@ import os
 import dill
 import importlib
 import learning.learner
-import planning.hybrid_symbolic_llm_planner
+import planning.planners
 import planning.planning_utils
-from planning.hybrid_symbolic_llm_planner import HybridSymbolicLLMPlanner, SymbolicPlanner
+from planning.planners import HybridSymbolicLLMPlanner, SymbolicPlanner
 from utils import *
 from tarski import fstrips as fs
 from execution.executor import Executor
