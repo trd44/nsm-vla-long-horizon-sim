@@ -7,7 +7,7 @@ Planning/HDDL/lilotane/
 .venv/
 .DS_Store
 __pycache__/
-.vscode/
+/.vscode/
 **/eval_logs/
 **/tensorboard_logs/
 **/monitor_logs.csv
