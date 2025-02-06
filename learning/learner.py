@@ -22,7 +22,7 @@ from learning.reward_functions.rewardFunctionPrompts import *
 from learning.custom_callback import CustomEvalCallback
 from learning.custom_gym_wrapper import *
 from utils import *
-from VLM.LlmApi import chat_completion
+from VLM.openai_api import chat_completion
 
 
 class BaseLearner:

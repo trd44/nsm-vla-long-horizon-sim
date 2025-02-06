@@ -18,7 +18,7 @@ from tarski import fstrips as fs
 from tarski.evaluators.simple import evaluate
 from tarski.model import Model
 from tarski.syntax.builtins import BuiltinPredicateSymbol
-from VLM.LlmApi import *
+from VLM.openai_api import *
 from planning.TreeOfThoughtsPrompts import *
 from utils import *
 

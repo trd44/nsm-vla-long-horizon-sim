@@ -15,7 +15,7 @@ from stable_baselines3.common.noise import OrnsteinUhlenbeckActionNoise
 from typing import *
 from learning.reward_functions.rewardFunctionPrompts import *
 from utils import *
-from VLM.LlmApi import chat_completion
+from VLM.openai_api import chat_completion
 
 class OperatorWrapper(gym.Wrapper):
     def __init__(self, env:MujocoEnv, grounded_operator:fs.Action, executed_operators:Dict[fs.Action, execution.executor.Executor], config:dict, domain:str, rl_algo:str, curr_subgoal:fs.SingleEffect, record_rollouts:bool=False):
