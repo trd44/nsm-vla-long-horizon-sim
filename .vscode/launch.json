@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "OPENAI_API_KEY": "",
+                "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/robosuite:${workspaceFolder}/robosuite/robosuite:${workspaceFolder}/tarski:${workspaceFolder}/tarski/src"
+            },
+            "args": [
+                //"--domain", "cleanup",
+                // "--rl_algorithm", "SAC",
+                // "--lr_schedule", "true",
+                // "--net_arch", "[128, 128]",
+                // "--op_wrap", 
+                // "--rw_shaping", "0",
+                //"--render", "true", // render the env during evaluation
+                //"--render_training", "true", // render the env during training
+                //"--ep_len", "200",
+                //"--learning_starts", "200",
+                // "--eval_freq", "1000"
+            ]
+        }
+    ]
+       
+}
