@@ -9,13 +9,14 @@ git clone https://github.com/helenlu66/mimicgen
 
 Clone RoboSuite in /OpLearn directory
 ```bash
-git clone https://github.com/ARISE-Initiative/robosuite.git
+git clone https://github.com/helenlu66/robosuite.git
 ```
 
 Clone tarski in /OpLearn directory. This is a symbolic planning parsing library.
 ```bash
-git clone https://github.com/ARISE-Initiative/tarski.git
+git clone https://github.com/helenlu66/tarski.git
 ```
+
 Install required libraries
 ```bash
 python3.8 -m venv .venv

@@ -43,7 +43,6 @@ def chat_completion(prompt:str, base64_image:bytes=None) -> str:
             
         )
     else:
-        # gpt-o1 does not support setting the temperature parameter
         completion = client.chat.completions.create(
             model=config['llm_agent']['model'],
             messages=[
