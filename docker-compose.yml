@@ -1,10 +1,10 @@
 version: '3.7'
 services:
-  oplearn:
+  cyclic_lxm:
     build:
       context: .
     volumes:
-      - .:/home/user/oplearn
+      - .:/cyclic_lxm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth
       - /etc/timezone:/etc/timezone:ro

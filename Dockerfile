@@ -61,11 +61,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Switch to non-root user
-WORKDIR /home/user/oplearn
+WORKDIR /cyclic_lxm
 COPY . .
 RUN pip install --upgrade pip
 RUN pip install -e mimicgen
-RUN pip install -e robosuite
-RUN pip install -e tarski
-RUN pip install -r requirements.txt
+# RUN pip install -e robosuite
+# RUN pip install -e tarski
+# RUN pip install -r requirements.txt
 
