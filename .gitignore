@@ -18,3 +18,11 @@ __pycache__/
 **/monitor_logs.csv
 docs/
 MUJOCO_LOG.TXT
+data/
+object_detection/
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+*.cover
