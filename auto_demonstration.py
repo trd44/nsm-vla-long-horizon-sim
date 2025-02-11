@@ -126,10 +126,16 @@ class RecordDemos(gym.Wrapper):
         """
         for step in self.action_steps:
             if step in self.episode_buffer.keys():
-                if step not in self.data_buffer.keys():
-                    self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
+                if self.args.vla:
+                    if step not in self.data_buffer.keys():
+                        self.data_buffer[step] = [self.episode_buffer[step]]
+                    else:
+                        self.data_buffer[step].append(self.episode_buffer[step])
                 else:
-                    self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
+                    if step not in self.data_buffer.keys():
+                        self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
+                    else:
+                        self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
         self.zip_buffer(self.data_buffer, self.args.traces)
         obs = self.reset()
         return obs
@@ -148,18 +154,29 @@ class RecordDemos(gym.Wrapper):
                     file.write(data_bytes)
 
     def record_step(self, obs, action, next_obs, state_memory, new_state, sym_action="MOVE", action_step="main", reward=-1.0, done=False, info=None, goal=None):
-        keypoint = self.relative_obs_mapping(goal)
-
-        transition = (obs, action, next_obs, keypoint, reward, done)
-
-        if action_step not in self.action_steps:
-            self.action_steps.append(action_step)
-        if action_step not in self.episode_buffer.keys():
-            self.episode_buffer[action_step] = [transition]
+        """
+        Records the step
+        """
+        if self.args.vla:
+            action_step = self.task
+            if action_step not in self.action_steps:
+                self.action_steps.append(action_step)
+            if action_step not in self.episode_buffer.keys():
+                self.episode_buffer[action_step] = [obs, action, next_obs]
+            else:
+                self.episode_buffer[action_step] += [action, next_obs]
+            return state_memory
         else:
-            self.episode_buffer[action_step].append(transition)
-        self.task_buffer.append(self.task)
-        return state_memory
+            keypoint = self.relative_obs_mapping(goal)
+            transition = (obs, action, next_obs, keypoint, reward, done)
+            if action_step not in self.action_steps:
+                self.action_steps.append(action_step)
+            if action_step not in self.episode_buffer.keys():
+                self.episode_buffer[action_step] = [transition]
+            else:
+                self.episode_buffer[action_step].append(transition)
+            self.task_buffer.append(self.task)
+            return state_memory
 
     def cap(self, eps, max_val=0.12, min_val=0.01):
         """
@@ -651,6 +668,7 @@ if __name__ == "__main__":
     parser.add_argument('--render', action='store_true', help='Render the recording')
     parser.add_argument('--vision', action='store_true', help='Use vision based observation')
     parser.add_argument('--relative_obs', action='store_true', help='Use relative gripper-goal observation')
+    parser.add_argument('--vla', action='store_true', help='Store the data in VLA friendly format')
 
     args = parser.parse_args()
     # Set the random seed
