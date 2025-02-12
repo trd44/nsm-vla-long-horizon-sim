@@ -28,3 +28,4 @@ object_detection/
 *.manifest
 *.spec
 *.cover
+*.log

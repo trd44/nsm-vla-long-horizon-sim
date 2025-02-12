@@ -721,7 +721,7 @@ if __name__ == "__main__":
     episode = 1
     while num_recorder_eps < args.episodes: 
         obs = env.reset()
-        print("Episode: {}".format(episode+1))
+        print("Episode: {}".format(episode))
         keys = list(env.data_buffer.keys())
         done = env.run_trajectory(obs)
         if done:

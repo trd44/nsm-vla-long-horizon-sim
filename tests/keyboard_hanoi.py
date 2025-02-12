@@ -6,9 +6,9 @@ import robosuite as suite
 import numpy as np
 from robosuite.wrappers import GymWrapper
 from robosuite.utils.detector import HanoiDetector
-from robosuite.wrappers.hanoi.hanoi_pick import PickWrapper
-from robosuite.wrappers.hanoi.hanoi_place import PlaceWrapper
-from robosuite.wrappers.hanoi.vision import VisionWrapper
+from robosuite.wrappers.hanoi.hanoi_pick import HanoiPickWrapper
+from robosuite.wrappers.hanoi.hanoi_place import HanoiPlaceWrapper
+from robosuite.wrappers.hanoi.vision import HanoiVisionWrapper
 import cv2
 
 from robosuite.devices import Keyboard
@@ -46,8 +46,8 @@ if __name__ == "__main__":
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    env = PlaceWrapper(env, render_init=True)
-    env = VisionWrapper(env)
+    env = HanoiPickWrapper(env, render_init=True)
+    env = HanoiVisionWrapper(env)
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     state = info['state']
     obj_to_pick = 'RoundNut'
     gripper_body = env.sim.model.body_name2id('gripper0_eef')
-
+    counter = 0
 
     while True:
         # Set active robot
@@ -101,16 +101,16 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        
-
         image = obs.reshape(256, 256, 3)
     
         cv2.imshow("Detected Numbers", image)
         cv2.waitKey(1)
 
-        print(reward)
-        if terminated:
-            print(terminated)
+        if counter % 20 == 0:
+            print(reward)
+            if terminated:
+                print(terminated)
+        counter += 1
 
 
 
