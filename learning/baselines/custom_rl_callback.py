@@ -7,12 +7,29 @@ from stable_baselines3.common.evaluation import evaluate_policy
 
 # Custom Evaluation Callback to save the results in a csv file
 class CustomEvalCallback(EvalCallback):
-    def __init__(self, eval_env, best_model_save_path, log_path, eval_freq=10000, n_eval_episodes=5, deterministic=True, render=False, verbose=1):
-        super(CustomEvalCallback, self).__init__(eval_env=eval_env, best_model_save_path=best_model_save_path, log_path=log_path, eval_freq=eval_freq, n_eval_episodes=n_eval_episodes, deterministic=deterministic, render=render, verbose=verbose)
+    def __init__(self, 
+                 eval_env, 
+                 best_model_save_path, 
+                 log_path, 
+                 eval_freq=10000, 
+                 n_eval_episodes=5, 
+                 deterministic=True, 
+                 render=False, 
+                 verbose=1, 
+                 callback_after_eval=None):
+        super(CustomEvalCallback, self).__init__(eval_env=eval_env, 
+                                                 best_model_save_path=best_model_save_path, 
+                                                 log_path=log_path, eval_freq=eval_freq, 
+                                                 n_eval_episodes=n_eval_episodes, 
+                                                 deterministic=deterministic, 
+                                                 render=render, 
+                                                 verbose=verbose, 
+                                                 callback_after_eval=callback_after_eval)
 
     def _on_step(self) -> bool:
 
         continue_training = True
+        success_rate = 0.0
 
         if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
 
