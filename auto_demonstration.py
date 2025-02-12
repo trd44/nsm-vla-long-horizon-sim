@@ -76,18 +76,25 @@ class RecordDemos(gym.Wrapper):
         A function that maps the operation to the corresponding function
         returns the function, the semantic description of the operation and the goal
         """
+        map_color = {"cube1": "blue", "cube2": "red", "cube3": "green",}
         operation = operation.lower().split(' ')
         if 'pick' in operation[0]:
-            return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
+            if self.args.env == "Hanoi":
+                return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
+            else:
+                return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
         elif 'place' in operation[0]:
-            return self.place, f'place {operation[1]} on {operation[2]}', (operation[1], operation[2])
+            if self.args.env == "Hanoi":
+                return self.place, f'place {operation[1]} on {operation[2]}', (operation[1], operation[2])
+            else:
+                return self.place, f'place {operation[1]} on {operation[2]}', (operation[1], operation[2])
         elif 'turn-on' in operation[0]:
             return self.turn_on_button, f'switch on button', "button"
         elif 'turn-off' in operation[0]:
             return self.turn_off_button, f'switch off button', "button"
         else:
             return None
-        
+
     def reset(self, seed=None):
         """
         The reset function that resets the environment
