@@ -10,4 +10,4 @@ perf list >> perf_events.log
 # Run CPU profiling with time, power, and FLOPs
 /usr/bin/time -v perf stat \
     -e power/energy-cores/,fp_arith_inst_retired.scalar_double,fp_arith_inst_retired.128b_packed_double \
-    python tests/keyboard_kitchen.py --render
+    python learning/baselines/eval_rl.py --eval_freq 100 --n_eval_episodes 2
