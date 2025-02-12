@@ -1,4 +1,4 @@
-# Base image with Python 3.8
+## Base image with Python 3.8
 FROM python:3.8-slim-buster
 
 # Set environment variables
@@ -6,6 +6,8 @@ ENV PYTHONUNBUFFERED=1
 
 # Install system dependencies (you may need to tweak this based on MimicGen's specific requirements)
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
     gcc \ 
     git \
     libhdf5-dev \
@@ -65,7 +67,9 @@ WORKDIR /cyclic_lxm
 COPY . .
 RUN pip install --upgrade pip
 RUN pip install -e mimicgen
-# RUN pip install -e robosuite
-# RUN pip install -e tarski
+RUN pip install -e robosuite
+RUN pip install -e robomimic
+RUN pip install -e robosuite-task-zoo
+# RUN pip install -e openvla
 # RUN pip install -r requirements.txt
 
