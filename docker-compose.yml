@@ -6,13 +6,13 @@ services:
     volumes:
       - .:/cyclic_lxm
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /tmp/.docker.xauth:/tmp/.docker.xauth
+      - /tmp/.docker.xauth:/docker.xauth
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
       - ./volume/vscode-server:$HOME/.vscode-server
     environment:
       - DISPLAY=${DISPLAY}
-      - XAUTHORITY=/tmp/.docker.xauth
+      - XAUTHORITY=/docker.xauth
       - QT_X11_NO_MITSHM=1
       - LIBGL_ALWAYS_INDIRECT=1
       - MUJOCO_GL=egl
@@ -24,4 +24,6 @@ services:
     stdin_open: true
     tty: true
     runtime: nvidia
+    network_mode: host
+
 

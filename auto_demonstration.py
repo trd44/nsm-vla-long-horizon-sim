@@ -106,6 +106,7 @@ class RecordDemos(gym.Wrapper):
         """
         Runs the trajectory
         """
+        done = False
         for operation in self.plan:
             try:
                 function, self.task, goal = self.operator_to_function(operation)

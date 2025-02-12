@@ -1,5 +1,5 @@
 ## Base image with Python 3.8
-FROM python:3.8-slim-buster
+FROM python:3.9-slim-buster
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
