@@ -6,9 +6,11 @@ import robosuite as suite
 import numpy as np
 from robosuite.wrappers import GymWrapper
 from robosuite.utils.detector import KitchenDetector
+from robosuite.wrappers.kitchen.kitchen_pick import KitchenPickWrapper
+from robosuite.wrappers.kitchen.kitchen_place import KitchenPlaceWrapper
+from robosuite.wrappers.kitchen.vision import KitchenVisionWrapper
 import cv2
-import robosuite_task_zoo
-from robosuite_task_zoo.environments.manipulation.kitchen import KitchenEnv
+
 from robosuite.devices import Keyboard
 from robosuite.utils.input_utils import input2action
 
@@ -44,8 +46,8 @@ if __name__ == "__main__":
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    #env = PlaceWrapper(env, render_init=True)
-    #env = VisionWrapper(env)
+    env = KitchenPickWrapper(env, render_init=True)
+    env = KitchenVisionWrapper(env)
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -62,7 +64,7 @@ if __name__ == "__main__":
     gripper_body = env.sim.model.body_name2id('gripper0_eef')
     detector = KitchenDetector(env)
     state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-    step_count = 0
+    counter = 0
 
 
     while True:
@@ -101,39 +103,33 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        
-        new_state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-        # image = obs.reshape(256, 256, 3)
+        image = obs.reshape(256, 256, 3)
     
-        # cv2.imshow("Detected Numbers", image)
-        # cv2.waitKey(1)
+        cv2.imshow("Detected Numbers", image)
+        cv2.waitKey(1)
 
-        # print(reward)
-        # if terminated:
-        #     print(terminated)
+        if counter % 20 == 0:
+            print(reward)
+            if terminated:
+                print(terminated)
+        counter += 1
 
 
+
+        new_state = info['state']
+        
         if new_state != state:
             # CHeck if the change is linked a grounded predicate 'on(o1,o2)' or 'clear(o1)'
             diff = {k: new_state[k] for k in new_state if k not in state or new_state[k] != state[k]}
             # If any key in diff has 'on' or 'clear' in it, print the change and the new state
             #if any(['on' in k or 'clear' in k for k in diff]):
-            #if any(['over' in k for k in diff]):
-            print("Change detected: {}".format(diff))
-            #    print("State: {}".format(new_state))
-            #    print("\n\n")
-            state = new_state
-
-        # if step_count % 100 == 0:
-        #     print("Step: {}".format(step_count))
-        #     print("State: {}".format(state))
-        #     print("\n\n")
-        step_count += 1
-
-
-
-
+            if any(['on' in k for k in diff]):
+                print("Change detected: {}".format(diff))
+                print("State: {}".format(new_state))
+                print("\n\n")
+                state = new_state
 
 
         #print("Obs: {}\n\n".format(obs))
         env.render()
+
