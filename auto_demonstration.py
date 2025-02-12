@@ -99,7 +99,7 @@ class RecordDemos(gym.Wrapper):
             obs, _ = self.env.reset()
         except:
             obs = self.env.reset()
-        self.sim.forward()
+        self.env.sim.forward()
         return obs
 
     def run_trajectory(self, obs):
