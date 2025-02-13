@@ -112,11 +112,18 @@ trap cleanup EXIT INT TERM SIGINT
 
 export DISPLAY=:99
 export MUJOCO_GL=egl
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+eval "$(conda shell.bash hook)"
+conda activate lxm
+python --version
+python -c "import torch; print(torch.cuda.is_available())"
+echo "Python path: $(which python)"
 
 # Run the Python script with profiling tools and capture all metrics in one command
 /usr/bin/time -v perf stat \
     -e mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses \
-    nv-nsight-cu-cli --metrics flop_count_sp,flop_count_dp --export "$GPU_COMPUTATION_LOG" \
+    ncu --metrics flop_count_sp --log-file "$GPU_COMPUTATION_LOG" \
     python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
     &> "$PERF_LOG"
 
