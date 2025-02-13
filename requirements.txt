@@ -221,3 +221,5 @@ y-py==0.6.2
 yarl==1.9.4
 ypy-websocket==0.8.4
 zipp==3.19.2
+hydra-core
+omegaconf
