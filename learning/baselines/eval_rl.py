@@ -58,7 +58,7 @@ def learn_policy(args, env, eval_env, name):
         policy_mode,
         env,
         learning_rate=args.lr,
-        buffer_size=int(1e6),
+        buffer_size=int(1e4),
         learning_starts=10000,
         batch_size=256,
         tau=0.005,
