@@ -48,16 +48,16 @@ GPU_COMPUTATION_LOG="$LOG_DIR/gpu_computation_log.txt"
 nvidia-smi dmon -s pmon -o DT -f "$GPU_LOG" &
 NVIDIA_PID=$!
 
-# Monitor GPU computation metrics (like FLOPs) using nvprof
-nvprof --metrics flop_count_sp,flop_count_dp --log-file "$GPU_COMPUTATION_LOG" &
-NVPROF_PID=$!
+# Monitor GPU computation metrics (like FLOPs) using nsys
+nsys profile --stats=true --output "$LOG_DIR/nsys_report" python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" &> "$GPU_COMPUTATION_LOG" &
+NSYS_PID=$!
 
 # Ensure cleanup of background processes
 cleanup() {
     kill $NVIDIA_PID 2>/dev/null || true
-    kill $NVPROF_PID 2>/dev/null || true
+    kill $NSYS_PID 2>/dev/null || true
     wait $NVIDIA_PID 2>/dev/null || true
-    wait $NVPROF_PID 2>/dev/null || true
+    wait $NSYS_PID 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -65,7 +65,7 @@ export DISPLAY=:99
 export MUJOCO_GL=egl
 
 # Start CPU power monitoring with rapl-read (No sudo required)
-./rapl-read > "$CPU_POWER_LOG" &
+./uarch-configure/rapl-read/rapl-read > "$CPU_POWER_LOG" &
 RAPL_PID=$!
 
 # Run the Python script with perf profiling
@@ -116,9 +116,8 @@ GPU_USAGE=$(grep -E "^(GPU|Processes)" "$GPU_LOG" | tail -n +2)
 echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$LOG_FILE"
 echo "$GPU_USAGE" >> "$LOG_FILE"
 
-# Extract GPU computational expenses (FLOPs)
-GPU_COMPUTATION=$(grep -E "flop_count" "$GPU_COMPUTATION_LOG")
-echo -e "\n🎮 GPU Computation (FLOPs):" >> "$LOG_FILE"
-echo "$GPU_COMPUTATION" >> "$LOG_FILE"
+# Extract GPU computational expenses from nsys
+echo -e "\n🎮 GPU Computation (Nsight Systems Report):" >> "$LOG_FILE"
+echo "Nsight report saved at: $LOG_DIR/nsys_report.qdrep" >> "$LOG_FILE"
 
 echo -e "\n==================== End of Log ====================" >> "$LOG_FILE"
