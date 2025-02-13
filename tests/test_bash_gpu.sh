@@ -36,6 +36,7 @@ GPU_LOG="$LOG_DIR/gpu_log.txt"
 CPU_POWER_LOG="$LOG_DIR/cpu_power_log.txt"
 PERF_LOG="$LOG_DIR/perf_metrics.log"
 GPU_COMPUTATION_LOG="$LOG_DIR/gpu_computation_log.txt"
+SUM_LOG="$LOG_DIR/summary_log.txt"
 
 # Clean previous logs
 > "$LOG_FILE"
@@ -43,9 +44,10 @@ GPU_COMPUTATION_LOG="$LOG_DIR/gpu_computation_log.txt"
 > "$CPU_POWER_LOG"
 > "$PERF_LOG"
 > "$GPU_COMPUTATION_LOG"
+> "$SUM_LOG"
 
 # Start NVIDIA GPU monitoring in the background (track memory, utilization, etc.)
-nvidia-smi dmon -s pmon -o DT -f "$GPU_LOG" &
+nvidia-smi dmon -o DT -f "$GPU_LOG" &
 NVIDIA_PID=$!
 
 # Start CPU power monitoring with rapl-read (No sudo required)
@@ -54,20 +56,67 @@ RAPL_PID=$!
 
 # Ensure cleanup of background processes
 cleanup() {
+    echo "Cleaning up..."
+
+    # Append logs to the final log file
+    cat "$GPU_LOG" >> "$LOG_FILE"
+    cat "$PERF_LOG" >> "$LOG_FILE"
+    cat "$GPU_COMPUTATION_LOG" >> "$LOG_FILE"
+
+    # Generate human-friendly summary
+    echo -e "\n==================== Performance Summary ====================" >> "$SUM_LOG"
+
+    # Extract total run time from /usr/bin/time output
+    RUN_TIME=$(grep "Elapsed (wall clock) time" "$LOG_FILE" | awk '{print $4}')
+    echo -e "⏱️  Total Run Time: $RUN_TIME" >> "$SUM_LOG"
+
+    # Extract CPU power usage summary
+    if [[ -f "$CPU_POWER_LOG" ]]; then
+        CPU_ENERGY=$(awk '{sum += $1} END {print sum}' "$CPU_POWER_LOG")
+        echo -e "🖥️  Total CPU Energy: ${CPU_ENERGY} Joules" >> "$SUM_LOG"
+    fi
+
+    # Extract GPU power usage summary
+    if [[ -f "$GPU_LOG" ]]; then
+        GPU_ENERGY=$(awk '{sum += $2} END {print sum}' "$GPU_LOG")
+        echo -e "🎮 Total GPU Energy: ${GPU_ENERGY} Joules" >> "$SUM_LOG"
+    fi
+
+    # Extract key CPU performance metrics from perf stat
+    echo -e "\n💾 CPU Performance Metrics:" >> "$SUM_LOG"
+    grep -E "mem-loads|mem-stores|cache-references|cache-misses|cpu-cycles|instructions|branch-instructions|branch-misses" "$PERF_LOG" >> "$SUM_LOG"
+
+    # Extract GPU usage information
+    GPU_USAGE=$(grep -E "^(GPU|Processes)" "$GPU_LOG" | tail -n +2)
+    echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$SUM_LOG"
+    echo "$GPU_USAGE" >> "$SUM_LOG"
+
+    # Extract GPU computational expenses (FLOPs)
+    GPU_COMPUTATION=$(grep -E "flop_count" "$GPU_COMPUTATION_LOG")
+    echo -e "\n🎮 GPU Computation (FLOPs):" >> "$SUM_LOG"
+    echo "$GPU_COMPUTATION" >> "$SUM_LOG"
+
+    echo -e "\n==================== End of Log ====================" >> "$SUM_LOG"
+
+    # Kill the background processes
     kill $NVIDIA_PID 2>/dev/null || true
     kill $RAPL_PID 2>/dev/null || true
+    
+    # Wait for background processes to terminate before proceeding
     wait $NVIDIA_PID 2>/dev/null || true
     wait $RAPL_PID 2>/dev/null || true
+
 }
-trap cleanup EXIT INT TERM
+
+trap cleanup EXIT INT TERM SIGINT
 
 export DISPLAY=:99
 export MUJOCO_GL=egl
 
-# Run the Python script with profiling tools
-/usr/bin/time -v perf stat -e \
-    mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses \
-    nv-nsight-cu-cli --metrics flop_count_sp,flop_count_dp --log-file "$GPU_COMPUTATION_LOG" \
+# Run the Python script with profiling tools and capture all metrics in one command
+/usr/bin/time -v perf stat \
+    -e mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses \
+    nv-nsight-cu-cli --metrics flop_count_sp,flop_count_dp --export "$GPU_COMPUTATION_LOG" \
     python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
     &> "$PERF_LOG"
 
