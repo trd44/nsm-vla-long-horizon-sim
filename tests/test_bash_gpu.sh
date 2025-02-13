@@ -66,9 +66,11 @@ cleanup() {
     # Generate human-friendly summary
     echo -e "\n==================== Performance Summary ====================" >> "$SUM_LOG"
 
-    # Extract total run time from /usr/bin/time output
-    RUN_TIME=$(grep "Elapsed (wall clock) time" "$LOG_FILE" | awk '{print $4}')
+    # Extract total run time from /usr/bin/time output in PERF_LOG
+    RUN_TIME=$(grep "Elapsed (wall clock) time" "$PERF_LOG" | awk '{print $8}')
     echo -e "⏱️  Total Run Time: $RUN_TIME" >> "$SUM_LOG"
+
+
 
     # Extract CPU power usage summary
     if [[ -f "$CPU_POWER_LOG" ]]; then
@@ -86,10 +88,60 @@ cleanup() {
     echo -e "\n💾 CPU Performance Metrics:" >> "$SUM_LOG"
     grep -E "mem-loads|mem-stores|cache-references|cache-misses|cpu-cycles|instructions|branch-instructions|branch-misses" "$PERF_LOG" >> "$SUM_LOG"
 
-    # Extract GPU usage information
-    GPU_USAGE=$(grep -E "^(GPU|Processes)" "$GPU_LOG" | tail -n +2)
-    echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$SUM_LOG"
-    echo "$GPU_USAGE" >> "$SUM_LOG"
+    if [[ ! -s "$GPU_COMPUTATION_LOG" ]]; then
+        echo "Error: $GPU_COMPUTATION_LOG is empty or not found."
+        exit 1
+    fi
+
+    # Extract GPU usage information (skipping the header row)
+    GPU_USAGE=$(grep -E "^[0-9]" "$GPU_LOG" | tail -n +2)
+
+    # Check if GPU_USAGE has content before appending
+    if [[ -n "$GPU_USAGE" ]]; then
+        echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$SUM_LOG"
+        echo "$GPU_USAGE" >> "$SUM_LOG"
+    else
+        echo "No GPU usage data available." >> "$SUM_LOG"
+    fi
+
+
+    # Initialize variables to accumulate metrics
+    total_gpu_memory=0
+    total_gpu_time_duration=0
+    total_gpu_occupancy=0
+    total_gpu_cycles_active=0
+    total_gpu_warps_active=0
+    count=0
+
+    # Iterate through the GPU computation log to sum values
+    while IFS= read -r line; do
+        if [[ "$line" =~ gpu__compute_memory_throughput\.avg\.pct_of_peak_sustained_elapsed ]]; then
+            total_gpu_memory=$(echo "$total_gpu_memory + $(echo "$line" | awk '{print $3}')" | bc)
+            ((count++))
+        elif [[ "$line" =~ gpu__time_duration\.sum ]]; then
+            total_gpu_time_duration=$(echo "$total_gpu_time_duration + $(echo "$line" | awk '{print $3}')" | bc)
+        elif [[ "$line" =~ launch__occupancy_per_block_size ]]; then
+            total_gpu_occupancy=$(echo "$total_gpu_occupancy + $(echo "$line" | awk '{print $3}')" | bc)
+        elif [[ "$line" =~ sm__cycles_active\.avg ]]; then
+            total_gpu_cycles_active=$(echo "$total_gpu_cycles_active + $(echo "$line" | awk '{print $3}')" | bc)
+        elif [[ "$line" =~ sm__warps_active\.avg\.per_cycle_active ]]; then
+            total_gpu_warps_active=$(echo "$total_gpu_warps_active + $(echo "$line" | awk '{print $3}')" | bc)
+        fi
+    done < "$GPU_COMPUTATION_LOG"
+
+    # Calculate averages (if needed)
+    if [[ $count -gt 0 ]]; then
+        avg_gpu_memory=$(echo "$total_gpu_memory / $count" | bc -l)
+    fi
+
+    # Append summed or averaged metrics to the summary log
+    echo -e "\n🎮 GPU Computational Metrics:" >> "$SUM_LOG"
+    echo -e "💡 Memory Throughput Efficiency (Average): ${avg_gpu_memory}%" >> "$SUM_LOG"
+    echo -e "⏳ Total GPU Time Duration: ${total_gpu_time_duration} microseconds" >> "$SUM_LOG"
+    echo -e "💻 Occupancy per Block Size (Sum): ${total_gpu_occupancy}" >> "$SUM_LOG"
+    echo -e "💥 Active Compute Cycles (Sum): ${total_gpu_cycles_active} cycles" >> "$SUM_LOG"
+    echo -e "🔄 Warps Active per Cycle (Sum): ${total_gpu_warps_active} warps" >> "$SUM_LOG"
+
 
     # Extract GPU computational expenses (FLOPs) and other relevant metrics
     GPU_COMPUTATION=$(grep -E "flop_count|sm__warps_active|sm__cycles_active|gpu__time_duration|gpu__compute_memory_throughput|launch__occupancy" "$GPU_COMPUTATION_LOG")
