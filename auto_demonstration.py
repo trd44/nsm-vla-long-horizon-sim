@@ -143,17 +143,17 @@ class RecordDemos(gym.Wrapper):
                         self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
                     else:
                         self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
-        self.zip_buffer(self.data_buffer, self.args.traces)
+        self.zip_buffer(self.args.traces)
         obs = self.reset()
         return obs
 
-    def zip_buffer(self, data_buffer, dir_path):
+    def zip_buffer(self, dir_path):
         # Decompose the data buffer into action steps
         for step in self.action_steps:
-            if step not in data_buffer.keys():
+            if step not in self.data_buffer.keys():
                 continue
             # Convert the data buffer to bytes
-            data_bytes = pickle.dumps(data_buffer[step])
+            data_bytes = pickle.dumps(self.data_buffer[step])
             file_path = dir_path + step + '.zip'
             # Write the bytes to a zip file
             with zipfile.ZipFile(file_path, 'w') as zip_file:
@@ -268,7 +268,8 @@ class RecordDemos(gym.Wrapper):
             dist_z = abs(ref_z - z_pos)
             dist_z = self.cap([dist_z])
             action = 5*np.concatenate([[0, 0], dist_z, [0]]) if not(self.randomize) else 5*np.concatenate([[0, 0], dist_z, [0]]) + np.concatenate([[0, 0], np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_z), 1), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
@@ -296,7 +297,8 @@ class RecordDemos(gym.Wrapper):
             dist_xy_plan = object_pos[:2] - gripper_pos[:2]
             dist_xy_plan = self.cap(dist_xy_plan)
             action = 5*np.concatenate([dist_xy_plan, [0, 0]]) if not(self.randomize) else 5*np.concatenate([dist_xy_plan, [0, 0]]) + np.concatenate([np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_xy_plan), 3), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
@@ -312,7 +314,8 @@ class RecordDemos(gym.Wrapper):
         #print("Opening gripper...")
         while not state['open_gripper(gripper)']:
             action = np.asarray([0,0,0,-1])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
@@ -332,7 +335,8 @@ class RecordDemos(gym.Wrapper):
             dist_z_axis = [object_pos[2] - gripper_pos[2]]
             dist_z_axis = self.cap(dist_z_axis)
             action = 5*np.concatenate([[0, 0], dist_z_axis, [0]]) if not(self.randomize) else 5*np.concatenate([[0, 0], dist_z_axis, [0]]) + np.concatenate([[0, 0], np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_z_axis), 1), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
@@ -348,7 +352,8 @@ class RecordDemos(gym.Wrapper):
         #print("Closing gripper...")
         while not state['grasped({})'.format(goal_str)]:
             action = np.asarray([0,0,0,1])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
@@ -365,7 +370,8 @@ class RecordDemos(gym.Wrapper):
         while not state['picked_up({})'.format(goal_str)]:
             action = np.asarray([0,0,0.4,0]) if not(self.randomize) else [0,0,0.5,0] + np.concatenate([np.random.normal(0, 0.1, 3), [0]])
             action = 5*self.cap(action)
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
@@ -425,7 +431,8 @@ class RecordDemos(gym.Wrapper):
             dist_xy_plan = object_pos[:2] - gripper_pos[:2]
             dist_xy_plan = self.cap(dist_xy_plan)
             action = 5*np.concatenate([dist_xy_plan, [0, 0]]) if not(self.randomize) else 5*np.concatenate([dist_xy_plan, [0, 0]]) + np.concatenate([np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_xy_plan), 3), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
@@ -446,7 +453,8 @@ class RecordDemos(gym.Wrapper):
             dist_z_axis = [- (gripper_pos[2] - place_pos[2])]
             dist_z_axis = self.cap(dist_z_axis)
             action = 5*np.concatenate([[0, 0], dist_z_axis, [0]]) if not(self.randomize) else 5*np.concatenate([[0, 0], dist_z_axis, [0]]) + np.concatenate([[0, 0], np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_z_axis), 1), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
@@ -462,7 +470,8 @@ class RecordDemos(gym.Wrapper):
         #print("dropping object...")
         while not(state['open_gripper(gripper)']):#state['grasped({})'.format(goal_str)]:
             action = np.asarray([0,0,0,-1])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
@@ -479,7 +488,8 @@ class RecordDemos(gym.Wrapper):
         # First move up
         for _ in range(15):
             action = np.array([0, 0, 1, 0])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
@@ -515,7 +525,8 @@ class RecordDemos(gym.Wrapper):
             dist_xy_plan = object_pos[:2] - gripper_pos[:2]
             dist_xy_plan = self.cap(dist_xy_plan)
             action = 5*np.concatenate([dist_xy_plan, [0, 0]]) if not(self.randomize) else 5*np.concatenate([dist_xy_plan, [0, 0]]) + np.concatenate([np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_xy_plan), 3), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_on", goal=goal_str)
@@ -535,7 +546,8 @@ class RecordDemos(gym.Wrapper):
             dist_z_axis = [object_pos[2] - gripper_pos[2]]
             dist_z_axis = self.cap(dist_z_axis)
             action = 5*np.concatenate([[0, 0], dist_z_axis, [0]]) if not(self.randomize) else 5*np.concatenate([[0, 0], dist_z_axis, [0]]) + np.concatenate([[0, 0], np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_z_axis), 1), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_on", goal=goal_str)
@@ -551,7 +563,8 @@ class RecordDemos(gym.Wrapper):
         #print("Turning on button...")
         while not state['stove_on()']:
             action = np.asarray([0,0.3,0,0])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_on", goal=goal_str)
@@ -566,7 +579,8 @@ class RecordDemos(gym.Wrapper):
 
         for _ in range(15):
             action = np.array([0, 0, 1, 0])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_on", goal=goal_str)
@@ -602,7 +616,8 @@ class RecordDemos(gym.Wrapper):
             dist_xy_plan = object_pos[:2] - gripper_pos[:2]
             dist_xy_plan = self.cap(dist_xy_plan)
             action = 5*np.concatenate([dist_xy_plan, [0, 0]]) if not(self.randomize) else 5*np.concatenate([dist_xy_plan, [0, 0]]) + np.concatenate([np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_xy_plan), 3), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_off", goal=goal_str)
@@ -622,7 +637,8 @@ class RecordDemos(gym.Wrapper):
             dist_z_axis = [object_pos[2] - gripper_pos[2]]
             dist_z_axis = self.cap(dist_z_axis)
             action = 5*np.concatenate([[0, 0], dist_z_axis, [0]]) if not(self.randomize) else 5*np.concatenate([[0, 0], dist_z_axis, [0]]) + np.concatenate([[0, 0], np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_z_axis), 1), [0]])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_off", goal=goal_str)
@@ -638,7 +654,8 @@ class RecordDemos(gym.Wrapper):
         #print("Turning off button...")
         while state['stove_on()']:
             action = np.asarray([0,-0.3,0,0])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_off", goal=goal_str)
@@ -653,7 +670,8 @@ class RecordDemos(gym.Wrapper):
 
         for _ in range(15):
             action = np.array([0, 0, 1, 0])
-            next_obs, _, _, _, _  = self.env.step(self.to_osc_pose(action))
+            action = self.to_osc_pose(action)
+            next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="turn_off", goal=goal_str)
