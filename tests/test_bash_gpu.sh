@@ -1,33 +1,56 @@
 #!/bin/bash
 
-# Ensure script exits on first error
-set -e
+# Ensure script exits on first error and catches undefined variables
+set -euo pipefail
+
+# Parse command-line arguments
+ARG1=""
+ARG2=""
+ARG3=""
+
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -arg1) ARG1="$2"; shift ;;  # Environment
+        -arg2) ARG2="$2"; shift ;;  # Operator
+        -arg3) ARG3="$2"; shift ;;  # Seed
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+# Validate required arguments
+if [[ -z "$ARG1" || -z "$ARG2" || -z "$ARG3" ]]; then
+    echo "Error: Missing required arguments."
+    echo "Usage: $0 -arg1 <environment> -arg2 <operator> -arg3 <seed>"
+    exit 1
+fi
 
 # Define log files
 LOG_FILE="perf_eval.log"
 GPU_LOG="gpu_log.txt"
-FULL_LOG="full_log.txt"
 
 # Start NVIDIA GPU monitoring in the background
 nvidia-smi dmon -s pum -o DT -f "$GPU_LOG" &
 NVIDIA_PID=$!
 
-# Ensure the background process is killed when script exits
-trap "kill $NVIDIA_PID 2>/dev/null" EXIT
+# Ensure cleanup of background processes
+cleanup() {
+    kill $NVIDIA_PID 2>/dev/null || true
+    wait $NVIDIA_PID 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
-# Run CPU profiling (time, power, FLOPs) and log output
-/usr/bin/time -v perf stat \
-    -e power/energy-cores/,power/energy-ram/,fp_arith_inst_retired.scalar_double,fp_arith_inst_retired.128b_packed_double \
-    python tests/keyboard_kitchen.py --render --seed 2 | tee "$FULL_LOG"
+# Run the Python script with both CPU and GPU profiling
+/usr/bin/time -v \
+nsys profile --stats=true --metrics flop_count_sp,flop_count_dp,dram_read_bytes,dram_write_bytes \
+perf stat -e power/energy-cores/,power/energy-ram/,fp_arith_inst_retired.scalar_double,fp_arith_inst_retired.128b_packed_double \
+python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
+&> "$LOG_FILE"
 
-# Stop GPU monitoring before running `nvprof`
-kill $NVIDIA_PID 2>/dev/null
-wait $NVIDIA_PID 2>/dev/null || true  # Ignore errors if the process is already stopped
+# Stop GPU monitoring
+cleanup
 
-# Run GPU FLOP profiling separately and log output
-nvprof --metrics flop_count_sp,flop_count_dp \
-    python learning/baselines/eval_rl.py --eval_freq 100 --n_eval_episodes 2 \
-    &>> "$FULL_LOG"
+# Append GPU power logs to the final log file
+cat "$GPU_LOG" >> "$LOG_FILE"
 
-# Append GPU monitoring logs to the final log
-cat "$GPU_LOG" >> "$FULL_LOG"
+echo "Performance logging completed. Logs saved to $LOG_FILE."
