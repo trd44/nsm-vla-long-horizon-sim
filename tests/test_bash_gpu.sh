@@ -42,10 +42,13 @@ trap cleanup EXIT INT TERM
 
 # Run the Python script with both CPU and GPU profiling
 /usr/bin/time -v \
-nsys profile --stats=true --metrics flop_count_sp,flop_count_dp,dram_read_bytes,dram_write_bytes \
-perf stat -e power/energy-cores/,power/energy-ram/,fp_arith_inst_retired.scalar_double,fp_arith_inst_retired.128b_packed_double \
-python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
-&> "$LOG_FILE"
+/usr/local/cuda/bin/nsys profile --trace=cuda,opengl,osrt,openacc \
+perf stat -e \
+    mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses,power/energy-cores/,power/energy-pkg/ \
+    python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
+    &> "$LOG_FILE"
+
+
 
 # Stop GPU monitoring
 cleanup
