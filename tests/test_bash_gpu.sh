@@ -91,9 +91,9 @@ cleanup() {
     echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$SUM_LOG"
     echo "$GPU_USAGE" >> "$SUM_LOG"
 
-    # Extract GPU computational expenses (FLOPs)
-    GPU_COMPUTATION=$(grep -E "flop_count" "$GPU_COMPUTATION_LOG")
-    echo -e "\n🎮 GPU Computation (FLOPs):" >> "$SUM_LOG"
+    # Extract GPU computational expenses (FLOPs) and other relevant metrics
+    GPU_COMPUTATION=$(grep -E "flop_count|sm__warps_active|sm__cycles_active|gpu__time_duration|gpu__compute_memory_throughput|launch__occupancy" "$GPU_COMPUTATION_LOG")
+    echo -e "\n🎮 GPU Computation and Metrics:" >> "$SUM_LOG"
     echo "$GPU_COMPUTATION" >> "$SUM_LOG"
 
     echo -e "\n==================== End of Log ====================" >> "$SUM_LOG"
@@ -123,49 +123,9 @@ echo "Python path: $(which python)"
 # Run the Python script with profiling tools and capture all metrics in one command
 /usr/bin/time -v perf stat \
     -e mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses \
-    ncu --metrics flop_count_sp --log-file "$GPU_COMPUTATION_LOG" \
+    ncu --metrics sm__warps_active.avg.per_cycle_active,sm__cycles_active.avg,gpu__time_duration.sum,gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed,launch__occupancy_per_block_size --log-file "$GPU_COMPUTATION_LOG" \
     python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
     &> "$PERF_LOG"
 
 # Stop monitoring
 cleanup
-
-# Append logs to the final log file
-cat "$GPU_LOG" >> "$LOG_FILE"
-cat "$PERF_LOG" >> "$LOG_FILE"
-cat "$GPU_COMPUTATION_LOG" >> "$LOG_FILE"
-
-# Generate human-friendly summary
-echo -e "\n==================== Performance Summary ====================" >> "$LOG_FILE"
-
-# Extract total run time from /usr/bin/time output
-RUN_TIME=$(grep "Elapsed (wall clock) time" "$LOG_FILE" | awk '{print $4}')
-echo -e "⏱️  Total Run Time: $RUN_TIME" >> "$LOG_FILE"
-
-# Extract CPU power usage summary
-if [[ -f "$CPU_POWER_LOG" ]]; then
-    CPU_ENERGY=$(awk '{sum += $1} END {print sum}' "$CPU_POWER_LOG")
-    echo -e "🖥️  Total CPU Energy: ${CPU_ENERGY} Joules" >> "$LOG_FILE"
-fi
-
-# Extract GPU power usage summary
-if [[ -f "$GPU_LOG" ]]; then
-    GPU_ENERGY=$(awk '{sum += $2} END {print sum}' "$GPU_LOG")
-    echo -e "🎮 Total GPU Energy: ${GPU_ENERGY} Joules" >> "$LOG_FILE"
-fi
-
-# Extract key CPU performance metrics from perf stat
-echo -e "\n💾 CPU Performance Metrics:" >> "$LOG_FILE"
-grep -E "mem-loads|mem-stores|cache-references|cache-misses|cpu-cycles|instructions|branch-instructions|branch-misses" "$PERF_LOG" >> "$LOG_FILE"
-
-# Extract GPU usage information
-GPU_USAGE=$(grep -E "^(GPU|Processes)" "$GPU_LOG" | tail -n +2)
-echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$LOG_FILE"
-echo "$GPU_USAGE" >> "$LOG_FILE"
-
-# Extract GPU computational expenses (FLOPs)
-GPU_COMPUTATION=$(grep -E "flop_count" "$GPU_COMPUTATION_LOG")
-echo -e "\n🎮 GPU Computation (FLOPs):" >> "$LOG_FILE"
-echo "$GPU_COMPUTATION" >> "$LOG_FILE"
-
-echo -e "\n==================== End of Log ====================" >> "$LOG_FILE"
