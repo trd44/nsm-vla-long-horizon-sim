@@ -35,30 +35,38 @@ LOG_FILE="$LOG_DIR/perf_eval.log"
 GPU_LOG="$LOG_DIR/gpu_log.txt"
 CPU_POWER_LOG="$LOG_DIR/cpu_power_log.txt"
 PERF_LOG="$LOG_DIR/perf_metrics.log"
+GPU_COMPUTATION_LOG="$LOG_DIR/gpu_computation_log.txt"
 
 # Clean previous logs
 > "$LOG_FILE"
 > "$GPU_LOG"
 > "$CPU_POWER_LOG"
 > "$PERF_LOG"
+> "$GPU_COMPUTATION_LOG"
 
-# Start NVIDIA GPU monitoring in the background
-nvidia-smi dmon -s pum -o DT -f "$GPU_LOG" &
+# Start NVIDIA GPU monitoring in the background (track memory, utilization, etc.)
+nvidia-smi dmon -s pmon -o DT -f "$GPU_LOG" &
 NVIDIA_PID=$!
+
+# Monitor GPU computation metrics (like FLOPs) using nvprof
+nvprof --metrics flop_count_sp,flop_count_dp --log-file "$GPU_COMPUTATION_LOG" &
+NVPROF_PID=$!
 
 # Ensure cleanup of background processes
 cleanup() {
     kill $NVIDIA_PID 2>/dev/null || true
+    kill $NVPROF_PID 2>/dev/null || true
     wait $NVIDIA_PID 2>/dev/null || true
+    wait $NVPROF_PID 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
 export DISPLAY=:99
 export MUJOCO_GL=egl
 
-# Start CPU power monitoring with turbostat
-sudo turbostat --quiet --Summary --interval 1 > "$CPU_POWER_LOG" & 
-TURBO_PID=$!
+# Start CPU power monitoring with rapl-read (No sudo required)
+./rapl-read > "$CPU_POWER_LOG" &
+RAPL_PID=$!
 
 # Run the Python script with perf profiling
 /usr/bin/time -v perf stat -e \
@@ -67,8 +75,8 @@ TURBO_PID=$!
     &> "$PERF_LOG"
 
 # Stop monitoring
-kill $TURBO_PID 2>/dev/null || true
-wait $TURBO_PID 2>/dev/null || true
+kill $RAPL_PID 2>/dev/null || true
+wait $RAPL_PID 2>/dev/null || true
 cleanup
 
 # Append GPU monitoring logs to the final log file
@@ -77,27 +85,40 @@ cat "$GPU_LOG" >> "$LOG_FILE"
 # Append perf profiling logs
 cat "$PERF_LOG" >> "$LOG_FILE"
 
+# Append GPU computation logs
+cat "$GPU_COMPUTATION_LOG" >> "$LOG_FILE"
+
 # Generate human-friendly summary
 echo -e "\n==================== Performance Summary ====================" >> "$LOG_FILE"
+
+# Extract total run time from /usr/bin/time output
+RUN_TIME=$(grep "Elapsed (wall clock) time" "$LOG_FILE" | awk '{print $4}')
+echo -e "⏱️  Total Run Time: $RUN_TIME" >> "$LOG_FILE"
 
 # Extract CPU power usage summary
 if [[ -f "$CPU_POWER_LOG" ]]; then
     CPU_ENERGY=$(awk '{sum += $1} END {print sum}' "$CPU_POWER_LOG")
-    echo -e "Total CPU Energy: ${CPU_ENERGY} Joules" >> "$LOG_FILE"
+    echo -e "🖥️  Total CPU Energy: ${CPU_ENERGY} Joules" >> "$LOG_FILE"
 fi
 
 # Extract GPU power usage summary
 if [[ -f "$GPU_LOG" ]]; then
     GPU_ENERGY=$(awk '{sum += $2} END {print sum}' "$GPU_LOG")
-    echo -e "Total GPU Energy: ${GPU_ENERGY} Joules" >> "$LOG_FILE"
+    echo -e "🎮 Total GPU Energy: ${GPU_ENERGY} Joules" >> "$LOG_FILE"
 fi
 
 # Extract key CPU performance metrics from perf stat
-echo -e "\n CPU Performance Metrics:" >> "$LOG_FILE"
+echo -e "\n💾 CPU Performance Metrics:" >> "$LOG_FILE"
 grep -E "mem-loads|mem-stores|cache-references|cache-misses|cpu-cycles|instructions|branch-instructions|branch-misses" "$PERF_LOG" >> "$LOG_FILE"
 
-# Extract time & memory usage from /usr/bin/time
-echo -e "\n Execution Time Metrics:" >> "$LOG_FILE"
-grep -E "Elapsed|User time|System time|Maximum resident set size" "$PERF_LOG" >> "$LOG_FILE"
+# Extract GPU usage information
+GPU_USAGE=$(grep -E "^(GPU|Processes)" "$GPU_LOG" | tail -n +2)
+echo -e "\n🎮 GPU Usage / Computation / Memory:" >> "$LOG_FILE"
+echo "$GPU_USAGE" >> "$LOG_FILE"
 
-echo -e "Performance logging completed. Logs saved in: $LOG_DIR" >> "$LOG_FILE"
+# Extract GPU computational expenses (FLOPs)
+GPU_COMPUTATION=$(grep -E "flop_count" "$GPU_COMPUTATION_LOG")
+echo -e "\n🎮 GPU Computation (FLOPs):" >> "$LOG_FILE"
+echo "$GPU_COMPUTATION" >> "$LOG_FILE"
+
+echo -e "\n==================== End of Log ====================" >> "$LOG_FILE"
