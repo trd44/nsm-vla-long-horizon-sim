@@ -4,6 +4,7 @@ import os
 import robosuite as suite
 import time
 import warnings
+import torch
 from datetime import datetime
 from robosuite.wrappers.gym_wrapper import GymWrapper
 from custom_rl_callback import CustomEvalCallback
@@ -51,6 +52,18 @@ op_to_wrapper = {"Hanoi":
 
 vision_wrapper = {"Hanoi": HanoiVisionWrapper, "KitchenEnv": KitchenVisionWrapper, "NutAssembly": AssembleVisionWrapper}
 
+# setting device on GPU if available, else CPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print('Using device:', device)
+print()
+
+#Additional Info when using cuda
+if device.type == 'cuda':
+    print(torch.cuda.get_device_name(0))
+    print('Memory Usage:')
+    print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+    print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+
 def learn_policy(args, env, eval_env, name):
     # Define the model
     policy_mode = 'MlpPolicy' if not args.vision else 'CnnPolicy'
@@ -58,8 +71,9 @@ def learn_policy(args, env, eval_env, name):
         policy_mode,
         env,
         learning_rate=args.lr,
-        buffer_size=int(1e6),
-        learning_starts=10000,
+        buffer_size=int(1e4),
+        device=device,
+        learning_starts=100,#10000,
         batch_size=256,
         tau=0.005,
         gamma=0.99,
@@ -158,7 +172,6 @@ if __name__ == "__main__":
     os.makedirs(args.modeldir, exist_ok=True)
     os.makedirs(args.bufferdir, exist_ok=True)
 
-    # Create the environment
     # Create the environment
     env = suite.make(
         args.env,

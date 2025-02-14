@@ -4,18 +4,18 @@ warnings.filterwarnings("ignore")
 import argparse
 import robosuite as suite
 import numpy as np
+import cv2
 from robosuite.wrappers import GymWrapper
 from robosuite.utils.detector import KitchenDetector
 from robosuite.wrappers.kitchen.kitchen_pick import KitchenPickWrapper
 from robosuite.wrappers.kitchen.kitchen_place import KitchenPlaceWrapper
 from robosuite.wrappers.kitchen.vision import KitchenVisionWrapper
-import cv2
-
 from robosuite.devices import Keyboard
 from robosuite.utils.input_utils import input2action
 
 # env import
 import gymnasium as gym
+
 
 if __name__ == "__main__":
     # Define the command line arguments
@@ -60,10 +60,8 @@ if __name__ == "__main__":
         obs = env.reset()
         info = None
     
-    obj_to_pick = 'RoundNut'
+    state = info['state']
     gripper_body = env.sim.model.body_name2id('gripper0_eef')
-    detector = KitchenDetector(env)
-    state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
     counter = 0
 
 
@@ -114,8 +112,6 @@ if __name__ == "__main__":
                 print(terminated)
         counter += 1
 
-
-
         new_state = info['state']
         
         if new_state != state:
@@ -132,4 +128,3 @@ if __name__ == "__main__":
 
         #print("Obs: {}\n\n".format(obs))
         env.render()
-
