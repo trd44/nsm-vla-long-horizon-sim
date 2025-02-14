@@ -39,7 +39,7 @@ def call_planner(pddl_dir, problem="problem_dummy.pddl", structure="pddl", mode=
     domain_path = pddl_dir + "domain.pddl"
     problem_path = pddl_dir + problem
     if structure == "pddl":
-        run_script = f"../Metric-FF-v2.1/./ff -o {domain_path} -f {problem_path} -s {mode}"
+        run_script = f"./Metric-FF-v2.1/./ff -o {domain_path} -f {problem_path} -s {mode}"
         output = subprocess.getoutput(run_script)
         #print("Output = ", output)
         if "unsolvable" in output or "goal can be simplified to FALSE" in output:
