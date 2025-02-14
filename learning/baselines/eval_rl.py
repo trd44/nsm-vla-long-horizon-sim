@@ -138,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument('--name', type=str, default=None, help='Name of the experiment')
     parser.add_argument('--render', action='store_true', help='Render the environment')
     parser.add_argument('--vision', action='store_true', help='Use vision based learning')
+    parser.add_argument('--logs', type=str, default=None)
 
     args = parser.parse_args()
     # Set the random seed
@@ -168,9 +169,16 @@ if __name__ == "__main__":
     args.logdir = os.path.join(args.env_dir, 'logs')
     args.modeldir = os.path.join(args.env_dir, 'models')
     args.bufferdir = os.path.join(args.env_dir, 'buffers')
+    if args.logs == None:
+        args.logs = args.logdir
     os.makedirs(args.logdir, exist_ok=True)
     os.makedirs(args.modeldir, exist_ok=True)
     os.makedirs(args.bufferdir, exist_ok=True)
+    os.makedirs(args.logs, exist_ok=True)
+
+    # Save PID to a file
+    with open(args.logs+"/pid.txt", "w") as f:
+        f.write(str(os.getpid()))
 
     # Create the environment
     env = suite.make(

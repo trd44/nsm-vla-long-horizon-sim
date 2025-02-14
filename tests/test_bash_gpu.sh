@@ -66,11 +66,9 @@ cleanup() {
     # Generate human-friendly summary
     echo -e "\n==================== Performance Summary ====================" >> "$SUM_LOG"
 
-    # Extract total run time from /usr/bin/time output in PERF_LOG
-    RUN_TIME=$(grep "Elapsed (wall clock) time" "$PERF_LOG" | awk '{print $8}')
+    # Extract total run time from /usr/bin/time output
+    RUN_TIME=$(grep "Elapsed (wall clock) time" "$LOG_FILE" | awk '{print $8}')
     echo -e "⏱️  Total Run Time: $RUN_TIME" >> "$SUM_LOG"
-
-
 
     # Extract CPU power usage summary
     if [[ -f "$CPU_POWER_LOG" ]]; then
@@ -174,9 +172,7 @@ echo "Python path: $(which python)"
 
 # Run the Python script with profiling tools and capture all metrics in one command
 /usr/bin/time -v perf stat \
-    -e mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses \
-    ncu --metrics sm__warps_active.avg.per_cycle_active,sm__cycles_active.avg,gpu__time_duration.sum,gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed,launch__occupancy_per_block_size --log-file "$GPU_COMPUTATION_LOG" \
-    python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" \
+    -e mem-loads,mem-stores,cache-references,cache-misses,cpu-cycles,instructions,branch-instructions,branch-misses python learning/baselines/eval_rl.py --vision --env "$ARG1" --op "$ARG2" --seed "$ARG3" --logs "$LOG_DIR" \
     &> "$PERF_LOG"
 
 # Stop monitoring
