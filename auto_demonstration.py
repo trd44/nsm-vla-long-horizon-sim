@@ -727,6 +727,10 @@ if __name__ == "__main__":
         use_object_obs=not(args.vision),
     )
 
+    mjcf_xml = env.sim.model.get_xml()
+    print(mjcf_xml)
+
+
     # Wrap the environment
     if args.env == 'Hanoi':
         detector = HanoiDetector(env)

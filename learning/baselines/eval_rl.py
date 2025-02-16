@@ -138,6 +138,7 @@ if __name__ == "__main__":
     parser.add_argument('--name', type=str, default=None, help='Name of the experiment')
     parser.add_argument('--render', action='store_true', help='Render the environment')
     parser.add_argument('--vision', action='store_true', help='Use vision based learning')
+    parser.add_argument('--size', type=int, default=128, help='size of the image observation (square)')
 
     args = parser.parse_args()
     # Set the random seed
@@ -193,6 +194,8 @@ if __name__ == "__main__":
         horizon=1000,
         use_camera_obs=args.vision,
         use_object_obs=not(args.vision),
+        camera_heights=args.size,
+        camera_widths=args.size,
     )
 
     # Wrap the environment
