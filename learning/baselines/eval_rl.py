@@ -191,6 +191,8 @@ if __name__ == "__main__":
         horizon=1000,
         use_camera_obs=args.vision,
         use_object_obs=not(args.vision),
+        camera_heights=args.size,
+        camera_widths=args.size,
     )
 
     eval_env = suite.make(
