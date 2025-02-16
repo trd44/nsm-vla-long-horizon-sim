@@ -1,14 +1,14 @@
 torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
   --vla_path "openvla/openvla-7b" \
-  --data_root_dir /cyclic_lxm/mimicgen/datasets/core \
-  --dataset_name bridge_orig \
+  --data_root_dir /root/tensorflow_datasets \
+  --dataset_name kitchen_env \
   --run_root_dir /cyclic_lxm/VLA/checkpoint \
   --adapter_tmp_dir /cyclic_lxm/VLA/adapter \
   --lora_rank 32 \
-  --batch_size 16 \
-  --grad_accumulation_steps 1 \
+  --batch_size 2 \
+  --grad_accumulation_steps 4 \
   --learning_rate 5e-4 \
   --image_aug True \
-  --wandb_project /cyclic_lxm/VLA/wandb_project \
-  --wandb_entity /cyclic_lxm/VLA/wandb_entity \
+  --wandb_project kitchen_env_wandb_project \
+  --wandb_entity kitchen_env_wandb_entity \
   --save_steps 1000

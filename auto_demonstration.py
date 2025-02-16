@@ -113,6 +113,7 @@ class RecordDemos(gym.Wrapper):
         """
         Runs the trajectory
         """
+        done = False
         for operation in self.plan:
             try:
                 function, self.task, goal = self.operator_to_function(operation)
@@ -127,23 +128,39 @@ class RecordDemos(gym.Wrapper):
         print("Successful episode?: ", done)
         return done
 
-    def save_trajectory(self):
+    def save_trajectory(self, num_recorded_eps):
         """
         Saves the trajectory to the buffer
         """
-        for step in self.action_steps:
-            if step in self.episode_buffer.keys():
-                if self.args.vla:
-                    if step not in self.data_buffer.keys():
-                        self.data_buffer[step] = [self.episode_buffer[step]]
-                    else:
-                        self.data_buffer[step].append(self.episode_buffer[step])
-                else:
+        if self.args.vla:
+            episode = []
+            for step in self.action_steps:
+                if step in self.episode_buffer.keys():
+                    for i in range(0,len(self.episode_buffer[step]),2): 
+                        # Convert action from dx,dy,dz,gripper to dx,dy,dz,d_roll,d_pitch,d_yaw,gripper
+                        action_4dim = self.episode_buffer[step][i]
+                        action = np.concatenate((action_4dim[:3], np.zeros(3), action_4dim[3:]))
+
+                        raw_image = self.episode_buffer[step][i+1]
+                        image = np.array(raw_image).reshape((256, 256, 3))
+                        
+                        episode.append({
+                            'image': image,
+                            # 'wrist_image': np.asarray(np.random.rand(64, 64, 3) * 255, dtype=np.uint8),
+                            # 'state': np.asarray(np.random.rand(10), dtype=np.float32),
+                            'action': action,
+                            'language_instruction': step,
+                        })
+            np.save(f'data/kitchen_env/episode_{num_recorded_eps}.npy', episode)
+        
+        else:
+            for step in self.action_steps:
+                if step in self.episode_buffer.keys():
                     if step not in self.data_buffer.keys():
                         self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
                     else:
                         self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
-        self.zip_buffer(self.args.traces)
+            self.zip_buffer(self.data_buffer, self.args.traces)
         obs = self.reset()
         return obs
 
@@ -169,7 +186,8 @@ class RecordDemos(gym.Wrapper):
             if action_step not in self.action_steps:
                 self.action_steps.append(action_step)
             if action_step not in self.episode_buffer.keys():
-                self.episode_buffer[action_step] = [obs, action, next_obs]
+                # self.episode_buffer[action_step] = [obs, action, next_obs] # Why 3 things?
+                self.episode_buffer[action_step] = [action, next_obs]
             else:
                 self.episode_buffer[action_step] += [action, next_obs]
             return state_memory
@@ -727,9 +745,7 @@ if __name__ == "__main__":
         use_object_obs=not(args.vision),
     )
 
-    mjcf_xml = env.sim.model.get_xml()
-    print(mjcf_xml)
-
+    env.reset()
 
     # Wrap the environment
     if args.env == 'Hanoi':
@@ -744,18 +760,22 @@ if __name__ == "__main__":
     env = GymWrapper(env, proprio_obs=not(args.vision))
     env = RecordDemos(env, args.vision, detector, pddl_path, args, render=args.render, randomize=True)
 
+    os.makedirs(f'data/kitchen_env', exist_ok=True)
+
     # Run the recording of the demonstrations
-    num_recorder_eps = 0
+    num_recorded_eps = 0
+    recorded_eps = 0
     episode = 1
-    while num_recorder_eps < args.episodes: 
+    while recorded_eps < args.episodes: 
         obs = env.reset()
         print("Episode: {}".format(episode))
         keys = list(env.data_buffer.keys())
         done = env.run_trajectory(obs)
         if done:
-            obs = env.save_trajectory()
+            obs = env.save_trajectory(recorded_eps)
+            recorded_eps += 1
         episode += 1
         if len(keys) > 0:
-            num_recorder_eps = len(env.data_buffer[keys[0]])
-            print("Number of recorded episodes: {}".format(num_recorder_eps))
+            num_recorded_eps = len(env.data_buffer[keys[0]])
+            print("Number of recorded episodes: {}".format(num_recorded_eps))
             print("\n\n")

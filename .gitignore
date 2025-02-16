@@ -29,3 +29,6 @@ object_detection/
 *.spec
 *.cover
 *.log
+rlds_dataset_builder
+VLA/adapter
+VLA/checkpoint
