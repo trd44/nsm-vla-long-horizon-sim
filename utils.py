@@ -3,7 +3,6 @@ import dill
 import yaml
 import copy
 import detection.detector
-import planning.planning_utils
 import json
 import re
 import copy
@@ -22,8 +21,20 @@ from robosuite.wrappers import VisualizationWrapper
 from stable_baselines3 import SAC
 from stable_baselines3.common.utils import set_random_seed
 from tarski import fstrips as fs
+from io import BytesIO
 
 config_file = "config.yaml"
+
+def load_image(image_path:str) -> np.array:
+    """load an image from the given path
+
+    Args:
+        image_path (str): the path to the image
+
+    Returns:
+        np.array: the image as a numpy array
+    """
+    return np.array(Image.open(image_path))
 
 def load_config(config_file):
     with open(config_file, 'r') as file:
@@ -572,6 +583,20 @@ def save_agent_view_image(image:np.array):
     # PIL image is flipped, so flip it back
     image = image.transpose(Image.FLIP_TOP_BOTTOM)
     image.save(config['image_path'])
+
+def numpy_to_base64(image_array):
+    """Converts a NumPy image (H, W, C) to a Base64-encoded string."""
+    # Convert to PIL image
+    image = Image.fromarray(image_array.astype('uint8'))
+
+    # Save to a buffer in PNG format
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    
+    # Encode as Base64
+    base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    
+    return base64_str
 
 def encode_image(image_path:str):
     """Encode the image at `image_path`

@@ -1,6 +1,7 @@
 import base64
 from planning.llm_planners import *
 from utils import *
+from planning.planner import *
 from langchain_openai import OpenAI
 from langchain_core.messages import *
 from langchain_openai import ChatOpenAI
@@ -53,6 +54,7 @@ def chat_completion(prompt:str, base64_image:bytes=None) -> str:
 
 if __name__=="__main__":
     # test the VLM
+    plan = call_planner()
     prompt = "You are the robot arm with a gripper performing tabletop manipulation tasks. Describe what you see in the image of the task."
     image_path = "images/agent_view.jpg"
     base64_image = encode_image(image_path)

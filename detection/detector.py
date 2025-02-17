@@ -1,6 +1,5 @@
 import itertools
 from typing import *
-from robosuite.environments.base import MujocoEnv
 
 class Detector:
     def __init__(self, env, return_int=False):
