@@ -3,6 +3,8 @@ from VLM.prompts import *
 from VLM.openai_api import *
 from utils import *
 from planner import *
+from llm_planners import *
+from tarski import fstrips as fs
 
 def vlm_evaluate_success(obs:dict, operator:str):
     """evaluate whether the operator has been successfully executed in the environment
@@ -25,10 +27,27 @@ def vlm_evaluate_success(obs:dict, operator:str):
     else:
         raise ValueError("Invalid response from the VLM")
 
+
+def grounded_operator_repr(grounded_op:fs.Action) -> str:
+    """Return a string representation of the grounded operator
+
+    Args:
+        grounded_op (fs.Action): the grounded operator
+    Returns:
+        str: the string representation of the grounded operator
+    """
+    effects_str:str = ' '.join(f'({eff})' for eff in grounded_op.effects)
+    return f"{grounded_op.name}\nprecondition: {grounded_op.precondition.pddl_repr()}\neffects: and {effects_str}"
+
+
 if __name__ == "__main__":
     # test the VLM evaluator
-    plan = call_planner(pddl_dir="planning/PDDL/nut_assembly/")
-    grounded_op = plan[0][0]
+    # get a grounded operator from the planner. Use the first one in the plan
+    planner = SymbolicPlanner(config=load_config('config.yaml')['planning']['nut_assembly'])
+    plan = planner.search()
+    grounded_op = grounded_operator_repr(plan[0])
+    # load the example image
     image = load_image("images/agent_view.jpg")
     dummy_obs = {'agentview_image': image}
+    # evaluate the success of the grounded operator
     success = vlm_evaluate_success(dummy_obs, grounded_op)

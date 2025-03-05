@@ -10,4 +10,18 @@ Answer:
 """
 
 # a very simple prompt for planning
-plan_prompt = """You are a robot arm with a gripper that can manipulate tabletop objects. You are capable of understanding the Planning Domain Definition Language (PDDL). Based on the image, generate a plan to achieve the goal of the task."""
+plan_prompt = """You are a robot arm with a gripper that can manipulate tabletop objects. You are capable of understanding the Planning Domain Definition Language (PDDL). The domain file is as follows:
+```
+{domain}
+```
+the problem files is as follows:
+```
+{problem}
+```
+generate a plan to achieve the goal defined in the problem file. Separate the grounded operators in the plan with a newline in the following format:
+```
+grounded operator1
+grounded operator2
+...
+```
+"""

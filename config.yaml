@@ -94,26 +94,30 @@ planning:
     planning_dir: "planning/PDDL/hanoi"
     domain: "hanoi"
     init_planning_domain: "domain.pddl" # the initial domain file
-    planning_problem: "problem_save.pddl" # the partially defined planning problem file
+    planning_problem: "problem_dummy.pddl" # the partially defined planning problem file
     planning_goal_node: "goal_node" # the pickled file name for the goal node
+    max_depth: 15 # maximum search depth
   kitchen:
     planning_dir: "planning/PDDL/kitchen"
     domain: "kitchen"
     init_planning_domain: "domain.pddl" # the initial domain file
-    planning_problem: "problem_save.pddl" # the partially defined planning problem file
+    planning_problem: "problem_dummy.pddl" # the partially defined planning problem file
     planning_goal_node: "goal_node" # the pickled file name for the goal node
+    max_depth: 15 # maximum search depth
   nut_assembly:
     planning_dir: "planning/PDDL/nut_assembly"
     domain: "nut_assembly"
     init_planning_domain: "domain.pddl" # the initial domain file
-    planning_problem: "problem_save.pddl" # the partially defined planning problem file
+    planning_problem: "problem_dummy.pddl" # the partially defined planning problem file
     planning_goal_node: "goal_node" # the pickled file name for the goal nod
+    max_depth: 15 # maximum search depth
   sorting:
     planning_dir: "planning/PDDL/sorting"
     domain: "sorting"
     init_planning_domain: "domain.pddl" # the initial domain file
-    planning_problem: "problem_save.pddl" # the partially defined planning problem file
+    planning_problem: "problem_dummy.pddl" # the partially defined planning problem file
     planning_goal_node: "goal_node" # the pickled file name for the goal nod
+    max_depth: 15 # maximum search depth
 
 logging: # TODO: enable this
   level: "INFO"
