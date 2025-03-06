@@ -7,6 +7,7 @@ import warnings
 import torch
 from datetime import datetime
 from robosuite.wrappers.gym_wrapper import GymWrapper
+from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
 from custom_rl_callback import CustomEvalCallback
 from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement, EvalCallback
@@ -17,14 +18,17 @@ from stable_baselines3.common.env_checker import check_env
 from robosuite.wrappers.nutassembly.assemble_pick import AssemblePickWrapper
 from robosuite.wrappers.nutassembly.assemble_place import AssemblePlaceWrapper
 from robosuite.wrappers.nutassembly.vision import AssembleVisionWrapper
+from robosuite.wrappers.nutassembly.object_state import AssembleStateWrapper
 from robosuite.wrappers.kitchen.kitchen_pick import KitchenPickWrapper
 from robosuite.wrappers.kitchen.kitchen_place import KitchenPlaceWrapper
 from robosuite.wrappers.kitchen.turn_on_stove import TurnOnStoveWrapper
 from robosuite.wrappers.kitchen.turn_off_stove import TurnOffStoveWrapper
 from robosuite.wrappers.kitchen.vision import KitchenVisionWrapper
+from robosuite.wrappers.kitchen.object_state import KitchenStateWrapper
 from robosuite.wrappers.hanoi.hanoi_pick import HanoiPickWrapper
 from robosuite.wrappers.hanoi.hanoi_place import HanoiPlaceWrapper
 from robosuite.wrappers.hanoi.vision import HanoiVisionWrapper
+from robosuite.wrappers.hanoi.object_state import HanoiStateWrapper
 
 warnings.filterwarnings("ignore")
 
@@ -51,6 +55,7 @@ op_to_wrapper = {"Hanoi":
     }
 
 vision_wrapper = {"Hanoi": HanoiVisionWrapper, "KitchenEnv": KitchenVisionWrapper, "NutAssembly": AssembleVisionWrapper}
+object_state_wrapper = {"Hanoi": HanoiStateWrapper, "KitchenEnv": KitchenStateWrapper, "NutAssembly": AssembleStateWrapper}
 
 # setting device on GPU if available, else CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -71,7 +76,7 @@ def learn_policy(args, env, eval_env, name):
         policy_mode,
         env,
         learning_rate=args.lr,
-        buffer_size=int(1e4),
+        buffer_size=int(1e5),
         device=device,
         learning_starts=100,#10000,
         batch_size=256,
@@ -209,6 +214,9 @@ if __name__ == "__main__":
     )
 
     # Wrap the environment
+    if args.vision:
+        env = VisualizationWrapper(env)
+        eval_env = VisualizationWrapper(eval_env)
     env = GymWrapper(env, proprio_obs=not(args.vision))
     eval_env = GymWrapper(eval_env, proprio_obs=not(args.vision))
     env = op_to_wrapper[args.env][args.op](env)
@@ -216,6 +224,9 @@ if __name__ == "__main__":
     if args.vision:
         env = vision_wrapper[args.env](env)
         eval_env = vision_wrapper[args.env](eval_env)
+    else:
+        env = object_state_wrapper[args.env](env)
+        eval_env = object_state_wrapper[args.env](eval_env)
 
     #check_env(env)
     env = Monitor(env, filename=None, allow_early_resets=True)
