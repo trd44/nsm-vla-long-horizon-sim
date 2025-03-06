@@ -1,7 +1,18 @@
 import os
 import copy
 import subprocess
+from tarski import fstrips as fs
 
+def grounded_operator_repr(grounded_op:fs.Action) -> str:
+    """Return a string representation of the grounded operator
+
+    Args:
+        grounded_op (fs.Action): the grounded operator
+    Returns:
+        str: the string representation of the grounded operator
+    """
+    effects_str:str = ' '.join(f'({eff})' for eff in grounded_op.effects)
+    return f"{grounded_op.name}\nprecondition: {grounded_op.precondition.pddl_repr()}\neffects: and {effects_str}"
 
 def add_predicates_to_pddl(pddl_dir, init_predicates, pddl_name='problem_save.pddl', problem_name="problem_dummy.pddl"):
     '''
