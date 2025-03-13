@@ -9,10 +9,11 @@ from datetime import datetime
 from robosuite.wrappers.gym_wrapper import GymWrapper
 from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
 from custom_rl_callback import CustomEvalCallback
-from stable_baselines3 import SAC
+from stable_baselines3 import SAC, PPO
 from stable_baselines3.common.callbacks import CallbackList, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement, EvalCallback
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
+from stable_baselines3.common.noise import NormalActionNoise
 
 # Import environments
 from robosuite.wrappers.nutassembly.assemble_pick import AssemblePickWrapper
@@ -70,26 +71,31 @@ if device.type == 'cuda':
     print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
 
 def learn_policy(args, env, eval_env, name):
+    # Add noise to SAC actions
+    #action_dim = env.action_space.shape[0]
+    #action_noise = NormalActionNoise(mean=np.zeros(action_dim), sigma=0.2 * np.ones(action_dim))
     # Define the model
     policy_mode = 'MlpPolicy' if not args.vision else 'CnnPolicy'
     model = SAC(
         policy_mode,
         env,
-        learning_rate=args.lr,
-        buffer_size=int(1e5),
-        device=device,
-        learning_starts=100,#10000,
-        batch_size=256,
-        tau=0.005,
-        gamma=0.99,
-        policy_kwargs=dict(net_arch=[1024, 512, 256]),
+        #action_noise=action_noise,
+        #learning_rate=args.lr,
+        #buffer_size=int(1e6),
+        #device=device,
+        #learning_starts=100,#10000,
+        #batch_size=256,
+        #tau=0.005,
+        #gamma=0.99,
+        #policy_kwargs=dict(net_arch=[1024, 512, 256]),
+        policy_kwargs=dict(net_arch=[256, 256]),
         verbose=1,
         tensorboard_log=args.logdir,
         seed=args.seed
     )
     print("Saving the model in: {}, as best_model.zip and final model {}".format(args.modeldir, os.path.join(args.bufferdir, 'task' + '_sac')))
     # Define all callbacks
-    callbacks = []
+    #callbacks = []
 
     #callbacks.append(eval_callback)
     # Add a stop callback on success rate of 100%
@@ -117,7 +123,8 @@ def learn_policy(args, env, eval_env, name):
         deterministic=True,
         render=False,
         verbose=1,
-        callback_after_eval=StopTrainingOnRewardThreshold(reward_threshold=0.95, verbose=1),
+        stop_training_threshold=0.95,
+        #callback_after_eval=StopTrainingOnRewardThreshold(reward_threshold=0.95, verbose=1),
     )
 
     # Train the model
@@ -138,7 +145,7 @@ if __name__ == "__main__":
     parser.add_argument('--timesteps', type=int, default=int(1e7), help='Number of timesteps to train for')
     parser.add_argument('--eval_freq', type=int, default=100_000, help='Evaluation frequency')
     parser.add_argument('--n_eval_episodes', type=int, default=50, help='Number of evaluation episodes')
-    parser.add_argument('--lr', type=float, default=3e-5, help='Learning rate') # 0.00005 0.00001
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate') # 0.00005 0.00001
     parser.add_argument('--seed', type=int, default=0, help='Random seed')
     parser.add_argument('--name', type=str, default=None, help='Name of the experiment')
     parser.add_argument('--render', action='store_true', help='Render the environment')
@@ -213,24 +220,30 @@ if __name__ == "__main__":
         camera_widths=args.size,
     )
 
+    if args.env == "Hanoi":
+        env.random_reset = True
+        eval_env.random_reset = True
+
     # Wrap the environment
     if args.vision:
         env = VisualizationWrapper(env)
         eval_env = VisualizationWrapper(eval_env)
-    env = GymWrapper(env, proprio_obs=not(args.vision))
-    eval_env = GymWrapper(eval_env, proprio_obs=not(args.vision))
-    env = op_to_wrapper[args.env][args.op](env)
-    eval_env = op_to_wrapper[args.env][args.op](eval_env)
+    env = GymWrapper(env, proprio_obs=False)
+    eval_env = GymWrapper(eval_env, proprio_obs=False)
+    env = op_to_wrapper[args.env][args.op](env, horizon=100, image_obs=args.vision)
+    eval_env = op_to_wrapper[args.env][args.op](eval_env, horizon=100, image_obs=args.vision)
     if args.vision:
+        print("Using vision wrapper")
         env = vision_wrapper[args.env](env)
         eval_env = vision_wrapper[args.env](eval_env)
     else:
+        print("Using object state wrapper")
         env = object_state_wrapper[args.env](env)
         eval_env = object_state_wrapper[args.env](eval_env)
 
-    #check_env(env)
-    env = Monitor(env, filename=None, allow_early_resets=True)
-    eval_env = Monitor(eval_env, filename=None, allow_early_resets=True)
+    check_env(env)
+    #env = Monitor(env, filename=None, allow_early_resets=True)
+    #eval_env = Monitor(eval_env, filename=None, allow_early_resets=True)
 
     # Trains the policy
     model = learn_policy(args, env, eval_env, args.op)
