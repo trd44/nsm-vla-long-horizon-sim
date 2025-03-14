@@ -3,6 +3,7 @@ import time
 import argparse
 import os
 import psutil
+import glob
 
 def run_nvidia_smi(command):
     """Run an nvidia-smi command and return its output as a list of lines."""
@@ -18,7 +19,7 @@ def parse_dmon_output(dmon_lines):
     parsed_data = []
     for line in dmon_lines:
         parts = line.split()
-        if len(parts) >= 11 and parts[0].isdigit():  
+        if len(parts) >= 11 and parts[0].isdigit():
             parsed_data.append({
                 "gpu_id": parts[0],
                 "power_w": parts[1],
@@ -41,7 +42,7 @@ def parse_pmon_output(pmon_lines):
     parsed_data = []
     for line in pmon_lines:
         parts = line.split()
-        if len(parts) >= 9 and parts[0].isdigit():  
+        if len(parts) >= 9 and parts[0].isdigit():
             pid = int(parts[1])
             cmd_line = get_process_cmdline(pid)
             parsed_data.append({
@@ -78,18 +79,50 @@ def get_cpu_usage(pids):
                 "memory_percent": p.memory_percent(),
                 "num_threads": p.num_threads(),
                 "io_read_bytes": p.io_counters().read_bytes,
-                "io_write_bytes": p.io_counters().write_bytes
+                "io_write_bytes": p.io_counters().write_bytes,
+                "cpu_power_w": get_cpu_power()
             })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return cpu_data
+
+def get_cpu_power():
+    """Reads CPU power usage from Intel RAPL or AMD hwmon sensors."""
+    power_w = None
+    
+    # Try Intel RAPL power reading
+    rapl_paths = glob.glob("/sys/class/powercap/intel-rapl:*")
+    for path in rapl_paths:
+        energy_path = os.path.join(path, "energy_uj")
+        if os.path.exists(energy_path):
+            try:
+                with open(energy_path, "r") as f:
+                    energy_uj = int(f.read().strip())
+                    power_w = energy_uj / 1e6  # Convert from microjoules to watts
+                    break
+            except:
+                pass
+
+    # Try AMD hwmon power reading
+    if power_w is None:
+        hwmon_paths = glob.glob("/sys/class/hwmon/hwmon*/power1_input")
+        for path in hwmon_paths:
+            try:
+                with open(path, "r") as f:
+                    power_uw = int(f.read().strip())
+                    power_w = power_uw / 1e6  # Convert from microwatts to watts
+                    break
+            except:
+                pass
+
+    return power_w if power_w is not None else 0.0
 
 def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
     """Continuously logs GPU and CPU usage to separate files."""
     with open(dmon_log_path, "w") as dmon_log, open(pmon_log_path, "w") as pmon_log, open(cpu_log_path, "w") as cpu_log:
         dmon_log.write("timestamp,gpu_id,power_w,gpu_temp_c,mem_temp_c,sm_util,mem_util,enc_util,dec_util,jpg_util,ofa_util,fb_mem_mb,bar1_mem_mb,ccpm_mem_mb\n")
         pmon_log.write("timestamp,gpu_id,pid,type,sm_util,mem_util,enc_util,dec_util,fb_mem_mb,ccpm_mem_mb,cmd_line\n")
-        cpu_log.write("timestamp,pid,cmd_line,cpu_percent,memory_percent,num_threads,io_read_bytes,io_write_bytes\n")
+        cpu_log.write("timestamp,pid,cmd_line,cpu_percent,memory_percent,num_threads,io_read_bytes,io_write_bytes,cpu_power_w\n")
 
     print(f"Logging GPU & CPU usage to {dmon_log_path}, {pmon_log_path}, {cpu_log_path}... Press Ctrl+C to stop.")
 
@@ -119,7 +152,7 @@ def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
 
             with open(cpu_log_path, "a") as cpu_log:
                 for c in cpu_data:
-                    cpu_log.write(f"{timestamp},{c['pid']},{c['cmd_line']},{c['cpu_percent']},{c['memory_percent']},{c['num_threads']},{c['io_read_bytes']},{c['io_write_bytes']}\n")
+                    cpu_log.write(f"{timestamp},{c['pid']},{c['cmd_line']},{c['cpu_percent']},{c['memory_percent']},{c['num_threads']},{c['io_read_bytes']},{c['io_write_bytes']},{c['cpu_power_w']}\n")
 
             time.sleep(1)  # Log every second
 
@@ -128,12 +161,9 @@ def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Log GPU and CPU usage for processes running on GPU.")
-    parser.add_argument("--dmon_log", type=str, default=os.path.join(os.getcwd(), "gpu_dmon_log.csv"),
-                        help="Path to device-level GPU log file.")
-    parser.add_argument("--pmon_log", type=str, default=os.path.join(os.getcwd(), "gpu_pmon_log.csv"),
-                        help="Path to process-level GPU log file.")
-    parser.add_argument("--cpu_log", type=str, default=os.path.join(os.getcwd(), "cpu_log.csv"),
-                        help="Path to CPU usage log file.")
+    parser.add_argument("--dmon_log", type=str, default=os.path.join(os.getcwd(), "gpu_dmon_log.csv"))
+    parser.add_argument("--pmon_log", type=str, default=os.path.join(os.getcwd(), "gpu_pmon_log.csv"))
+    parser.add_argument("--cpu_log", type=str, default=os.path.join(os.getcwd(), "cpu_log.csv"))
     args = parser.parse_args()
 
     log_usage(args.dmon_log, args.pmon_log, args.cpu_log)
