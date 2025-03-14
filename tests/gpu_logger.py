@@ -80,17 +80,16 @@ def get_cpu_usage(pids):
                 "num_threads": p.num_threads(),
                 "io_read_bytes": p.io_counters().read_bytes,
                 "io_write_bytes": p.io_counters().write_bytes,
-                "cpu_power_w": get_cpu_power()
+                "cpu_energy_j": get_cpu_energy()
             })
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
     return cpu_data
 
-def get_cpu_power():
-    """Reads CPU power usage from Intel RAPL or AMD hwmon sensors."""
-    power_w = None
+def get_cpu_energy():
+    """Reads CPU energy usage from Intel RAPL or AMD hwmon sensors."""
     
-    # Try Intel RAPL power reading
+    # Try Intel RAPL energy reading
     rapl_paths = glob.glob("/sys/class/powercap/intel-rapl:*")
     for path in rapl_paths:
         energy_path = os.path.join(path, "energy_uj")
@@ -98,24 +97,25 @@ def get_cpu_power():
             try:
                 with open(energy_path, "r") as f:
                     energy_uj = int(f.read().strip())
-                    power_w = energy_uj / 1e6  # Convert from microjoules to watts
+                    energy_j = energy_uj / 1e6  # Convert from microjoules to joules
                     break
             except:
                 pass
 
-    # Try AMD hwmon power reading
-    if power_w is None:
-        hwmon_paths = glob.glob("/sys/class/hwmon/hwmon*/power1_input")
+    # Try AMD hwmon energy reading (if applicable)
+    if energy_j is None:
+        hwmon_paths = glob.glob("/sys/class/hwmon/hwmon*/energy1_input")
         for path in hwmon_paths:
-            try:
-                with open(path, "r") as f:
-                    power_uw = int(f.read().strip())
-                    power_w = power_uw / 1e6  # Convert from microwatts to watts
-                    break
-            except:
-                pass
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        energy_uj = int(f.read().strip())
+                        energy_j = energy_uj / 1e6  # Convert from microjoules to joules
+                        break
+                except:
+                    pass
 
-    return power_w if power_w is not None else 0.0
+    return energy_j if energy_j is not None else 0
 
 def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
     """Continuously logs GPU and CPU usage to separate files."""
@@ -152,7 +152,7 @@ def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
 
             with open(cpu_log_path, "a") as cpu_log:
                 for c in cpu_data:
-                    cpu_log.write(f"{timestamp},{c['pid']},{c['cmd_line']},{c['cpu_percent']},{c['memory_percent']},{c['num_threads']},{c['io_read_bytes']},{c['io_write_bytes']},{c['cpu_power_w']}\n")
+                    cpu_log.write(f"{timestamp},{c['pid']},{c['cmd_line']},{c['cpu_percent']},{c['memory_percent']},{c['num_threads']},{c['io_read_bytes']},{c['io_write_bytes']},{c['cpu_energy_j']}\n")
 
             time.sleep(1)  # Log every second
 
