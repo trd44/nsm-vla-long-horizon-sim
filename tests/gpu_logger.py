@@ -43,20 +43,23 @@ def parse_pmon_output(pmon_lines):
     for line in pmon_lines:
         parts = line.split()
         if len(parts) >= 9 and parts[0].isdigit():
-            pid = int(parts[1])
-            cmd_line = get_process_cmdline(pid)
-            parsed_data.append({
-                "gpu_id": parts[0],
-                "pid": pid,
-                "type": parts[2],
-                "sm_util": parts[3],
-                "mem_util": parts[4],
-                "enc_util": parts[5],
-                "dec_util": parts[6],
-                "fb_mem_mb": parts[7],
-                "ccpm_mem_mb": parts[8],
-                "cmd_line": cmd_line
-            })
+            try:
+                pid = int(parts[1])
+                cmd_line = get_process_cmdline(pid)
+                parsed_data.append({
+                    "gpu_id": parts[0],
+                    "pid": pid,
+                    "type": parts[2],
+                    "sm_util": parts[3],
+                    "mem_util": parts[4],
+                    "enc_util": parts[5],
+                    "dec_util": parts[6],
+                    "fb_mem_mb": parts[7],
+                    "ccpm_mem_mb": parts[8],
+                    "cmd_line": cmd_line
+                })
+            except ValueError:
+                continue
     return parsed_data
 
 def get_process_cmdline(pid):
