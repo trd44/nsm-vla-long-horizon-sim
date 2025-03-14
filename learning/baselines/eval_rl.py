@@ -79,16 +79,16 @@ def learn_policy(args, env, eval_env, name):
     model = SAC(
         policy_mode,
         env,
+        batch_size=512,
         #action_noise=action_noise,
         #learning_rate=args.lr,
         #buffer_size=int(1e6),
         #device=device,
         #learning_starts=100,#10000,
-        #batch_size=256,
         #tau=0.005,
         #gamma=0.99,
         #policy_kwargs=dict(net_arch=[1024, 512, 256]),
-        policy_kwargs=dict(net_arch=[256, 256]),
+        policy_kwargs=dict(net_arch=[256, 512, 128]),
         verbose=1,
         tensorboard_log=args.logdir,
         seed=args.seed
