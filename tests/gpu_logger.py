@@ -18,14 +18,21 @@ def parse_dmon_output(dmon_lines):
     parsed_data = []
     for line in dmon_lines:
         parts = line.split()
-        if len(parts) >= 6 and parts[0].isdigit():  # Ignore headers, look for numeric GPU indices
+        if len(parts) >= 11 and parts[0].isdigit():  # Ensure we have numeric GPU indices
             parsed_data.append({
                 "gpu_id": parts[0],
-                "sm_util": parts[1],  # Streaming multiprocessor usage (%)
-                "mem_util": parts[2],  # Memory usage (%)
-                "enc_util": parts[3],  # Encoder usage (%)
-                "dec_util": parts[4],  # Decoder usage (%)
-                "power_w": parts[5]  # Power consumption (W)
+                "power_w": parts[1],   # Power consumption (W)
+                "gpu_temp_c": parts[2], # GPU temperature (°C)
+                "mem_temp_c": parts[3], # Memory temperature (°C) or '-'
+                "sm_util": parts[4],    # Streaming multiprocessor usage (%)
+                "mem_util": parts[5],   # Memory utilization (%)
+                "enc_util": parts[6],   # Encoder usage (%)
+                "dec_util": parts[7],   # Decoder usage (%)
+                "jpg_util": parts[8],   # JPEG decoding (%)
+                "ofa_util": parts[9],   # Optical Flow Accelerator (%)
+                "fb_mem_mb": parts[10], # Framebuffer memory (MB)
+                "bar1_mem_mb": parts[11], # BAR1 memory (MB)
+                "ccpm_mem_mb": parts[12] # Compute Process Memory (MB)
             })
     return parsed_data
 
@@ -34,33 +41,35 @@ def parse_pmon_output(pmon_lines):
     parsed_data = []
     for line in pmon_lines:
         parts = line.split()
-        if len(parts) >= 6 and parts[0].isdigit():  # Ignore headers, look for numeric PIDs
+        if len(parts) >= 9 and parts[0].isdigit():  # Ensure we have numeric GPU indices
             pid = int(parts[1])
-            cmd_name = get_process_name(pid)
+            cmd_line = get_process_cmdline(pid)
             parsed_data.append({
                 "gpu_id": parts[0],
                 "pid": pid,
-                "cmd_name": cmd_name,
-                "type": parts[2],  # Compute (C) or Graphics (G)
+                "type": parts[2],  # Compute (C), Graphics (G), or Both (C+G)
                 "sm_util": parts[3],  # GPU compute usage (%)
-                "mem_usage_mb": parts[4],  # GPU memory usage (MB)
+                "mem_util": parts[4],  # GPU memory usage (%)
                 "enc_util": parts[5],  # Encoder usage (%)
-                "dec_util": parts[6]   # Decoder usage (%)
+                "dec_util": parts[6],  # Decoder usage (%)
+                "fb_mem_mb": parts[7], # GPU memory usage (MB)
+                "ccpm_mem_mb": parts[8], # Compute Process Memory (MB)
+                "cmd_line": cmd_line  # Full command line (script + args)
             })
     return parsed_data
 
-def get_process_name(pid):
-    """Get the command name of a process given its PID"""
+def get_process_cmdline(pid):
+    """Get the full command line of a process given its PID"""
     try:
-        return psutil.Process(pid).name()
+        return " ".join(psutil.Process(pid).cmdline())
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return "Unknown"
 
 def log_gpu_usage(dmon_log_path, pmon_log_path):
     """Continuously logs GPU usage to separate dmon and pmon files."""
     with open(dmon_log_path, "w") as dmon_log, open(pmon_log_path, "w") as pmon_log:
-        dmon_log.write("timestamp,gpu_id,sm_util,mem_util,enc_util,dec_util,power_w\n")
-        pmon_log.write("timestamp,gpu_id,pid,cmd_name,type,sm_util,mem_usage_mb,enc_util,dec_util\n")
+        dmon_log.write("timestamp,gpu_id,power_w,gpu_temp_c,mem_temp_c,sm_util,mem_util,enc_util,dec_util,jpg_util,ofa_util,fb_mem_mb,bar1_mem_mb,ccpm_mem_mb\n")
+        pmon_log.write("timestamp,gpu_id,pid,type,sm_util,mem_util,enc_util,dec_util,fb_mem_mb,ccpm_mem_mb,cmd_line\n")
 
     print(f"Logging GPU usage to {dmon_log_path} (device) and {pmon_log_path} (process)... Press Ctrl+C to stop.")
 
@@ -75,11 +84,11 @@ def log_gpu_usage(dmon_log_path, pmon_log_path):
 
             with open(dmon_log_path, "a") as dmon_log:
                 for d in dmon_data:
-                    dmon_log.write(f"{timestamp},{d['gpu_id']},{d['sm_util']},{d['mem_util']},{d['enc_util']},{d['dec_util']},{d['power_w']}\n")
+                    dmon_log.write(f"{timestamp},{d['gpu_id']},{d['power_w']},{d['gpu_temp_c']},{d['mem_temp_c']},{d['sm_util']},{d['mem_util']},{d['enc_util']},{d['dec_util']},{d['jpg_util']},{d['ofa_util']},{d['fb_mem_mb']},{d['bar1_mem_mb']},{d['ccpm_mem_mb']}\n")
 
             with open(pmon_log_path, "a") as pmon_log:
                 for p in pmon_data:
-                    pmon_log.write(f"{timestamp},{p['gpu_id']},{p['pid']},{p['cmd_name']},{p['type']},{p['sm_util']},{p['mem_usage_mb']},{p['enc_util']},{p['dec_util']}\n")
+                    pmon_log.write(f"{timestamp},{p['gpu_id']},{p['pid']},{p['type']},{p['sm_util']},{p['mem_util']},{p['enc_util']},{p['dec_util']},{p['fb_mem_mb']},{p['ccpm_mem_mb']},{p['cmd_line']}\n")
 
             time.sleep(1)  # Log every second
 
