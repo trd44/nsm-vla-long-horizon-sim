@@ -122,7 +122,7 @@ def log_usage(dmon_log_path, pmon_log_path, cpu_log_path):
     with open(dmon_log_path, "w") as dmon_log, open(pmon_log_path, "w") as pmon_log, open(cpu_log_path, "w") as cpu_log:
         dmon_log.write("timestamp,gpu_id,power_w,gpu_temp_c,mem_temp_c,sm_util,mem_util,enc_util,dec_util,jpg_util,ofa_util,fb_mem_mb,bar1_mem_mb,ccpm_mem_mb\n")
         pmon_log.write("timestamp,gpu_id,pid,type,sm_util,mem_util,enc_util,dec_util,fb_mem_mb,ccpm_mem_mb,cmd_line\n")
-        cpu_log.write("timestamp,pid,cmd_line,cpu_percent,memory_percent,num_threads,io_read_bytes,io_write_bytes,cpu_power_w\n")
+        cpu_log.write("timestamp,pid,cmd_line,cpu_percent,memory_percent,num_threads,io_read_bytes,io_write_bytes,cpu_energy_j\n")
 
     print(f"Logging GPU & CPU usage to {dmon_log_path}, {pmon_log_path}, {cpu_log_path}... Press Ctrl+C to stop.")
 
