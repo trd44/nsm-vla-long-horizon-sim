@@ -44,10 +44,12 @@ if __name__ == "__main__":
         #camera_segmentations='element',
         render_camera="agentview",#"robot0_eye_in_hand", # Available "camera" names = ('frontview', 'birdview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand')
     )
+    env.random_reset = True
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    env = HanoiPickWrapper(env, render_init=True)
+    #env = HanoiPickWrapper(env, render_init=True)
+    env = HanoiPlaceWrapper(env, render_init=True)
     env = HanoiStateWrapper(env)
 
     device = Keyboard()
@@ -108,9 +110,7 @@ if __name__ == "__main__":
         # cv2.waitKey(1)
 
         if counter % 20 == 0:
-            print(reward)
-            if terminated:
-                print(terminated)
+            print(reward, env.obj_to_pick, env.place_to_drop)
         counter += 1
 
 

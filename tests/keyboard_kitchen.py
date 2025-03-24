@@ -12,6 +12,7 @@ from robosuite.wrappers.kitchen.kitchen_place import KitchenPlaceWrapper
 from robosuite.wrappers.kitchen.turn_on_stove import TurnOnStoveWrapper
 from robosuite.wrappers.kitchen.turn_off_stove import TurnOffStoveWrapper
 from robosuite.wrappers.kitchen.vision import KitchenVisionWrapper
+from robosuite.wrappers.kitchen.object_state import KitchenStateWrapper
 from robosuite.devices import Keyboard
 from robosuite.utils.input_utils import input2action
 
@@ -48,8 +49,10 @@ if __name__ == "__main__":
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    env = TurnOnStoveWrapper(env, render_init=True)
-    env = KitchenVisionWrapper(env)
+    #env = KitchenPickWrapper(env)
+    env = KitchenPlaceWrapper(env)
+    #env = KitchenVisionWrapper(env)
+    env = KitchenStateWrapper(env)
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -104,15 +107,15 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        image = obs.reshape(64, 64, 3)
+        # image = obs.reshape(64, 64, 3)
     
-        cv2.imshow("Detected Numbers", image)
-        cv2.waitKey(1)
+        # cv2.imshow("Detected Numbers", image)
+        # cv2.waitKey(1)
 
         if counter % 20 == 0:
             print(reward)
-            if terminated:
-                print(terminated)
+            #if terminated:
+            #    print(terminated)
         counter += 1
 
         new_state = info['state']

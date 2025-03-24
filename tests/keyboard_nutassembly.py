@@ -11,6 +11,7 @@ from robosuite.utils.detector import NutAssemblyDetector
 from robosuite.wrappers.nutassembly.assemble_pick import AssemblePickWrapper
 from robosuite.wrappers.nutassembly.assemble_place import AssemblePlaceWrapper
 from robosuite.wrappers.nutassembly.vision import AssembleVisionWrapper
+from robosuite.wrappers.nutassembly.object_state import AssembleStateWrapper
 from robosuite.devices import Keyboard
 from robosuite.utils.input_utils import input2action
 
@@ -53,7 +54,10 @@ if __name__ == "__main__":
     env = VisualizationWrapper(env)
     env = GymWrapper(env, proprio_obs=False)
     env = AssemblePlaceWrapper(env, render_init=True)
-    env = AssembleVisionWrapper(env)
+    #env = AssemblePickWrapper(env, render_init=True)
+    #env = AssembleVisionWrapper(env)
+    env = AssembleStateWrapper(env)
+
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -107,15 +111,13 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        image = obs.reshape(128, 128, 3)
+        # image = obs.reshape(128, 128, 3)
     
-        cv2.imshow("Detected Numbers", image)
-        cv2.waitKey(1)
+        # cv2.imshow("Detected Numbers", image)
+        # cv2.waitKey(1)
 
         if counter % 20 == 0:
             print(reward)
-            if terminated:
-                print(terminated)
         counter += 1
 
         new_state = info['state']

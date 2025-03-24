@@ -240,6 +240,7 @@ if __name__ == "__main__":
         print("Using object state wrapper")
         env = object_state_wrapper[args.env](env)
         eval_env = object_state_wrapper[args.env](eval_env)
+        env.relative_obs = True
 
     check_env(env)
     #env = Monitor(env, filename=None, allow_early_resets=True)
