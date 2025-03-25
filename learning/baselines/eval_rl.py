@@ -123,7 +123,7 @@ def learn_policy(args, env, eval_env, name):
         deterministic=True,
         render=False,
         verbose=1,
-        stop_training_threshold=0.95,
+        stop_training_threshold=0.85,
         #callback_after_eval=StopTrainingOnRewardThreshold(reward_threshold=0.95, verbose=1),
     )
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('--op', type=str, default='pick', choices=['pick', 'place', 'turnon', 'turnoff'], help='Name of the operator to train the policy for')
     parser.add_argument('--dir', type=str, default='./data/', help='Path to the data folder')
     parser.add_argument('--timesteps', type=int, default=int(1e7), help='Number of timesteps to train for')
-    parser.add_argument('--eval_freq', type=int, default=100_000, help='Evaluation frequency')
+    parser.add_argument('--eval_freq', type=int, default=50_000, help='Evaluation frequency')
     parser.add_argument('--n_eval_episodes', type=int, default=50, help='Number of evaluation episodes')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate') # 0.00005 0.00001
     parser.add_argument('--seed', type=int, default=0, help='Random seed')
@@ -241,6 +241,7 @@ if __name__ == "__main__":
         env = object_state_wrapper[args.env](env)
         eval_env = object_state_wrapper[args.env](eval_env)
         env.relative_obs = True
+        eval_env.relative_obs = True
 
     check_env(env)
     #env = Monitor(env, filename=None, allow_early_resets=True)
