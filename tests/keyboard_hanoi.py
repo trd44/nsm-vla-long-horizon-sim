@@ -9,6 +9,7 @@ from robosuite.utils.detector import HanoiDetector
 from robosuite.wrappers.hanoi.hanoi_pick import HanoiPickWrapper
 from robosuite.wrappers.hanoi.hanoi_place import HanoiPlaceWrapper
 from robosuite.wrappers.hanoi.vision import HanoiVisionWrapper
+from robosuite.wrappers.hanoi.object_state import HanoiStateWrapper
 import cv2
 
 from robosuite.devices import Keyboard
@@ -43,11 +44,13 @@ if __name__ == "__main__":
         #camera_segmentations='element',
         render_camera="agentview",#"robot0_eye_in_hand", # Available "camera" names = ('frontview', 'birdview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand')
     )
+    env.random_reset = True
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    env = HanoiPickWrapper(env, render_init=True)
-    env = HanoiVisionWrapper(env)
+    #env = HanoiPickWrapper(env, render_init=True)
+    env = HanoiPlaceWrapper(env, render_init=True)
+    env = HanoiStateWrapper(env)
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -101,15 +104,13 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        image = obs.reshape(256, 256, 3)
+        # image = obs.reshape(256, 256, 3)
     
-        cv2.imshow("Detected Numbers", image)
-        cv2.waitKey(1)
+        # cv2.imshow("Detected Numbers", image)
+        # cv2.waitKey(1)
 
         if counter % 20 == 0:
-            print(reward)
-            if terminated:
-                print(terminated)
+            print(reward, env.obj_to_pick, env.place_to_drop)
         counter += 1
 
 

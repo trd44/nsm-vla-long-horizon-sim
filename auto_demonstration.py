@@ -1,16 +1,26 @@
 import os, argparse, time, zipfile, pickle, copy
 import numpy as np
 import robosuite as suite
-from robosuite.wrappers import GymWrapper
 import robosuite_task_zoo
 from datetime import datetime
 import gymnasium as gym
 #import gym
 
+from robosuite.wrappers import GymWrapper
+from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
 from robosuite.utils.detector import HanoiDetector, KitchenDetector, NutAssemblyDetector
+from robosuite.wrappers.nutassembly.object_state import AssembleStateWrapper
+from robosuite.wrappers.kitchen.object_state import KitchenStateWrapper
+from robosuite.wrappers.hanoi.object_state import HanoiStateWrapper
+from robosuite.wrappers.nutassembly.vision import AssembleVisionWrapper
+from robosuite.wrappers.kitchen.vision import KitchenVisionWrapper
+from robosuite.wrappers.hanoi.vision import HanoiVisionWrapper
 
 from planning.planner import *
 from planning.executor import *
+
+object_state_wrapper = {"Hanoi": HanoiStateWrapper, "KitchenEnv": KitchenStateWrapper, "NutAssembly": AssembleStateWrapper}
+vision_wrapper = {"Hanoi": HanoiVisionWrapper, "KitchenEnv": KitchenVisionWrapper, "NutAssembly": AssembleVisionWrapper}
 
 def to_datestring(unixtime: int, format='%Y-%m-%d_%H:%M:%S'):
 	return datetime.utcfromtimestamp(unixtime).strftime(format)
@@ -78,6 +88,8 @@ class RecordDemos(gym.Wrapper):
         """
         map_color = {"cube1": "blue", "cube2": "red", "cube3": "green",}
         operation = operation.lower().split(' ')
+        if not self.vision_based:
+            self.env.set_task(operation[1], operation[2])
         if 'pick' in operation[0]:
             if self.args.env == "Hanoi":
                 return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
@@ -104,7 +116,9 @@ class RecordDemos(gym.Wrapper):
         self.task_buffer = list()
         try:
             obs, _ = self.env.reset()
-        except:
+        except AttributeError:
+            obs = self.env.env.reset()
+        except AttributeError:
             obs = self.env.reset()
         self.env.sim.forward()
         return obs
@@ -160,7 +174,7 @@ class RecordDemos(gym.Wrapper):
                         self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
                     else:
                         self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
-            self.zip_buffer(self.data_buffer, self.args.traces)
+            self.zip_buffer(self.args.traces)
         obs = self.reset()
         return obs
 
@@ -181,27 +195,29 @@ class RecordDemos(gym.Wrapper):
         """
         Records the step
         """
+        if obs.shape != next_obs.shape:
+            return state_memory
         if self.args.vla:
             action_step = self.task
-            if action_step not in self.action_steps:
-                self.action_steps.append(action_step)
-            if action_step not in self.episode_buffer.keys():
-                # self.episode_buffer[action_step] = [obs, action, next_obs] # Why 3 things?
-                self.episode_buffer[action_step] = [action, next_obs]
-            else:
-                self.episode_buffer[action_step] += [action, next_obs]
-            return state_memory
+        if action_step not in self.action_steps:
+            self.action_steps.append(action_step)
+        if action_step not in self.episode_buffer.keys():
+            # self.episode_buffer[action_step] = [obs, action, next_obs] # Why 3 things?
+            self.episode_buffer[action_step] = [action, next_obs]
         else:
-            keypoint = self.relative_obs_mapping(goal)
-            transition = (obs, action, next_obs, keypoint, reward, done)
-            if action_step not in self.action_steps:
-                self.action_steps.append(action_step)
-            if action_step not in self.episode_buffer.keys():
-                self.episode_buffer[action_step] = [transition]
-            else:
-                self.episode_buffer[action_step].append(transition)
-            self.task_buffer.append(self.task)
-            return state_memory
+            self.episode_buffer[action_step] += [action, next_obs]
+        return state_memory
+        # else:
+        #     keypoint = self.relative_obs_mapping(goal)
+        #     transition = (obs, action, next_obs, keypoint, reward, done)
+        #     if action_step not in self.action_steps:
+        #         self.action_steps.append(action_step)
+        #     if action_step not in self.episode_buffer.keys():
+        #         self.episode_buffer[action_step] = [transition]
+        #     else:
+        #         self.episode_buffer[action_step].append(transition)
+        #     self.task_buffer.append(self.task)
+        #     return state_memory
 
     def cap(self, eps, max_val=0.12, min_val=0.01):
         """
@@ -427,8 +443,10 @@ class RecordDemos(gym.Wrapper):
         goal_quat = self.env.sim.data.body_xquat[goal]
         self.keypoint = np.concatenate([goal_pos, goal_quat])
 
-        #print("Moving gripper over place to drop...")
+        print("Moving gripper over place to drop...")
         while not state['over(gripper,{})'.format(goal_str)]:
+            #distance = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=True)['over(gripper,stove)']
+            #print("Distance: ", distance)
             if pick_str == 'pot':
                 gripper_pos = self.env.sim.data.body_xpos[self.env.sim.model.body_name2id("PotObject_root")]
             elif self.args.env == "NutAssembly":
@@ -758,6 +776,17 @@ if __name__ == "__main__":
         detector = NutAssemblyDetector(env)
         pddl_path = './planning/PDDL/nut_assembly/'
     env = GymWrapper(env, proprio_obs=not(args.vision))
+    if args.vla:
+        print("Using VLA friendly format")
+        env = VisualizationWrapper(env)
+    elif not args.vision:
+        print("Using object based observation")
+        env = object_state_wrapper[args.env](env)
+    else:
+        print("Using vision based observation")
+        env = VisualizationWrapper(env)
+        env = vision_wrapper[args.env](env)
+
     env = RecordDemos(env, args.vision, detector, pddl_path, args, render=args.render, randomize=True)
 
     os.makedirs(f'data/kitchen_env', exist_ok=True)

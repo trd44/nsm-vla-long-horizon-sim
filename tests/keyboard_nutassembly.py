@@ -6,10 +6,12 @@ import robosuite as suite
 import numpy as np
 import cv2
 from robosuite.wrappers import GymWrapper
+from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
 from robosuite.utils.detector import NutAssemblyDetector
 from robosuite.wrappers.nutassembly.assemble_pick import AssemblePickWrapper
 from robosuite.wrappers.nutassembly.assemble_place import AssemblePlaceWrapper
 from robosuite.wrappers.nutassembly.vision import AssembleVisionWrapper
+from robosuite.wrappers.nutassembly.object_state import AssembleStateWrapper
 from robosuite.devices import Keyboard
 from robosuite.utils.input_utils import input2action
 
@@ -43,13 +45,19 @@ if __name__ == "__main__":
         horizon=1000000,
         use_camera_obs=True,
         use_object_obs=False,
+        camera_heights=128,
+        camera_widths=128,
         render_camera="agentview",#"robot0_eye_in_hand", # Available "camera" names = ('frontview', 'birdview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand')
     )
 
     # Wrap the environment
+    env = VisualizationWrapper(env)
     env = GymWrapper(env, proprio_obs=False)
-    env = AssemblePickWrapper(env)
-    env = AssembleVisionWrapper(env)
+    env = AssemblePlaceWrapper(env, render_init=True)
+    #env = AssemblePickWrapper(env, render_init=True)
+    #env = AssembleVisionWrapper(env)
+    env = AssembleStateWrapper(env)
+
 
     device = Keyboard()
     env.viewer.add_keypress_callback(device.on_press)
@@ -103,15 +111,13 @@ if __name__ == "__main__":
             obs, reward, terminated, truncated, info = env.step(action)
         except:
             obs, reward, done, info = env.step(action)
-        image = obs.reshape(256, 256, 3)
+        # image = obs.reshape(128, 128, 3)
     
-        cv2.imshow("Detected Numbers", image)
-        cv2.waitKey(1)
+        # cv2.imshow("Detected Numbers", image)
+        # cv2.waitKey(1)
 
         if counter % 20 == 0:
             print(reward)
-            if terminated:
-                print(terminated)
         counter += 1
 
         new_state = info['state']

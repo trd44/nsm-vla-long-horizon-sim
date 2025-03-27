@@ -11,6 +11,7 @@ class CustomEvalCallback(EvalCallback):
                  eval_env, 
                  best_model_save_path, 
                  log_path, 
+                 stop_training_threshold,
                  eval_freq=10000, 
                  n_eval_episodes=5, 
                  deterministic=True, 
@@ -25,6 +26,7 @@ class CustomEvalCallback(EvalCallback):
                                                  render=render, 
                                                  verbose=verbose, 
                                                  callback_after_eval=callback_after_eval)
+        self.stop_training_threshold = stop_training_threshold
 
     def _on_step(self) -> bool:
 
@@ -118,5 +120,7 @@ class CustomEvalCallback(EvalCallback):
             # Trigger callback after every evaluation, if needed
             if self.callback is not None:
                 continue_training = continue_training and self._on_event()
+            if success_rate > self.stop_training_threshold:
+                continue_training = False
 
         return continue_training
