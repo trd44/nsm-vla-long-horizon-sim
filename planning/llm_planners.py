@@ -1,29 +1,17 @@
 import os
 import logging
-import heapq
-import copy
-import itertools
-import dill
 from collections import deque
 
 from tarski.search import GroundForwardSearchModel
-from tarski.model import Model
 from tarski.grounding.lp_grounding import ground_problem_schemas_into_plain_operators
 from tarski.io.fstrips import FstripsReader, FstripsWriter
-from tarski.syntax import land, neg, CompoundFormula, Sort, Constant, Atom
-from tarski.syntax.formulas import VariableBinding
 from tarski.syntax.builtins import *
 from tarski import fstrips as fs
 from tarski.evaluators.simple import evaluate
-from tarski.model import Model
-from tarski.syntax.builtins import BuiltinPredicateSymbol
 from VLM.openai_api import *
-from utils import *
+from VLM.prompts import *
 from planning.planning_utils import *
 
-class LLMPlanner:
-    """First iteration of a purely LLM planner"""
-    #TODO: implement the LLM planner
 
 class SymbolicPlanner:
     def __init__(self, config:dict):
@@ -89,4 +77,38 @@ class SymbolicPlanner:
         return None
 
 
+class LLMPlanner(SymbolicPlanner):
+    """First iteration of a purely LLM planner"""
 
+    def prompt_for_plan(self):
+        """Generate a plan by calling the LLM
+        """
+        print("#"*20 + "The domain file" + "#"*20)
+        print(self.reader.domain_text)
+        print("#"*20 + "The problem file" + "#"*20)
+        print(self.reader.problem_text)
+
+        #TODO: implement the LLM planner by calling the LLM API
+        # first. complete the prompt that is going to go into the LLM by filling in the domain and problem files
+        print("#"*20 + "The current prompt" + "#"*20)
+        print(plan_prompt) # feel free to modify this prompt for the best output
+        
+    
+    def parse_plan(plan:str) -> List[str]:
+        """Parse the plan string into a list of grounded operators
+
+        Args:
+            plan (str): the plan string (output of the prompt_for_plan method)
+
+        Returns:
+            List[str]: the list of grounded operators
+        """
+        #TODO: implement the parsing of the plan string
+
+
+if __name__ == "__main__":
+    # test the LLM planner
+    planner = LLMPlanner(config=load_config('config.yaml')['planning']['nut_assembly'])
+    plan = planner.prompt_for_plan()
+    grounded_ops = planner.parse_plan(plan)
+    print(grounded_ops)
