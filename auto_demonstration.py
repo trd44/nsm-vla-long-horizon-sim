@@ -760,7 +760,7 @@ if __name__ == "__main__":
     parser.add_argument('--vision', action='store_true', help='Use vision based observation')
     parser.add_argument('--relative_obs', action='store_true', help='Use relative gripper-goal observation')
     parser.add_argument('--vla', action='store_true', help='Store the data in VLA friendly format')
-    parser.add_argument('--size', type=int, default=128, help='Size of the observation')
+    parser.add_argument('--size', type=int, default=224, help='Size of the observation')
     parser.add_argument('--checkpoints', type=int, default=0, help='Saves the data every n episodes, and resets the buffer')
 
     args = parser.parse_args()
@@ -819,7 +819,7 @@ if __name__ == "__main__":
     else:
         print("Using vision based observation")
         env = VisualizationWrapper(env)
-        env = vision_wrapper[args.env](env)
+        env = vision_wrapper[args.env](env, image_size=args.size)
 
     env = RecordDemos(env, args.vision, detector, pddl_path, args, render=args.render, randomize=True)
 
