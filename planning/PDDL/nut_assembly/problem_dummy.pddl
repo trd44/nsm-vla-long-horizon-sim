@@ -5,7 +5,7 @@
     SquareNut - square_nut
     RoundPeg - round_peg
     SquarePeg - square_peg
-    table - table
+    table1 - table ;change the name of table to avoid conflict with the table type when parsing
   )
   (:init 
     (free-gripper)
@@ -13,8 +13,8 @@
     (clear SquareNut)
     (clear RoundPeg)
     (clear SquarePeg)
-    (on SquareNut table)
-    (on RoundNut table)
+    (on SquareNut table1)
+    (on RoundNut table1)
     (matches RoundNut RoundPeg)
     (matches SquareNut SquarePeg)
   )

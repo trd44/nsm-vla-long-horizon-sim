@@ -5,7 +5,7 @@ eval_prompt = """You are a robot arm with a gripper that can manipulate tabletop
 {rationale}
 Question: You have been executing the following operator represented in the Planning Domain Definition Language (PDDL) as follows:
 {grounded_operator}
-Output `yes` if all effects are achieved, `no` if not all effects are achieved.
+Output `yes` if all effects are achieved, `no` if not all effects are achieved. Output either `yes` or `no`.
 Answer:
 """
 
