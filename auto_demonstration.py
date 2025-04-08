@@ -5,6 +5,8 @@ import robosuite_task_zoo
 from datetime import datetime
 import gymnasium as gym
 #import gym
+import cv2
+import sys
 
 from robosuite.wrappers import GymWrapper
 from robosuite.wrappers.visualization_wrapper import VisualizationWrapper
@@ -57,10 +59,14 @@ class RecordDemos(gym.Wrapper):
 
         # Set up the environment
         self.gripper_body = self.env.sim.model.body_name2id('gripper0_eef')
+        self.recorded_eps = 0
 
         # Init buffer
         self.data_buffer = dict()
         self.action_steps = []
+        self.checkpoint = None
+        if args.checkpoints > 0:
+            self.checkpoint = 0
 
         # Detect init state
         self.reset()
@@ -88,8 +94,11 @@ class RecordDemos(gym.Wrapper):
         """
         map_color = {"cube1": "blue", "cube2": "red", "cube3": "green",}
         operation = operation.lower().split(' ')
-        if not self.vision_based:
+        print("Operation: ", operation[0])
+        if len(operation) == 3:
             self.env.set_task(operation[1], operation[2])
+        elif 'turn' in operation[0]:
+            self.env.set_task(None, None)
         if 'pick' in operation[0]:
             if self.args.env == "Hanoi":
                 return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
@@ -111,6 +120,12 @@ class RecordDemos(gym.Wrapper):
         """
         The reset function that resets the environment
         """
+        if self.args.checkpoints > 0:
+            if self.recorded_eps // self.args.checkpoints > self.checkpoint:
+                print("\nSAVING CHECKPOINT: ", self.checkpoint)
+                self.data_buffer = dict()
+                self.action_steps = []
+                self.checkpoint += 1
         self.operator_step = 0
         self.episode_buffer = dict() # 1 episode here consists of a trajectory between 2 symbolic nodes
         self.task_buffer = list()
@@ -142,7 +157,7 @@ class RecordDemos(gym.Wrapper):
         print("Successful episode?: ", done)
         return done
 
-    def save_trajectory(self, num_recorded_eps):
+    def save_trajectory(self):
         """
         Saves the trajectory to the buffer
         """
@@ -165,16 +180,19 @@ class RecordDemos(gym.Wrapper):
                             'action': action,
                             'language_instruction': step,
                         })
-            np.save(f'data/kitchen_env/episode_{num_recorded_eps}.npy', episode)
+            np.save(f'data/kitchen_env/episode_{self.recorded_eps}.npy', episode)
         
         else:
             for step in self.action_steps:
+                print(step)
+                print("\n\n\n")
                 if step in self.episode_buffer.keys():
                     if step not in self.data_buffer.keys():
                         self.data_buffer[step] = [(self.episode_buffer[step], self.task_buffer)]
                     else:
                         self.data_buffer[step].append((self.episode_buffer[step], self.task_buffer))
             self.zip_buffer(self.args.traces)
+        self.recorded_eps += 1
         obs = self.reset()
         return obs
 
@@ -185,7 +203,11 @@ class RecordDemos(gym.Wrapper):
                 continue
             # Convert the data buffer to bytes
             data_bytes = pickle.dumps(self.data_buffer[step])
-            file_path = dir_path + step + '.zip'
+            if self.args.checkpoints > 0:
+                file_path = dir_path + str(self.checkpoint) + '/' + step + '.zip'
+                os.makedirs(dir_path + str(self.checkpoint), exist_ok=True)
+            else:
+                file_path = dir_path + step + '.zip'
             # Write the bytes to a zip file
             with zipfile.ZipFile(file_path, 'w') as zip_file:
                 with zip_file.open('data.pkl', 'w', force_zip64=True) as file:
@@ -195,6 +217,14 @@ class RecordDemos(gym.Wrapper):
         """
         Records the step
         """
+        if self.args.render and self.vision_based:
+            # display the image (obs)
+            cv2.imshow('image', obs)
+            cv2.waitKey(1)
+        if self.vision_based or self.args.vla:
+            # convert obs type to np.uint8
+            obs = np.array(obs, dtype=np.uint8)
+            next_obs = np.array(next_obs, dtype=np.uint8)
         if obs.shape != next_obs.shape:
             return state_memory
         if self.args.vla:
@@ -730,6 +760,8 @@ if __name__ == "__main__":
     parser.add_argument('--vision', action='store_true', help='Use vision based observation')
     parser.add_argument('--relative_obs', action='store_true', help='Use relative gripper-goal observation')
     parser.add_argument('--vla', action='store_true', help='Store the data in VLA friendly format')
+    parser.add_argument('--size', type=int, default=128, help='Size of the observation')
+    parser.add_argument('--checkpoints', type=int, default=0, help='Saves the data every n episodes, and resets the buffer')
 
     args = parser.parse_args()
     # Set the random seed
@@ -761,6 +793,8 @@ if __name__ == "__main__":
         horizon=100000000,
         use_camera_obs=args.vision,
         use_object_obs=not(args.vision),
+        camera_heights=args.size,
+        camera_widths=args.size,
     )
 
     env.reset()
@@ -792,19 +826,14 @@ if __name__ == "__main__":
     os.makedirs(f'data/kitchen_env', exist_ok=True)
 
     # Run the recording of the demonstrations
-    num_recorded_eps = 0
-    recorded_eps = 0
     episode = 1
-    while recorded_eps < args.episodes: 
+    while env.recorded_eps < args.episodes: 
         obs = env.reset()
         print("Episode: {}".format(episode))
         keys = list(env.data_buffer.keys())
         done = env.run_trajectory(obs)
         if done:
-            obs = env.save_trajectory(recorded_eps)
-            recorded_eps += 1
+            obs = env.save_trajectory()
         episode += 1
-        if len(keys) > 0:
-            num_recorded_eps = len(env.data_buffer[keys[0]])
-            print("Number of recorded episodes: {}".format(num_recorded_eps))
-            print("\n\n")
+        print("Number of recorded episodes: {}".format(env.recorded_eps))
+        print("\n\n")

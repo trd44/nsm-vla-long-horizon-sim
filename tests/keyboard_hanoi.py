@@ -48,8 +48,8 @@ if __name__ == "__main__":
 
     # Wrap the environment
     env = GymWrapper(env, proprio_obs=False)
-    #env = HanoiPickWrapper(env, render_init=True)
-    env = HanoiPlaceWrapper(env, render_init=True)
+    env = HanoiPickWrapper(env, render_init=True)
+    #env = HanoiPlaceWrapper(env, render_init=True)
     env = HanoiStateWrapper(env)
 
     device = Keyboard()

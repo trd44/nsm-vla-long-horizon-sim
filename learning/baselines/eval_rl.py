@@ -230,8 +230,8 @@ if __name__ == "__main__":
         eval_env = VisualizationWrapper(eval_env)
     env = GymWrapper(env, proprio_obs=False)
     eval_env = GymWrapper(eval_env, proprio_obs=False)
-    env = op_to_wrapper[args.env][args.op](env, horizon=100, image_obs=args.vision)
-    eval_env = op_to_wrapper[args.env][args.op](eval_env, horizon=100, image_obs=args.vision)
+    env = op_to_wrapper[args.env][args.op](env, horizon=150, image_obs=args.vision)
+    eval_env = op_to_wrapper[args.env][args.op](eval_env, horizon=150, image_obs=args.vision)
     if args.vision:
         print("Using vision wrapper")
         env = vision_wrapper[args.env](env)
