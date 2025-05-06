@@ -30,5 +30,7 @@ object_detection/
 *.cover
 *.log
 rlds_dataset_builder
-VLA/adapter
-VLA/checkpoint
+VLA/hanoi_old
+*.mp4
+hanoi_dataset
+uarch-configure/
