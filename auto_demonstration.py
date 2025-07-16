@@ -4,7 +4,7 @@ import robosuite as suite
 import robosuite_task_zoo
 from datetime import datetime
 import gymnasium as gym
-#import gym
+# import gym
 import cv2
 import sys
 
@@ -134,7 +134,7 @@ class RecordDemos(gym.Wrapper):
         self.episode_buffer = dict() # 1 episode here consists of a trajectory between 2 symbolic nodes
         self.task_buffer = list()
         try:
-            obs, _ = self.env.reset()
+            obs = self.env.reset()
         except AttributeError:
             obs = self.env.env.reset()
         except AttributeError:
