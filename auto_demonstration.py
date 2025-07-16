@@ -67,18 +67,22 @@ class RecordDemos(gym.Wrapper):
         self.checkpoint = None
         if args.checkpoints > 0:
             self.checkpoint = 0
-
-        # Detect init state
         self.reset()
-        state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-        # Filter and keep only the predicates that are in planning_predicates[args.env] and are True and map them to the PDDL format
-        init_predicates = {predicate: True for predicate in state.keys() if state[predicate] and predicate in planning_predicates[args.env]}
 
+    def get_plan(self):
+        """
+        Returns the plan
+        """
+        # Detect init state
+        state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+        # Filter and keep only the predicates that are in planning_predicates[args.env] and are True and map them to the PDDL format
+        init_predicates = {predicate: True for predicate in state.keys() if state[predicate] and predicate.split("(")[0] in planning_predicates[self.args.env]}
+        print("Initial predicates: ", init_predicates)
         # Usage
 
         add_predicates_to_pddl(pddl_path, init_predicates)
         # Generate a plan
-        self.plan, _ = call_planner(pddl_path, mode=planning_mode[args.env])
+        self.plan, _ = call_planner(pddl_path, mode=planning_mode[self.args.env])
         print("Task demonstrated: ", self.plan)
 
     def get_task(self):
@@ -96,9 +100,9 @@ class RecordDemos(gym.Wrapper):
         operation = operation.lower().split(' ')
         print("Operation: ", operation[0])
         if len(operation) == 3:
-            self.env.set_task(operation[1], operation[2])
+            self.env.set_task((operation[1], operation[2]))
         elif 'turn' in operation[0]:
-            self.env.set_task(None, None)
+            self.env.set_task((None, None))
         if 'pick' in operation[0]:
             if self.args.env == "Hanoi":
                 return self.pick, f'pick {operation[1]} from {operation[2]}', operation[1]
@@ -136,6 +140,7 @@ class RecordDemos(gym.Wrapper):
         except AttributeError:
             obs = self.env.reset()
         self.env.sim.forward()
+        self.get_plan()
         return obs
 
     def run_trajectory(self, obs):
@@ -213,6 +218,23 @@ class RecordDemos(gym.Wrapper):
                 with zip_file.open('data.pkl', 'w', force_zip64=True) as file:
                     file.write(data_bytes)
 
+    def filter_obs(self, obs, action_step="main"):
+        if action_step == "main":
+            return obs
+        elif action_step == "pick":
+            return np.concatenate([obs[3:6], [obs[-1]]])
+        elif action_step == "place":
+            return obs[-4:]
+        elif action_step == "turn_on":
+            return obs[:3]
+        elif action_step == "turn_off":
+            return obs[:3]
+        elif action_step == "reach_pick":
+            return obs[3:6]
+        elif action_step == "reach_place":
+            return obs[-4:-1]
+
+
     def record_step(self, obs, action, next_obs, state_memory, new_state, sym_action="MOVE", action_step="main", reward=-1.0, done=False, info=None, goal=None):
         """
         Records the step
@@ -231,6 +253,9 @@ class RecordDemos(gym.Wrapper):
             action_step = self.task
         if action_step not in self.action_steps:
             self.action_steps.append(action_step)
+        if self.args.filter_obs:
+            obs = self.filter_obs(obs, action_step)
+            next_obs = self.filter_obs(next_obs, action_step)
         if action_step not in self.episode_buffer.keys():
             # self.episode_buffer[action_step] = [obs, action, next_obs] # Why 3 things?
             self.episode_buffer[action_step] = [action, next_obs]
@@ -267,7 +292,8 @@ class RecordDemos(gym.Wrapper):
         """
         # Add [0, 0, 0] to the action to make it a 6D action and the gripper aperture at the end
         # Insert [0, 0, 0] from action[3] to action[5]
-        action = np.insert(action, 3, [0, 0, 0])
+        if not self.args.ee:
+            action = np.insert(action, 3, [0, 0, 0])
         return action
 
     def relative_obs_mapping(self, goal):
@@ -336,7 +362,7 @@ class RecordDemos(gym.Wrapper):
             next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
+            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="reach_pick", goal=goal_str)
             if self.state_memory is None:
                 return False, obs
             obs, state = next_obs, next_state
@@ -365,7 +391,7 @@ class RecordDemos(gym.Wrapper):
             next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="pick", goal=goal_str)
+            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="reach_pick", goal=goal_str)
             if self.state_memory is None:
                 return False, obs
             obs, state = next_obs, next_state
@@ -438,7 +464,7 @@ class RecordDemos(gym.Wrapper):
             next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
+            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="reach_place", goal=goal_str)
             if self.state_memory is None:
                 return False, obs
             obs, state = next_obs, next_state
@@ -488,20 +514,26 @@ class RecordDemos(gym.Wrapper):
                 gripper_pos = np.asarray(self.env.sim.data.body_xpos[self.gripper_body])
             if 'peg' in goal_str and self.args.env == "Hanoi":
                 object_pos = self.detector.area_pos[goal_str]
+            elif "serving" in goal_str:
+                object_pos = np.asarray(self.env.sim.data.body_xpos[goal])+np.array([0.002, -0.05, 0])
             # elif self.args.env == "NutAssembly" and goal_str == "roundpeg":
             #     object_pos = np.asarray(self.env.sim.data.body_xpos[goal])+np.array([0, 0.05, 0])
             # elif self.args.env == "NutAssembly" and goal_str == "squarepeg":
             #     object_pos = np.asarray(self.env.sim.data.body_xpos[goal])+ np.array([-0.01, 0.025, 0])
+            #elif "stove" in goal_str:
+            #    object_pos = np.asarray(self.env.sim.data.body_xpos[goal])+np.array([0.01, 0, 0])
+            #elif "pot" in goal_str:
+            #    object_pos = np.asarray(self.env.sim.data.body_xpos[goal])+np.array([0, -0.01, 0])
             else:
                 object_pos = np.asarray(self.env.sim.data.body_xpos[goal])
-            dist_xy_plan = object_pos[:2] - gripper_pos[:2]
+            dist_xy_plan = object_pos[:2] - gripper_pos[:2] #+ 0.05
             dist_xy_plan = self.cap(dist_xy_plan)
             action = 5*np.concatenate([dist_xy_plan, [0, 0]]) if not(self.randomize) else 5*np.concatenate([dist_xy_plan, [0, 0]]) + np.concatenate([np.random.normal(0, self.noise_std_factor*np.linalg.norm(dist_xy_plan), 3), [0]])
             action = self.to_osc_pose(action)
             next_obs, _, _, _, _  = self.env.step(action)
             self.env.render() if self.render else None
             next_state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="place", goal=goal_str)
+            self.state_memory = self.record_step(obs, action, next_obs, self.state_memory, next_state, action_step="reach_place", goal=goal_str)
             if self.state_memory is None:
                 return False, obs
             obs, state = next_obs, next_state
@@ -511,7 +543,7 @@ class RecordDemos(gym.Wrapper):
         reset_step_count = 0
         self.env.time_step = 0
 
-        #print("Moving down picked object on place to drop...")
+        print("Moving down picked object on place to drop...")
         while not state['on({},{})'.format(pick_str, goal_str)]:
             gripper_pos = np.asarray(self.env.sim.data.body_xpos[self.gripper_body])
             #object_pos = np.asarray(self.env.sim.data.body_xpos[goal])
@@ -533,7 +565,7 @@ class RecordDemos(gym.Wrapper):
         reset_step_count = 0
         self.env.time_step = 0
 
-        #print("dropping object...")
+        print("dropping object...")
         while not(state['open_gripper(gripper)']):#state['grasped({})'.format(goal_str)]:
             action = np.asarray([0,0,0,-1])
             action = self.to_osc_pose(action)
@@ -762,6 +794,9 @@ if __name__ == "__main__":
     parser.add_argument('--vla', action='store_true', help='Store the data in VLA friendly format')
     parser.add_argument('--size', type=int, default=224, help='Size of the observation')
     parser.add_argument('--checkpoints', type=int, default=0, help='Saves the data every n episodes, and resets the buffer')
+    parser.add_argument('--ee', action='store_true', help='Use end effector observation, without rotations')
+    parser.add_argument('--filter_obs', action='store_true', help='Filter the observations relevant to the operators')
+    parser.add_argument('--rnd_reset', action='store_true', help='Random reset for Hanoi env')
 
     args = parser.parse_args()
     # Set the random seed
@@ -784,18 +819,34 @@ if __name__ == "__main__":
     # Load the controller config
     controller_config = suite.load_controller_config(default_controller='OSC_POSE')
     # Create the environment
-    env = suite.make(
-        args.env,
-        robots="Kinova3",
-        controller_configs=controller_config,
-        has_renderer=args.render,
-        has_offscreen_renderer=True,
-        horizon=100000000,
-        use_camera_obs=args.vision,
-        use_object_obs=not(args.vision),
-        camera_heights=args.size,
-        camera_widths=args.size,
-    )
+    if args.env == 'Hanoi':
+        env = suite.make(
+            args.env,
+            robots="Kinova3",
+            controller_configs=controller_config,
+            has_renderer=args.render,
+            has_offscreen_renderer=True,
+            horizon=100000000,
+            use_camera_obs=args.vision,
+            use_object_obs=not(args.vision),
+            camera_heights=args.size,
+            camera_widths=args.size,
+            random_reset = args.rnd_reset
+        )
+    else:
+        env = suite.make(
+            args.env,
+            robots="Kinova3",
+            controller_configs=controller_config,
+            has_renderer=args.render,
+            has_offscreen_renderer=True,
+            horizon=100000000,
+            use_camera_obs=args.vision,
+            use_object_obs=not(args.vision),
+            camera_heights=args.size,
+            camera_widths=args.size,
+        )
+
 
     env.reset()
 

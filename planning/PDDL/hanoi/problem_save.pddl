@@ -6,12 +6,6 @@
   )
   (:init 
     (free-gripper)
-    (on cube3 peg1)
-    (on cube2 cube3)
-    (on cube1 cube2)
-    (clear cube1)
-    (clear peg2)
-    (clear peg3)
     (smaller cube1 cube2)
     (smaller cube1 cube3)
     (smaller cube1 peg1)
