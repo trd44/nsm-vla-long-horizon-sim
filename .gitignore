@@ -33,4 +33,8 @@ rlds_dataset_builder
 VLA/hanoi_old
 *.mp4
 hanoi_dataset
-uarch-configure/
+uarch-configure/__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+src/robosuite.egg-info/
