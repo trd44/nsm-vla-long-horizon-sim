@@ -6,8 +6,9 @@
   )
   (:init 
 (on cube3 peg2 )
-(on cube2 peg3 )
+(on cube2 peg2 )
 (on cube1 peg1 )
+(clear peg3 )
 (clear cube3 )
 (clear cube2 )
 (clear cube1 )
