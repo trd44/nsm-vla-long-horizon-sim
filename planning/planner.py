@@ -40,6 +40,32 @@ def add_predicates_to_pddl(pddl_dir, init_predicates, pddl_name='problem_save.pd
     with open(problem_path, 'w') as file:
         file.writelines(lines)
 
+def define_goal_in_pddl(pddl_dir, goal_predicates, problem_name="problem_dummy.pddl"):
+    '''
+        Given a PDDL file, this function adds the goal predicates to the goal section of the PDDL file.
+        The new PDDL file is saved as "problem_dummy.pddl"
+    '''
+    # read the PDDL file
+    problem_path = pddl_dir + problem_name
+    with open(problem_path, 'r') as file:
+        lines = file.readlines()
+
+    goal_index_start = lines.index('  (:goal \n')
+    goal_index_end = lines.index('  )\n', goal_index_start)
+
+    # remove existing goal predicates
+    del lines[goal_index_start + 1:goal_index_end]
+
+    # add new goal predicates
+    lines.insert(goal_index_start + 1, '    (and\n')
+    for predicate in goal_predicates:
+        lines.insert(goal_index_end, f'      ({predicate})\n')
+    lines.insert(goal_index_end + len(goal_predicates) + 1, '    )\n')
+
+    # overwrite the new problem file
+    with open(problem_path, 'w') as file:
+        file.writelines(lines)
+
 
 def call_planner(pddl_dir, problem="problem_dummy.pddl", structure="pddl", mode=0):
     '''

@@ -5,13 +5,10 @@
     peg1 peg2 peg3 - peg
   )
   (:init 
-(on cube3 peg2 )
-(on cube2 peg2 )
-(on cube1 peg1 )
-(clear peg3 )
 (clear cube3 )
 (clear cube2 )
 (clear cube1 )
+(clear cube0 )
     (free-gripper)
     (smaller cube1 cube2)
     (smaller cube1 cube3)
