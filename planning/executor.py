@@ -1323,7 +1323,7 @@ class Executor_Diffusion(Executor):
                     #     cubes_xyz = copy.deepcopy(self.detected_positions)
                     # else:
                     cubes_obs = {}
-                    if (step_executor % self.yolo_frequency == 0 and obs_num==0) or self.save_data:
+                    if (step_executor % self.yolo_frequency == 0) or self.save_data:
                         predicted_cubes_xyz = self.yolo_estimate(image1 = agentview_image, 
                                                         image2 = wrist_image, 
                                                         save_video=self.save_data, 
