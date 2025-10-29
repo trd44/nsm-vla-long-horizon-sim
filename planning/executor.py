@@ -1317,13 +1317,13 @@ class Executor_Diffusion(Executor):
         if not self.relations:
             # Map predicted positions to object positions based on relationships
             self.relations = match_objects_by_relationships(sim_objs, predicted_objs)
-            print("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
+            self.debug_print("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
 
             for pred_id, sim_id in self.relations.items():
                 if sim_id:
-                    print(f"{pred_id}  -->  {sim_id}")
+                    self.debug_print(f"{pred_id}  -->  {sim_id}")
                 else:
-                    print(f"{pred_id}  -->  (no confident match found)")
+                    self.debug_print(f"{pred_id}  -->  (no confident match found)")
         
         # obj_to_pick_pos = predicted_pos[obj_to_pick] if obj_to_pick in predicted_pos else objects_pos[obj_to_pick]
         # place_to_drop_pos = predicted_pos[place_to_drop] if place_to_drop in predicted_pos else objects_pos[place_to_drop]
@@ -1370,7 +1370,7 @@ class Executor_Diffusion(Executor):
         action = np.concatenate([action[:3], action_gripper])
         return action
 
-    def execute(self, env, observations, symgoal, render=False):
+    def execute(self, env, observations, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
         self.image_buffer = []
         self.detected_positions = {}
@@ -1456,7 +1456,21 @@ class Executor_Diffusion(Executor):
             step_executor += 1
             state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             success = self.Beta(state, symgoal)
-            
+
+            self.debug_print()
+            self.debug_print("Checking goal predicates: ")
+            self.debug_print(state)
+            goal_reached = True
+            for predicate in task_goals:
+                self.debug_print("Checking predicate: ", predicate)
+                predicate_parts = predicate.split(' ')
+                predicate_name = predicate_parts[0]
+                predicate_args = ','.join(predicate_parts[1:]).replace(' ', '')
+                predicate_str = f"{predicate_name}({predicate_args})"
+                if not state[predicate_str]:
+                    goal_reached = False
+                    break
+            success = success or goal_reached
             if success:
                 done = True
             if step_executor > horizon:

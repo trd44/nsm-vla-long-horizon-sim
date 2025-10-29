@@ -170,7 +170,7 @@ def get_plan(state, pddl_path, mode):
         print("Goal predicates: ", goal_str)
     define_goal_in_pddl(pddl_path, goal_predicates)
     plan, _ = call_planner(pddl_path, mode=mode)
-    return plan
+    return plan, goal_predicates
 
 if __name__ == "__main__":
 
@@ -393,8 +393,9 @@ if __name__ == "__main__":
             state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             print("Initial state: ", state)
             # Generate a plan
-            plan = get_plan(state, pddl_path, mode=planning_mode[args.env])
+            plan, goal_predicates = get_plan(state, pddl_path, mode=planning_mode[args.env])
         print("Plan: ", plan)
+        print("Goal predicates: ", goal_predicates)
 
         pick_place_success = 0
         # Execute the first operator in the plan
@@ -432,9 +433,14 @@ if __name__ == "__main__":
                 if tracking_data:
                     action_step.set_tracking_data(tracking_data)
                 print("\tExecuting action: ", action_step.id)
-                symgoal = (obj_to_pick, obj_to_drop)
-                observations, success = action_step.execute(env, observations, symgoal, args.render)
+                sub_goal = (obj_to_pick, obj_to_drop)
+                task_goals = goal_predicates.copy()
+                observations, success = action_step.execute(env, observations, sub_goal, task_goals, args.render)
                 tracking_data = action_step.get_tracking_data()
+
+                state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+                # Compute if the goal has been reached based on the current state and the goal predicates
+                goal_reached = True
                 if not success:
                     print("Execution failed.\n")
             if success:
@@ -444,7 +450,7 @@ if __name__ == "__main__":
                 print(f"Successfull operations: {pick_place_success}, Out of: {len(plan)/2}, Percentage advancement: {pick_place_success/(len(plan)/2)}")
                 if operator == plan[-1]:
                     continue
-                reset_gripper(env)#, obs[-1][-1])
+                reset_gripper(env)
             else:
                 # Print the number of operators that were successfully executed out of the total number of operators in the plan
                 print("--- Object not picked and placed.")
