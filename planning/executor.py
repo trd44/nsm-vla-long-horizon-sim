@@ -188,10 +188,10 @@ class Executor_Diffusion(Executor):
                  use_yolo=True, 
                  save_data=False,
                  instances_per_label=None,
-                 particle_filter_particles_2d=500,
-                 particle_filter_particles_3d=500,
-                 max_position_jump=0.15,  # 15cm max jump in 3D world coords
-                 max_bbox_jump=50,  # 50 pixels max jump in image space
+                 particle_filter_particles_2d=100,
+                 particle_filter_particles_3d=100,
+                 max_position_jump=0.10,  # 10cm max jump in 3D world coords
+                 max_bbox_jump=20,  # 20 pixels max jump in image space
                  debug=False
                  ):
         super().__init__(id, "RL", Beta)
@@ -399,7 +399,7 @@ class Executor_Diffusion(Executor):
             self.particle_filters_2d[track_id] = ParticleFilter2D(
                 n_particles=self.particle_filter_particles_2d,
                 process_noise=5.0,
-                measurement_noise=10.0
+                measurement_noise=5.0
             )
             self.particle_filters_2d[track_id].initialize(bbox_center)
         else:
@@ -533,6 +533,107 @@ class Executor_Diffusion(Executor):
         
         return None
 
+    def clean_noisy_tracks(self, min_detection_frames=5, max_unmatched_ratio=0.7):
+        """
+        Remove tracked objects that are likely noise based on several heuristics.
+        
+        Args:
+            min_detection_frames: Minimum number of frames an object must be detected to be kept
+            max_unmatched_ratio: Maximum ratio of missing frames to total frames before removal
+        
+        Returns:
+            List of removed track IDs
+        """
+        removed_tracks = []
+        current_frame = sum(meta.get('missing_frames', 0) == 0 for meta in self.tracking_metadata.values())
+        
+        for track_id in list(self.tracked_objects.keys()):
+            if track_id not in self.tracking_metadata:
+                continue
+            
+            metadata = self.tracking_metadata[track_id]
+            should_remove = False
+            removal_reason = ""
+            
+            # Heuristic 1: Too few detection frames (likely spurious detection)
+            position_history_len = len(metadata.get('position_history', []))
+            if position_history_len < min_detection_frames:
+                should_remove = True
+                removal_reason = f"too few detections ({position_history_len})"
+            
+            # Heuristic 2: High ratio of missing frames (object disappeared)
+            missing_frames = metadata.get('missing_frames', 0)
+            if missing_frames > 0:
+                # Estimate total frames this object has been tracked
+                total_frames = position_history_len + missing_frames
+                unmatched_ratio = missing_frames / total_frames if total_frames > 0 else 1.0
+                
+                if unmatched_ratio > max_unmatched_ratio and total_frames >= min_detection_frames:
+                    should_remove = True
+                    removal_reason = f"high unmatched ratio ({unmatched_ratio:.2f})"
+            
+            # Heuristic 3: Object not in relations mapping (no semantic match found)
+            if hasattr(self, 'relations') and self.relations:
+                # Check if this track_id appears in the relations mapping
+                is_mapped = track_id in self.relations.values()
+                
+                # If object has been around long enough but still not mapped, likely noise
+                if not is_mapped and position_history_len >= min_detection_frames * 2:
+                    should_remove = True
+                    removal_reason = "not mapped to any semantic object"
+            
+            # Heuristic 4: Excessive outlier count
+            outlier_count = self.detection_outlier_count.get(track_id, 0)
+            if outlier_count >= self.max_outlier_frames:
+                should_remove = True
+                removal_reason = f"excessive outliers ({outlier_count})"
+            
+            # Heuristic 5: Too many objects of the same class detected
+            obj_class = self.tracked_objects[track_id]['class']
+            expected_count = self.instances_per_label.get(obj_class, 1)
+            same_class_tracks = [tid for tid, obj in self.tracked_objects.items() 
+                                if obj['class'] == obj_class]
+            
+            if len(same_class_tracks) > expected_count * 1.5:  # 50% tolerance
+                # Remove tracks with lowest confidence or most missing frames
+                tracks_with_scores = []
+                for tid in same_class_tracks:
+                    conf = self.tracked_objects[tid].get('conf', 0)
+                    missing = self.tracking_metadata[tid].get('missing_frames', 0)
+                    score = conf - (missing * 0.1)  # Penalize missing frames
+                    tracks_with_scores.append((tid, score))
+                
+                tracks_with_scores.sort(key=lambda x: x[1])
+                tracks_to_remove = [t[0] for t in tracks_with_scores[:len(same_class_tracks) - expected_count]]
+                
+                if track_id in tracks_to_remove:
+                    should_remove = True
+                    removal_reason = f"excess {obj_class} detected (keeping top {expected_count})"
+            
+            if should_remove:
+                self.debug_print(f"[CLEANUP] Removing noisy track {track_id}: {removal_reason}")
+                removed_tracks.append(track_id)
+                
+                # Clean up all related data structures
+                del self.tracked_objects[track_id]
+                del self.tracking_metadata[track_id]
+                
+                if track_id in self.particle_filters_2d:
+                    del self.particle_filters_2d[track_id]
+                if track_id in self.particle_filters_3d:
+                    del self.particle_filters_3d[track_id]
+                if track_id in self.detection_outlier_count:
+                    del self.detection_outlier_count[track_id]
+                
+                # Remove from detected_positions if present
+                if track_id in self.detected_positions:
+                    del self.detected_positions[track_id]
+        
+        if removed_tracks:
+            self.debug_print(f"[CLEANUP] Removed {len(removed_tracks)} noisy tracks")
+        
+        return removed_tracks
+
     def assign_detections_to_tracks(self, detections, cls_name, iou_threshold=0.3):
         """
         Assign new detections to existing tracked objects using Hungarian algorithm.
@@ -656,43 +757,43 @@ class Executor_Diffusion(Executor):
             self.debug_print(f"  -> [RELEASE] {track_id} was released")
         
         # Heuristic 3: Use particle filter estimate for bbox
-        pf_estimate = self.get_particle_filter_estimate_2d(track_id)
-        estimated_pos_3d = self.get_particle_filter_estimate_3d(track_id)
-        if pf_estimate is not None and estimated_pos_3d is not None:
-            # Predict next position
-            bbox_velocity = metadata.get('bbox_velocity', np.array([0.0, 0.0]))
-            self.particle_filters_2d[track_id].predict(bbox_velocity)
-            pf_estimate = self.get_particle_filter_estimate_2d(track_id)
+        # pf_estimate = self.get_particle_filter_estimate_2d(track_id)
+        # estimated_pos_3d = self.get_particle_filter_estimate_3d(track_id)
+        # if pf_estimate is not None and estimated_pos_3d is not None:
+        #     # Predict next position
+        #     bbox_velocity = metadata.get('bbox_velocity', np.array([0.0, 0.0]))
+        #     self.particle_filters_2d[track_id].predict(bbox_velocity)
+        #     pf_estimate = self.get_particle_filter_estimate_2d(track_id)
             
-            self.debug_print(f"  -> [PARTICLE FILTER] {track_id} using PF estimate: {pf_estimate}")
+        #     self.debug_print(f"  -> [PARTICLE FILTER] {track_id} using PF estimate: {pf_estimate}")
             
-            # # Estimate 3D position using velocity if available
-            # if np.linalg.norm(last_velocity) > 0.001:
-            #     damping_factor = 0.8 ** missing_frames
-            #     estimated_pos_3d = last_pos + last_velocity * missing_frames * damping_factor
-            # else:
-            #     estimated_pos_3d = last_pos
+        #     # # Estimate 3D position using velocity if available
+        #     # if np.linalg.norm(last_velocity) > 0.001:
+        #     #     damping_factor = 0.8 ** missing_frames
+        #     #     estimated_pos_3d = last_pos + last_velocity * missing_frames * damping_factor
+        #     # else:
+        #     #     estimated_pos_3d = last_pos
 
-            # Update 3D particle filter
-            self.particle_filters_3d[track_id].predict(last_velocity)
-            estimated_pos_3d = self.get_particle_filter_estimate_3d(track_id)
+        #     # Update 3D particle filter
+        #     self.particle_filters_3d[track_id].predict(last_velocity)
+        #     estimated_pos_3d = self.get_particle_filter_estimate_3d(track_id)
             
-            return {
-                'position_3d': estimated_pos_3d,
-                'bbox_center_2d': pf_estimate
-            }
+        #     return {
+        #         'position_3d': estimated_pos_3d,
+        #         'bbox_center_2d': pf_estimate
+        #     }
         
         # Heuristic 4: Use velocity-based prediction
-        if np.linalg.norm(last_velocity) > 0.1:
-            damping_factor = 0.8 ** missing_frames
-            estimated_pos = last_pos + last_velocity * missing_frames * damping_factor
-            bbox_2d = self.project_3d_to_2d_approximate(estimated_pos, image_shape)
-            self.debug_print(f"  -> [VELOCITY] {track_id} using velocity extrapolation")
+        # if np.linalg.norm(last_velocity) > 0.1:
+        #     damping_factor = 0.8 ** missing_frames
+        #     estimated_pos = last_pos + last_velocity * missing_frames * damping_factor
+        #     bbox_2d = self.project_3d_to_2d_approximate(estimated_pos, image_shape)
+        #     self.debug_print(f"  -> [VELOCITY] {track_id} using velocity extrapolation")
             
-            return {
-                'position_3d': estimated_pos,
-                'bbox_center_2d': bbox_2d
-            }
+        #     return {
+        #         'position_3d': estimated_pos,
+        #         'bbox_center_2d': bbox_2d
+        #     }
         
         # Heuristic 5: Keep last known position
         bbox_2d = self.project_3d_to_2d_approximate(last_pos, image_shape)
@@ -1070,8 +1171,13 @@ class Executor_Diffusion(Executor):
                                 cv2.imshow("Tracking", image1)
                                 cv2.waitKey(1)
                 else:
-                    #self.debug_print(f"Object {track_id} lost after {missing_frames} frames")
+                    self.debug_print(f"Object {track_id} lost after {missing_frames} frames")
                     pass
+
+        # STEP 7: Periodically clean noisy tracks
+        if self.count % 10 == 0:  # Clean every 10 frames
+            self.clean_noisy_tracks(min_detection_frames=5, max_unmatched_ratio=0.7)
+
 
         if save_video:
             if not hasattr(self, "image_buffer"):
@@ -1110,7 +1216,6 @@ class Executor_Diffusion(Executor):
         self.tracked_objects = {}
         self.tracking_metadata = {}
         self.next_object_id = {}
-        self.detected_positions = {}
         self.instances_per_label = {}
         self.particle_filters_2d = {}
         self.particle_filters_3d = {}
@@ -1125,7 +1230,6 @@ class Executor_Diffusion(Executor):
         self.particle_filters_2d = tracking_data_dict.get('particle_filters_2d', {})
         self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
         self.detection_outlier_count = tracking_data_dict.get('detection_outlier_count', {})
-        self.detected_positions = tracking_data_dict.get('detected_positions', {})
         self.next_object_id = tracking_data_dict.get('next_object_id', {})
 
     def get_tracking_data(self):
@@ -1137,7 +1241,6 @@ class Executor_Diffusion(Executor):
             'particle_filters_2d': self.particle_filters_2d,
             'particle_filters_3d': self.particle_filters_3d,
             'detection_outlier_count': self.detection_outlier_count,
-            'detected_positions': self.detected_positions,
             'next_object_id': self.next_object_id,
             'instances_per_label': self.instances_per_label
         }
@@ -1255,32 +1358,6 @@ class Executor_Diffusion(Executor):
         else:
             obs = np.concatenate([gripper_pos, [aperture], obj_to_pick_pos, place_to_drop_pos])
         return obs
-                    
-    def obs_base_from_info(self, info):
-        obs_base = []
-        for i in range(len(info)):
-            obs_base.append(info[i]["obs_base"])
-        return np.array(obs_base)
-
-    def image_from_info(self, info, camera="agentview"):
-        images = []
-        for i in range(len(info)):
-            if camera in info[i]:
-                images.append(info[i][camera])
-        return np.array(images)
-    
-    def valid_state_f(self, state):
-        state = {k: state[k] for k in state if 'on' in k}
-        state = {key: value for key, value in state.items() if value}
-        if len(state) != 3:
-            return False
-        pegs = []
-        for relation, value in state.items():
-            _, peg = relation.split('(')[1].split(',')
-            pegs.append(peg)
-        if len(pegs) != len(set(pegs)):
-            return False
-        return True
 
     def map_gripper(self, action):
         action_gripper = action[-1]
@@ -1295,20 +1372,20 @@ class Executor_Diffusion(Executor):
 
     def execute(self, env, observations, symgoal, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
-        self.relations = {}
         self.image_buffer = []
         self.detected_positions = {}
         self.yolo_frequency = 2  # Run YOLO every 2 policy calls
-        horizon = self.horizon if self.horizon is not None else 500
+        horizon = self.horizon if self.horizon is not None else 50
         self.debug_print("\tTask goal: ", symgoal)
 
         step_executor = 0
         done = False
         success = False 
         self.debug_print("\tStarting executor for step: ", self.id)
-        
+
         while not done:
             processed_obs = []
+            self.relations = {}
             for obs_num, observation in enumerate(observations):
                 if self.use_yolo or self.save_data:
                     objects_pos = observation["objects_pos"]
@@ -1323,14 +1400,14 @@ class Executor_Diffusion(Executor):
                     #     cubes_xyz = copy.deepcopy(self.detected_positions)
                     # else:
                     cubes_obs = {}
-                    if (step_executor % self.yolo_frequency == 0) or self.save_data:
+                    if (step_executor % self.yolo_frequency == 0 and obs_num==0) or self.save_data:
                         predicted_cubes_xyz = self.yolo_estimate(image1 = agentview_image, 
                                                         image2 = wrist_image, 
                                                         save_video=self.save_data, 
                                                         cubes_obs=cubes_obs,
                                                         ee_pos=ee_pos,
-                                                        conf_threshold=0.92,
-                                                        max_missing_frames=5,
+                                                        conf_threshold=0.8,
+                                                        max_missing_frames=200,
                                                         render=render)
                     else:
                         tracked_positions = {}
