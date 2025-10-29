@@ -1,5 +1,5 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem assemblyline)
+  (:domain assemblyline)
   (:objects 
     cube0 cube1 cube2 cube3 cube4 cube5 - disk
     bin0 bin1 bin2 bin3 bin4 bin5 table - peg
@@ -26,10 +26,10 @@
   )
   (:goal 
     (and
-      (on cube3 bin0)
-      (on cube2 bin2)
-      (on cube1 bin1)
       (on cube0 bin0)
-  )
+      (on cube1 bin1)
+      (on cube2 bin2)
+      (on cube3 bin0)
     )
+  )
 )

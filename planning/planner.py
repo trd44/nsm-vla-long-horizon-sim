@@ -57,10 +57,13 @@ def define_goal_in_pddl(pddl_dir, goal_predicates, problem_name="problem_dummy.p
     del lines[goal_index_start + 1:goal_index_end]
 
     # add new goal predicates
-    lines.insert(goal_index_start + 1, '    (and\n')
+    insert_pos = goal_index_start + 1
+    lines.insert(insert_pos, '    (and\n')
+    insert_pos += 1
     for predicate in goal_predicates:
-        lines.insert(goal_index_end, f'      ({predicate})\n')
-    lines.insert(goal_index_end + len(goal_predicates) + 1, '    )\n')
+        lines.insert(insert_pos, f'      ({predicate})\n')
+        insert_pos += 1
+    lines.insert(insert_pos, '    )\n')
 
     # overwrite the new problem file
     with open(problem_path, 'w') as file:

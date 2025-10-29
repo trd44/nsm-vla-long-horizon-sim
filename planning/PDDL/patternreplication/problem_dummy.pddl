@@ -1,5 +1,5 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem patternreplication)
+  (:domain patternreplication)
   (:objects 
     cube0 cube1 cube2 - disk
     target_platform table - peg
@@ -16,8 +16,8 @@
   )
   (:goal 
     (and
-      (on cube1 target_platform)
-      (on cube2 cube1)
+      (on cube2 target_platform)
+      (on cube1 cube0)
       (on cube0 cube2)
   )
     )

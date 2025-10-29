@@ -1,5 +1,5 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem cubesorting)
+  (:domain cubesorting)
   (:objects 
     cube0 cube1 cube2 cube3 cube4 cube5 - disk
     platform1 platform2 table - peg

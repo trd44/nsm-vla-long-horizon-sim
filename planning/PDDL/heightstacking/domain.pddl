@@ -1,4 +1,4 @@
-(define (domain hanoi)
+(define (domain heightstacking)
   (:requirements :strips :typing)
   (:types disk peg - location)
 

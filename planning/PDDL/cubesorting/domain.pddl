@@ -1,4 +1,4 @@
-(define (domain hanoi)
+(define (domain cubesorting)
   (:requirements :strips :typing)
   (:types disk peg - location)
 
@@ -7,7 +7,7 @@
     (clear ?location - location)       ; no disk is on disk
     (grasped ?disk - disk)     ; robot is grasped a disk
     (free-gripper) ; the gripper is free
-    (type_match ?disk - disk ?location - location)
+    (small ?disk - disk)       ; disk is small (for CubeSorting)
   )
 
   (:action pick
@@ -17,6 +17,6 @@
 
   (:action place
     :parameters (?d - disk ?l - location)
-    :precondition (and (grasped ?d) (type_match ?d ?l) (clear ?l))
+    :precondition (and (grasped ?d) (clear ?l))
     :effect (and (not (grasped ?d)) (on ?d ?l) (free-gripper)))
 )

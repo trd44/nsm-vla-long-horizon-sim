@@ -1,5 +1,5 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem heightstacking)
+  (:domain heightstacking)
   (:objects 
     cube0 cube1 cube2 cube3 cube4 cube5 - disk
     platform table - peg
@@ -30,10 +30,10 @@
   )
   (:goal 
     (and
-      (on cube3 platform)
-      (on cube2 cube3)
-      (on cube1 cube2)
       (on cube0 cube1)
-  )
+      (on cube1 cube2)
+      (on cube2 cube3)
+      (on cube3 platform)
     )
+  )
 )

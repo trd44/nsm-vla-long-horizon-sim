@@ -1,14 +1,12 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem cubesorting)
+  (:domain cubesorting)
   (:objects 
     cube0 cube1 cube2 cube3 cube4 cube5 - disk
     platform1 platform2 table - peg
   )
   (:init 
-(type_match cube3 platform1 )
-(type_match cube2 platform1 )
-(type_match cube1 platform1 )
-(type_match cube0 platform1 )
+(small cube3 )
+(small cube2 )
 (clear platform2 )
 (clear platform1 )
 (clear cube3 )
@@ -25,10 +23,10 @@
   )
   (:goal 
     (and
-      (on cube3 platform1)
+      (on cube0 platform2)
+      (on cube1 platform2)
       (on cube2 platform1)
-      (on cube1 platform1)
-      (on cube0 platform1)
-  )
+      (on cube3 platform1)
     )
+  )
 )

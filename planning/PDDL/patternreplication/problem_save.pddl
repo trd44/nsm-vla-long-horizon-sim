@@ -1,5 +1,5 @@
-(define (problem hanoi)
-  (:domain hanoi)
+(define (problem patternreplication)
+  (:domain patternreplication)
   (:objects 
     cube0 cube1 cube2 - disk
     target_platform table - peg
