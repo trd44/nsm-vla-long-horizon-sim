@@ -6,7 +6,6 @@
     (on ?disk - disk ?location - location)  ; disk is on another disk or a peg
     (clear ?location - location)       ; no disk is on disk
     (grasped ?disk - disk)     ; robot is grasped a disk
-    (smaller ?disk - disk ?location - location) ; disk is smaller than the location
     (free-gripper) ; the gripper is free
     (type_match ?disk - disk ?location - location)
   )

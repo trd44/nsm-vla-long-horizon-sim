@@ -5,6 +5,10 @@
     platform1 platform2 table - peg
   )
   (:init 
+(type_match cube3 platform1 )
+(type_match cube2 platform1 )
+(type_match cube1 platform1 )
+(type_match cube0 platform1 )
 (clear platform2 )
 (clear platform1 )
 (clear cube3 )
@@ -22,9 +26,9 @@
   (:goal 
     (and
       (on cube3 platform1)
-      (on cube2 platform2)
-      (on cube1 platform2)
-      (on cube0 platform2)
+      (on cube2 platform1)
+      (on cube1 platform1)
+      (on cube0 platform1)
   )
     )
 )

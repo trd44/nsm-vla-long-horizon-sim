@@ -16,8 +16,8 @@
   )
   (:goal 
     (and
-      (on cube2 target_platform)
-      (on cube1 cube0)
+      (on cube1 target_platform)
+      (on cube2 cube1)
       (on cube0 cube2)
   )
     )

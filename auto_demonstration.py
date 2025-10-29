@@ -15,7 +15,6 @@ from planning.planner import *
 from planning.executor import *
 
 from ultralytics import YOLO
-from roboflow import Roboflow
 import joblib
 import pandas as pd
 
@@ -30,7 +29,7 @@ planning_predicates = {
     "Hanoi": ['on', 'clear', 'grasped'],
     "KitchenEnv": ['on', 'clear', 'grasped', 'stove_on'],
     "NutAssembly": ['on', 'clear', 'grasped'],
-    "CubeSorting": ['on', 'clear', 'grasped'],
+    "CubeSorting": ['on', 'clear', 'grasped', 'type_match'],
     "HeightStacking": ['on', 'clear', 'grasped', 'smaller'],
     "AssemblyLineSorting": ['on', 'clear', 'grasped', 'type_match'],
     "PatternReplication": ['on', 'clear', 'grasped']}
