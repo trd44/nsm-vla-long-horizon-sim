@@ -7,7 +7,7 @@
     (clear ?location - location)       ; no disk is on disk
     (grasped ?disk - disk)     ; robot is grasped a disk
     (free-gripper) ; the gripper is free
-    (small ?disk - disk)       ; disk is small (for CubeSorting)
+    (type_match ?disk - disk ?location - location)
   )
 
   (:action pick
@@ -17,6 +17,6 @@
 
   (:action place
     :parameters (?d - disk ?l - location)
-    :precondition (and (grasped ?d) (clear ?l))
+    :precondition (and (grasped ?d) (type_match ?d ?l) (clear ?l))
     :effect (and (not (grasped ?d)) (on ?d ?l) (free-gripper)))
 )
