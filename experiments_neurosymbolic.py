@@ -342,9 +342,11 @@ if __name__ == "__main__":
     def reset_gripper(env):
         print("Resetting gripper")
         # First open the gripper
-        for _ in range(50):
+        state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+        while not(state["open_gripper(gripper)"]):
             action = np.array([0, 0, 0, -1])
             env.step(action)
+            state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             if args.render:
                 env.render()
         # Then move the gripper to the initial position

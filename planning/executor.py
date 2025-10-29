@@ -8,7 +8,6 @@
 import dill
 import torch
 import numpy as np
-from stable_baselines3.common.utils import set_random_seed
 from diffusion_policy.common.pytorch_util import dict_apply
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 from diffusion_policy.workspace.train_diffusion_transformer_lowdim_workspace import TrainDiffusionTransformerLowdimWorkspace
@@ -1312,7 +1311,6 @@ class Executor_Diffusion(Executor):
             processed_obs = []
             for obs_num, observation in enumerate(observations):
                 if self.use_yolo or self.save_data:
-                    cubes_xyz = {}
                     objects_pos = observation["objects_pos"]
                     state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
                     agentview_image = np.array(observation["agentview_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
@@ -1325,7 +1323,7 @@ class Executor_Diffusion(Executor):
                     #     cubes_xyz = copy.deepcopy(self.detected_positions)
                     # else:
                     cubes_obs = {}
-                    if (step_executor % self.yolo_frequency == 0) or self.save_data:
+                    if (step_executor % self.yolo_frequency == 0 and obs_num==0) or self.save_data:
                         predicted_cubes_xyz = self.yolo_estimate(image1 = agentview_image, 
                                                         image2 = wrist_image, 
                                                         save_video=self.save_data, 
