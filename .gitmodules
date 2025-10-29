@@ -1,0 +1,12 @@
+[submodule "openpi"]
+	path = openpi
+	url = https://github.com/trd44/openpi.git
+[submodule "robosuite"]
+	path = robosuite
+	url = https://github.com/lorangpi/robosuite.git
+[submodule "robosuite-task-zoo"]
+	path = robosuite-task-zoo
+	url = https://github.com/ARISE-Initiative/robosuite-task-zoo.git
+[submodule "tarski"]
+	path = tarski
+	url = https://github.com/helenlu66/tarski.git

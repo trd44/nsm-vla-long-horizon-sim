@@ -1,40 +1,66 @@
-Metaworld/
-mimicgen/
-robosuite/
-robomimic/
-tarski/
-Metaworld
-mimicgen
-robosuite
-robomimic
-openvla
-robosuite-task-zoo
-tarski
-Planning/HDDL/lilotane/
-.venv/
+# ==============================================================================
+# Operating System Files
+# ==============================================================================
 .DS_Store
-__pycache__/
+
+# ==============================================================================
+# IDE / Editor Files
+# ==============================================================================
 /.vscode/
+
+# ==============================================================================
+# Python
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+.installed.cfg
+
+# Testing / Coverage
+*.cover
+*.manifest
+*.spec
+
+# ==============================================================================
+# Virtual Environments
+# ==============================================================================
+.venv/
+
+# ==============================================================================
+# Logs and Outputs
+# ==============================================================================
+*.log
+MUJOCO_LOG.TXT
 **/eval_logs/
 **/tensorboard_logs/
 **/monitor_logs.csv
-docs/
-MUJOCO_LOG.TXT
+
+# ==============================================================================
+# Data and Media Files
+# ==============================================================================
 data/
-object_detection/
-*.egg-info/
-.installed.cfg
-*.egg
-*.manifest
-*.spec
-*.cover
-*.log
-rlds_dataset_builder
-VLA/hanoi_old
+*.gif
 *.mp4
+*.pt
 hanoi_dataset
-uarch-configure/__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-src/robosuite.egg-info/
+
+# ==============================================================================
+# External Dependencies / Submodules
+# ==============================================================================
+Metaworld
+mimicgen
+robomimic
+
+# ==============================================================================
+# Project-Specific Directories
+# ==============================================================================
+lerobot/
+object_detection/
+rlds_dataset_builder
+runs/
+wandb/
