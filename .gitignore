@@ -64,3 +64,15 @@ object_detection/
 rlds_dataset_builder
 runs/
 wandb/
+
+# ==============================================================================
+# Dummy PDDL Files
+# ==============================================================================
+# Ignore dummy PDDL problems
+planning/PDDL/cubesorting/problem_dummy.pddl
+planning/PDDL/patternreplication/problem_dummy.pddl
+planning/PDDL/heightstacking/problem_dummy.pddl
+planning/PDDL/hanoi/problem_dummy.pddl
+planning/PDDL/assemblyline/problem_dummy.pddl
+planning/PDDL/nut_assembly/problem_dummy.pddl
+planning/PDDL/kitchen/problem_dummy.pddl
