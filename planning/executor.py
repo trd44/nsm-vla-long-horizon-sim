@@ -1319,8 +1319,8 @@ class Executor_Diffusion(Executor):
         if action_step not in obs_dim.keys():
             return obs
         returned_obs = np.zeros((len(obs), obs_dim[action_step]))
-        for j, env_n_obs in enumerate(obs):
-            obs_policy = self.action_obs_mapping(env_n_obs, action_step=action_step, relative=False)
+        for j, env_j_obs in enumerate(obs):
+            obs_policy = self.action_obs_mapping(env_j_obs, action_step=action_step, relative=False)
             returned_obs[j] = obs_policy
         return returned_obs
 
@@ -1592,7 +1592,8 @@ class Executor_Diffusion(Executor):
         
         return predicted_pos
 
-    def execute(self, env, observations, symgoal, task_goals=None, render=False):
+
+    def execute(self, env, observations, n_act, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
         self.image_buffer = []
         self.detected_positions = {}
@@ -1606,60 +1607,99 @@ class Executor_Diffusion(Executor):
         self.debug_message("\tStarting executor for step: ", self.id)
 
         while not done:
-            processed_obs = []
-            
-            for obs_num, observation in enumerate(observations):
-                if self.use_yolo or self.save_data:
-                    objects_pos = observation["objects_pos"]
-                    agentview_image = np.array(observation["agentview_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
-                    wrist_image = np.array(observation["robot0_eye_in_hand_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
-                    ee_pos = observation["robot0_eef_pos"]
-                    
-                    # STEP 1: Run YOLO detection (without grasp heuristics)
-                    if (step_executor % self.yolo_frequency == 0 and obs_num == 0) or self.save_data:
-                        predicted_cubes_xyz = self.yolo_estimate(
-                            image1=agentview_image, 
-                            image2=wrist_image, 
-                            save_video=self.save_data, 
-                            cubes_obs={},
-                            ee_pos=ee_pos,
-                            conf_threshold=0.8,
-                            max_missing_frames=200,
-                            render=render
+            anomaly_safe = False
+            max_shift_threshold = 100.0  # in mm
+            while not anomaly_safe:
+                processed_obs = []
+                
+                for obs_num, observation in enumerate(observations):
+                    if self.use_yolo or self.save_data:
+                        objects_pos = observation["objects_pos"]
+                        agentview_image = np.array(observation["agentview_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
+                        wrist_image = np.array(observation["robot0_eye_in_hand_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
+                        ee_pos = observation["robot0_eef_pos"]
+                        
+                        # STEP 1: Run YOLO detection (without grasp heuristics)
+                        if (step_executor % self.yolo_frequency == 0 and obs_num == 0) or self.save_data:
+                            predicted_cubes_xyz = self.yolo_estimate(
+                                image1=agentview_image, 
+                                image2=wrist_image, 
+                                save_video=self.save_data, 
+                                cubes_obs={},
+                                ee_pos=ee_pos,
+                                conf_threshold=0.8,
+                                max_missing_frames=200,
+                                render=render
+                            )
+                        else:
+                            # Use tracked positions
+                            tracked_positions = {}
+                            for obj_id in self.tracked_objects.keys():
+                                tracked_positions[obj_id] = self.tracking_metadata[obj_id]['last_position']
+                            predicted_cubes_xyz = copy.deepcopy(tracked_positions)
+                        
+                        # STEP 2: Build/update relations mapping
+                        if predicted_cubes_xyz:
+                            self.update_relations_with_new_detections(predicted_cubes_xyz, objects_pos)
+                        
+                        # STEP 3: Correct positions of grasped objects (for both detected and undetected)
+                        predicted_cubes_xyz = self.correct_grasped_object_positions(
+                            predicted_cubes_xyz, 
+                            ee_pos, 
+                            image_shape=agentview_image.shape  # Pass image shape
                         )
+                        
+                        # STEP 4: Build observation for policy
+                        obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, 
+                                                symgoal[0], symgoal[1], relative_obs=self.oracle)
                     else:
-                        # Use tracked positions
-                        tracked_positions = {}
-                        for obj_id in self.tracked_objects.keys():
-                            tracked_positions[obj_id] = self.tracking_metadata[obj_id]['last_position']
-                        predicted_cubes_xyz = copy.deepcopy(tracked_positions)
+                        objects_pos = observation["objects_pos"]
+                        obs = self.get_object_obs(env, objects_pos, {}, 
+                                                symgoal[0], symgoal[1], relative_obs=self.oracle)
+                        
+                    processed_obs.append(obs)
+                
+                processed_obs = np.array(processed_obs)
+                if self.oracle:
+                    processed_obs = self.prepare_obs(processed_obs, action_step=self.id)
+
+                # Check for anomalies between consecutive observations
+                anomaly_detected = False
+                anomaly_indices = []
+        
+                for i in range(len(processed_obs) - 1):
+                    obs_current = processed_obs[i]
+                    obs_next = processed_obs[i + 1]
                     
-                    # STEP 2: Build/update relations mapping
-                    if predicted_cubes_xyz:
-                        self.update_relations_with_new_detections(predicted_cubes_xyz, objects_pos)
+                    # Compute absolute difference
+                    diff = np.abs(obs_next - obs_current)
+                    max_diff = np.max(diff)
                     
-                    # STEP 3: Correct positions of grasped objects (for both detected and undetected)
-                    predicted_cubes_xyz = self.correct_grasped_object_positions(
-                        predicted_cubes_xyz, 
-                        ee_pos, 
-                        image_shape=agentview_image.shape  # Pass image shape
-                    )
-                    
-                    # STEP 4: Build observation for policy
-                    obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, 
-                                            symgoal[0], symgoal[1], relative_obs=self.oracle)
+                    if max_diff > max_shift_threshold:
+                        anomaly_detected = True
+                        anomaly_indices.append(i)
+                        print(f"[ANOMALY] Large shift detected between observations {i} and {i+1}, reating as YOLO failure. Patching observations.")
+                        self.debug_message(f"  Max shift: {max_diff:.2f} mm (threshold: {max_shift_threshold:.2f})")
+                        self.debug_message(f"  Obs {i}: {obs_current}")
+                        self.debug_message(f"  Obs {i+1}: {obs_next}")
+                        self.debug_message(f"  Diff: {diff}")
+                        # Patch the current observation by copying the next one
+                        processed_obs[i] = obs_next.copy()
+                
+                # If anomaly detected, get fresh observations with forced YOLO detection
+                if len(anomaly_indices) > 2:
+                    print(f"[RECOVERY] Getting {len(observations)} fresh observations with YOLO detection")
+                    for _ in range(len(observations)):
+                        # Get current observation
+                        obs = env._get_observations()
+                        objects_pos = self.detector.get_all_objects_pos()
+                        obs['objects_pos'] = objects_pos
+                        observations.append(obs)
+                        observations.pop(0)
                 else:
-                    objects_pos = observation["objects_pos"]
-                    obs = self.get_object_obs(env, objects_pos, {}, 
-                                            symgoal[0], symgoal[1], relative_obs=self.oracle)
-                    
-                processed_obs.append(obs)
+                    anomaly_safe = True
             
-            processed_obs = np.array(processed_obs)
-            if self.oracle:
-                processed_obs = self.prepare_obs(processed_obs, action_step=self.id)
             processed_obs = np.array([processed_obs])
-            
             np_obs_dict = {'obs': processed_obs.astype(np.float32)}
             obs_dict = dict_apply(np_obs_dict, 
                 lambda x: torch.from_numpy(x).to(device=self.device))
@@ -1675,7 +1715,8 @@ class Executor_Diffusion(Executor):
                 for index in self.nulified_action_indexes:
                     actions = np.insert(actions, index, 0, axis=2)
             
-            observations = []
+            #observations = []
+            i_act = 0
             for action in actions[0]:
                 action = self.map_gripper(action)
                 _, _, done, info = env.step(action)
@@ -1684,7 +1725,13 @@ class Executor_Diffusion(Executor):
                 obs = env._get_observations()
                 objects_pos = self.detector.get_all_objects_pos()
                 obs['objects_pos'] = objects_pos
+                # Append last obs and pop first obs to keep the buffer size
                 observations.append(obs)
+                observations.pop(0)
+                if i_act == n_act - 1:
+                    break
+                i_act += 1
+
             
             if done:
                 self.debug_message("Environment terminated")
