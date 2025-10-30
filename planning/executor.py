@@ -1268,6 +1268,8 @@ class Executor_Diffusion(Executor):
 
     def get_tracking_data(self):
         """Returns all the variables related to tracking for external use."""
+        if not hasattr(self, 'tracking_metadata'):
+            return {}
         return {
             'tracked_objects': self.tracked_objects,
             'tracking_metadata': self.tracking_metadata,
@@ -1332,60 +1334,64 @@ class Executor_Diffusion(Executor):
         # self.debug_message("objects_pos keys: ", objects_pos.keys())
         # self.debug_message("predicted_pos keys: ", predicted_pos.keys())
         # self.debug_message()
+        if len(predicted_pos) > 1:
 
-        # Get relationships between predicted objects
-        predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id]) for obj_id in predicted_pos.keys()]
-        update_object_metadata(predicted_objs, eps=1e-3)
-        # pretty_self.debug_message_scene(predicted_objs)
-        # Query example:
-        # a = objs[0]
-        # b = objs[1]
-        # self.debug_message(f"{a.id} relations to {b.id}:", a.get_relations_to(b.id))
+            # Get relationships between predicted objects
+            predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id]) for obj_id in predicted_pos.keys()]
+            update_object_metadata(predicted_objs, eps=1e-3)
+            # pretty_self.debug_message_scene(predicted_objs)
+            # Query example:
+            # a = objs[0]
+            # b = objs[1]
+            # self.debug_message(f"{a.id} relations to {b.id}:", a.get_relations_to(b.id))
 
-        # Get relationships between sim objects
-        cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() if obj_id != "gripper" and 'cube' in obj_id}
-        sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) for obj_id in cubes_only.keys()]
-        update_object_metadata(sim_objs, eps=1e-3)
-        # pretty_self.debug_message_scene(sim_objs)
+            # Get relationships between sim objects
+            cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() if obj_id != "gripper" and 'cube' in obj_id}
+            sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) for obj_id in cubes_only.keys()]
+            update_object_metadata(sim_objs, eps=1e-3)
+            # pretty_self.debug_message_scene(sim_objs)
 
-        # if not self.relations:
-        #     # Map predicted positions to object positions based on relationships
-        #     self.relations = match_objects_by_relationships(sim_objs, predicted_objs)
-        #     self.debug_message("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
+            # if not self.relations:
+            #     # Map predicted positions to object positions based on relationships
+            #     self.relations = match_objects_by_relationships(sim_objs, predicted_objs)
+            #     self.debug_message("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
 
-        #     for pred_id, sim_id in self.relations.items():
-        #         if sim_id:
-        #             self.debug_message(f"{pred_id}  -->  {sim_id}")
-        #         else:
-        #             self.debug_message(f"{pred_id}  -->  (no confident match found)")
+            #     for pred_id, sim_id in self.relations.items():
+            #         if sim_id:
+            #             self.debug_message(f"{pred_id}  -->  {sim_id}")
+            #         else:
+            #             self.debug_message(f"{pred_id}  -->  (no confident match found)")
+                
+            #     # ADD THIS: Update the inverse mapping
+            #     self.update_yolo_to_pddl_mapping()
+            # obj_to_pick_pos = predicted_pos[obj_to_pick] if obj_to_pick in predicted_pos else objects_pos[obj_to_pick]
+            # place_to_drop_pos = predicted_pos[place_to_drop] if place_to_drop in predicted_pos else objects_pos[place_to_drop]
+
+            obj_to_pick_yolo_id = self.relations.get(obj_to_pick, None)
+            place_to_drop_yolo_id = self.relations.get(place_to_drop, None)
+
+            # if None, self.debug_message warning
+            if obj_to_pick_yolo_id is None and self.warnings["obj_to_pick"]:
+                self.debug_message(f"Warning: No YOLO prediction matched for object to pick: {obj_to_pick}")
+                self.warnings["obj_to_pick"] = False  # Only warn once per episode
+            if place_to_drop_yolo_id is None and self.warnings["place_to_drop"]:
+                self.debug_message(f"Warning: No YOLO prediction matched for place to drop: {place_to_drop}")
+                self.warnings["place_to_drop"] = False  # Only warn once per episode
+
+            if obj_to_pick_yolo_id is not None and obj_to_pick_yolo_id not in predicted_pos:
+                self.debug_message(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
+                obj_to_pick_pos = self.tracking_metadata.get(obj_to_pick_yolo_id, {}).get('last_position', objects_pos[obj_to_pick])
+            else:
+                obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id] if obj_to_pick_yolo_id is not None else objects_pos[obj_to_pick]
             
-        #     # ADD THIS: Update the inverse mapping
-        #     self.update_yolo_to_pddl_mapping()
-        # obj_to_pick_pos = predicted_pos[obj_to_pick] if obj_to_pick in predicted_pos else objects_pos[obj_to_pick]
-        # place_to_drop_pos = predicted_pos[place_to_drop] if place_to_drop in predicted_pos else objects_pos[place_to_drop]
-
-        obj_to_pick_yolo_id = self.relations.get(obj_to_pick, None)
-        place_to_drop_yolo_id = self.relations.get(place_to_drop, None)
-
-        # if None, self.debug_message warning
-        if obj_to_pick_yolo_id is None and self.warnings["obj_to_pick"]:
-            self.debug_message(f"Warning: No YOLO prediction matched for object to pick: {obj_to_pick}")
-            self.warnings["obj_to_pick"] = False  # Only warn once per episode
-        if place_to_drop_yolo_id is None and self.warnings["place_to_drop"]:
-            self.debug_message(f"Warning: No YOLO prediction matched for place to drop: {place_to_drop}")
-            self.warnings["place_to_drop"] = False  # Only warn once per episode
-
-        if obj_to_pick_yolo_id is not None and obj_to_pick_yolo_id not in predicted_pos:
-            self.debug_message(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
-            obj_to_pick_pos = self.tracking_metadata.get(obj_to_pick_yolo_id, {}).get('last_position', objects_pos[obj_to_pick])
+            if place_to_drop_yolo_id is not None and place_to_drop_yolo_id not in predicted_pos:
+                self.debug_message(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
+                place_to_drop_pos = self.tracking_metadata.get(place_to_drop_yolo_id, {}).get('last_position', objects_pos[place_to_drop])
+            else:
+                place_to_drop_pos = predicted_pos[place_to_drop_yolo_id] if place_to_drop_yolo_id is not None else objects_pos[place_to_drop]
         else:
-            obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id] if obj_to_pick_yolo_id is not None else objects_pos[obj_to_pick]
-        
-        if place_to_drop_yolo_id is not None and place_to_drop_yolo_id not in predicted_pos:
-            self.debug_message(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
-            place_to_drop_pos = self.tracking_metadata.get(place_to_drop_yolo_id, {}).get('last_position', objects_pos[place_to_drop])
-        else:
-            place_to_drop_pos = predicted_pos[place_to_drop_yolo_id] if place_to_drop_yolo_id is not None else objects_pos[place_to_drop]
+            obj_to_pick_pos = objects_pos[obj_to_pick]
+            place_to_drop_pos = objects_pos[place_to_drop]
 
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
@@ -1641,6 +1647,10 @@ class Executor_Diffusion(Executor):
                     
                     # STEP 4: Build observation for policy
                     obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, 
+                                            symgoal[0], symgoal[1], relative_obs=self.oracle)
+                else:
+                    objects_pos = observation["objects_pos"]
+                    obs = self.get_object_obs(env, objects_pos, {}, 
                                             symgoal[0], symgoal[1], relative_obs=self.oracle)
                     
                 processed_obs.append(obs)
