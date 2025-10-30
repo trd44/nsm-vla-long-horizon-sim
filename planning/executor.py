@@ -5,6 +5,7 @@
 # This files implements the structure of the executor object used in this paper.
 
 '''
+import os
 import dill
 import torch
 import numpy as np
@@ -12,7 +13,6 @@ from diffusion_policy.common.pytorch_util import dict_apply
 from diffusion_policy.workspace.base_workspace import BaseWorkspace
 from diffusion_policy.workspace.train_diffusion_transformer_lowdim_workspace import TrainDiffusionTransformerLowdimWorkspace
 from scipy.optimize import linear_sum_assignment
-from scipy.spatial.distance import mahalanobis
 from planning.object_metadata import *
 import copy
 
@@ -205,15 +205,18 @@ class Executor_Diffusion(Executor):
         self.use_yolo = use_yolo
         self.save_data = save_data
         self.image_buffer = []
-        self.map_id_semantic = {
-                "blue cube": "cube1",
-                "red cube": "cube2",
-                "green cube": "cube3",
-                "yellow cube": "cube4",
-        }
+        # self.map_id_semantic = {
+        #         "blue cube": "cube1",
+        #         "red cube": "cube2",
+        #         "green cube": "cube3",
+        #         "yellow cube": "cube4",
+        # }
+        self.relations = {}  # Maps PDDL semantic IDs -> YOLO track IDs
+        self.map_id_semantic = {}  # Maps YOLO track IDs -> PDDL semantic IDs
         self.detected_positions = {}
         self.bboxes_centers = []
         self.count = count
+        self.count_save = 0
         
         # Multi-instance tracking
         self.instances_per_label = instances_per_label or {}
@@ -234,10 +237,22 @@ class Executor_Diffusion(Executor):
         self.detection_outlier_count = {}  # Track consecutive outlier detections
         self.max_outlier_frames = 50  # Ignore object after 3 consecutive outlier frames 
 
-    # Creates a debug self.debug_print that only self.debug_prints if self.debug is True
-    def debug_print(self, *args, **kwargs):
+    # Creates a debug self.debug_message that only self.debug_messages if self.debug is True
+    def debug_message(self, *args, **kwargs):
         if self.debug:
             print(*args, **kwargs)
+
+    def update_yolo_to_pddl_mapping(self):
+        """
+        Update map_id_semantic to be the inverse of self.relations.
+        Maps YOLO track IDs (e.g., 'blue cube_0') to PDDL semantic IDs (e.g., 'cube1')
+        """
+        if not self.relations:
+            self.debug_message("No relations to update mapping from.")
+            return
+        #print(self.relations.items())
+        self.map_id_semantic = {yolo_id: pddl_id for pddl_id, yolo_id in self.relations.items() if yolo_id is not None}
+        self.debug_message(f"Updated map_id_semantic: {self.map_id_semantic}")
 
     def load_policy(self, detector=None, yolo_model=None, regressor_model=None, image_size=256):
         path = self.policy
@@ -340,7 +355,7 @@ class Executor_Diffusion(Executor):
             bbox_jump = np.linalg.norm(bbox_center_new - bbox_center_old)
             
             if bbox_jump > self.max_bbox_jump:
-                self.debug_print(f"  [OUTLIER] {track_id}: bbox jump {bbox_jump:.1f}px > {self.max_bbox_jump}px")
+                self.debug_message(f"  [OUTLIER] {track_id}: bbox jump {bbox_jump:.1f}px > {self.max_bbox_jump}px")
                 return True
         
         # Check position jump in 3D world space
@@ -349,7 +364,7 @@ class Executor_Diffusion(Executor):
             position_jump = np.linalg.norm(np.array(new_position) - old_position)
             
             if position_jump > self.max_position_jump:
-                self.debug_print(f"  [OUTLIER] {track_id}: position jump {position_jump:.3f}m > {self.max_position_jump}m")
+                self.debug_message(f"  [OUTLIER] {track_id}: position jump {position_jump:.3f}m > {self.max_position_jump}m")
                 return True
         
         return False
@@ -371,7 +386,7 @@ class Executor_Diffusion(Executor):
         
         # If we suddenly lose all objects, it's likely a bad frame
         if len(tracked_classes) > 0 and len(detected_classes) == 0:
-            self.debug_print("  [INVALID SET] All objects lost in detection")
+            self.debug_message("  [INVALID SET] All objects lost in detection")
             return False
         
         # If we suddenly detect way more objects than we're tracking, be suspicious
@@ -380,7 +395,7 @@ class Executor_Diffusion(Executor):
             tracked_count = current_tracked_count.get(cls, 0)
             
             if tracked_count > 0 and detected_count > tracked_count * 2:
-                self.debug_print(f"  [INVALID SET] Detected {detected_count} {cls} vs tracking {tracked_count}")
+                self.debug_message(f"  [INVALID SET] Detected {detected_count} {cls} vs tracking {tracked_count}")
                 return False
         
         return True
@@ -508,7 +523,7 @@ class Executor_Diffusion(Executor):
             
             return grasped_objects
         except Exception as e:
-            self.debug_print(f"Error getting grasped objects: {e}")
+            self.debug_message(f"Error getting grasped objects: {e}")
             return set()
 
     def get_ground_truth_position(self, object_semantic_id):
@@ -529,7 +544,7 @@ class Executor_Diffusion(Executor):
             if object_semantic_id in all_positions:
                 return np.array(all_positions[object_semantic_id])
         except Exception as e:
-            self.debug_print(f"Error getting ground truth position: {e}")
+            self.debug_message(f"Error getting ground truth position: {e}")
         
         return None
 
@@ -611,7 +626,7 @@ class Executor_Diffusion(Executor):
                     removal_reason = f"excess {obj_class} detected (keeping top {expected_count})"
             
             if should_remove:
-                self.debug_print(f"[CLEANUP] Removing noisy track {track_id}: {removal_reason}")
+                self.debug_message(f"[CLEANUP] Removing noisy track {track_id}: {removal_reason}")
                 removed_tracks.append(track_id)
                 
                 # Clean up all related data structures
@@ -630,7 +645,7 @@ class Executor_Diffusion(Executor):
                     del self.detected_positions[track_id]
         
         if removed_tracks:
-            self.debug_print(f"[CLEANUP] Removed {len(removed_tracks)} noisy tracks")
+            self.debug_message(f"[CLEANUP] Removed {len(removed_tracks)} noisy tracks")
         
         return removed_tracks
 
@@ -701,6 +716,26 @@ class Executor_Diffusion(Executor):
                         self.detection_outlier_count.get(tracked_id, 0) + 1
         
         return assignments, unmatched_detections
+    
+    def is_object_grasped(self, track_id):
+        """
+        Check if a YOLO-tracked object is currently grasped.
+        
+        Args:
+            track_id: YOLO track ID (e.g., 'blue cube_0')
+        
+        Returns:
+            bool: True if object is grasped
+        """
+        # Get the PDDL semantic ID for this YOLO track
+        semantic_id = self.map_id_semantic.get(track_id)
+        
+        if semantic_id is None:
+            return False
+        
+        # Check if object is grasped using detector
+        grasped_objects = self.get_grasped_objects()
+        return semantic_id in grasped_objects
 
     def estimate_undetected_object_position(self, track_id, ee_pos, image_shape):
         """
@@ -720,42 +755,31 @@ class Executor_Diffusion(Executor):
         last_velocity = np.array(metadata['last_velocity'])
         missing_frames = metadata['missing_frames']
         
-        # Get object's semantic ID for grasp checking
-        obj_class = self.tracked_objects[track_id]['class']
-        semantic_id = self.map_id_semantic.get(obj_class)
-        
-        # Check if object is grasped using detector
-        grasped_objects = self.get_grasped_objects()
-        is_grasped = semantic_id in grasped_objects if semantic_id else False
-        
-        # Heuristic 1: Object is grasped - use ee_pos #use ground truth from detector
-        if is_grasped and semantic_id:
-            self.debug_print(f"  -> {track_id} is currently grasped")
-            #gt_position = self.get_ground_truth_position(semantic_id)
-            gt_position = ee_pos
-            if gt_position is not None:
-                metadata['grasped'] = True
-                self.debug_print(f"  -> [GRASP] {track_id} using ee pos (grasped)")
-                
-                # Update particle filter with projected position
-                bbox_2d = self.project_3d_to_2d_approximate(gt_position, image_shape)
-                if track_id in self.particle_filters_2d:
-                    self.particle_filters_2d[track_id].predict()
-                    self.particle_filters_2d[track_id].update(bbox_2d)
-                if track_id in self.particle_filters_3d:
-                    self.particle_filters_3d[track_id].predict()
-                    self.particle_filters_3d[track_id].update(gt_position)
+        # Heuristic 1: Object is grasped - use ee_pos
+        if self.is_object_grasped(track_id):
+            #print(f"  -> {track_id} is currently grasped")
+            metadata['grasped'] = True
+            self.debug_message(f"  -> [GRASP] {track_id} using ee pos (grasped)")
+            
+            # Update particle filter with projected position
+            bbox_2d = self.project_3d_to_2d_approximate(ee_pos, image_shape)
+            if track_id in self.particle_filters_2d:
+                self.particle_filters_2d[track_id].predict()
+                self.particle_filters_2d[track_id].update(bbox_2d)
+            if track_id in self.particle_filters_3d:
+                self.particle_filters_3d[track_id].predict()
+                self.particle_filters_3d[track_id].update(ee_pos)
 
-                return {
-                    'position_3d': gt_position,
-                    'bbox_center_2d': bbox_2d
-                }
+            return {
+                'position_3d': ee_pos,
+                'bbox_center_2d': bbox_2d
+            }
         
         # Heuristic 2: Was grasped but no longer - check if near gripper
-        if metadata['grasped'] and not is_grasped:
+        if metadata['grasped'] and not self.is_object_grasped(track_id):
             metadata['grasped'] = False
-            self.debug_print(f"  -> [RELEASE] {track_id} was released")
-        
+            self.debug_message(f"  -> [RELEASE] {track_id} was released")
+
         # Heuristic 3: Use particle filter estimate for bbox
         # pf_estimate = self.get_particle_filter_estimate_2d(track_id)
         # estimated_pos_3d = self.get_particle_filter_estimate_3d(track_id)
@@ -765,7 +789,7 @@ class Executor_Diffusion(Executor):
         #     self.particle_filters_2d[track_id].predict(bbox_velocity)
         #     pf_estimate = self.get_particle_filter_estimate_2d(track_id)
             
-        #     self.debug_print(f"  -> [PARTICLE FILTER] {track_id} using PF estimate: {pf_estimate}")
+        #     self.debug_message(f"  -> [PARTICLE FILTER] {track_id} using PF estimate: {pf_estimate}")
             
         #     # # Estimate 3D position using velocity if available
         #     # if np.linalg.norm(last_velocity) > 0.001:
@@ -788,7 +812,7 @@ class Executor_Diffusion(Executor):
         #     damping_factor = 0.8 ** missing_frames
         #     estimated_pos = last_pos + last_velocity * missing_frames * damping_factor
         #     bbox_2d = self.project_3d_to_2d_approximate(estimated_pos, image_shape)
-        #     self.debug_print(f"  -> [VELOCITY] {track_id} using velocity extrapolation")
+        #     self.debug_message(f"  -> [VELOCITY] {track_id} using velocity extrapolation")
             
         #     return {
         #         'position_3d': estimated_pos,
@@ -797,7 +821,7 @@ class Executor_Diffusion(Executor):
         
         # Heuristic 5: Keep last known position
         bbox_2d = self.project_3d_to_2d_approximate(last_pos, image_shape)
-        self.debug_print(f"  -> [STATIC] {track_id} keeping last position")
+        self.debug_message(f"  -> [STATIC] {track_id} keeping last position")
         
         return {
             'position_3d': last_pos,
@@ -813,15 +837,16 @@ class Executor_Diffusion(Executor):
         try:
             image1 = cv2.resize(image1, (256, 256))
         except Exception as e:
-            self.debug_print("Error resizing image: ", e, image1.shape, image1.dtype)
+            self.debug_message("Error resizing image: ", e, image1.shape, image1.dtype)
         try:
             image2 = cv2.resize(image2, (256, 256))
         except Exception as e:
-            self.debug_print("Error resizing image2: ", e, image2.shape, image2.dtype)
+            self.debug_message("Error resizing image2: ", e, image2.shape, image2.dtype)
         
         # Mirror and convert images
         image1 = cv2.flip(image1, 0)
         image1 = cv2.cvtColor(image1, cv2.COLOR_RGB2BGR)
+        ogi_image = image1.copy()
         predictions1 = self.yolo_model.predict(image1, verbose=False)[0]
         
         image2 = cv2.flip(image2, 0)
@@ -879,7 +904,7 @@ class Executor_Diffusion(Executor):
                 semantic_id = self.map_id_semantic[cls]
                 if semantic_id in cubes_obs:
                     ground_truth_xyz = cubes_obs[semantic_id]
-            
+
             predicted_xyz = self.pixel_to_world_dual(
                 cls_id, x, y, w, h, conf,
                 x_cam2, y_cam2, w_cam2, h_cam2, conf_cam2,
@@ -903,7 +928,7 @@ class Executor_Diffusion(Executor):
             current_tracked_count[cls] = current_tracked_count.get(cls, 0) + 1
         
         if not self.is_detection_set_valid(detections_by_class, current_tracked_count):
-            #self.debug_print("[WARNING] Invalid detection set - using estimation only")
+            #self.debug_message("[WARNING] Invalid detection set - using estimation only")
             detections_by_class = {}  # Ignore all detections this frame
         
         # STEP 3: Update instances_per_label
@@ -927,7 +952,7 @@ class Executor_Diffusion(Executor):
             filtered_detections = [d for d in top_detections if d['conf'] >= conf_threshold]
             if len(filtered_detections) == 0 and len(top_detections) > 0:
                 filtered_detections = [top_detections[0]]
-                #self.debug_print(f"Warning: No {cls} detections above {conf_threshold}, using highest conf: {top_detections[0]['conf']:.2f}")
+                #self.debug_message(f"Warning: No {cls} detections above {conf_threshold}, using highest conf: {top_detections[0]['conf']:.2f}")
             
             top_detections = filtered_detections
             
@@ -937,7 +962,7 @@ class Executor_Diffusion(Executor):
             # Update existing tracks
             for det_idx, track_id in assignments.items():
                 det = top_detections[det_idx]
-                
+                    
                 # Calculate velocities
                 velocity_3d = np.array([0.0, 0.0, 0.0])
                 velocity_2d = np.array([0.0, 0.0])
@@ -1067,7 +1092,7 @@ class Executor_Diffusion(Executor):
                 # Store in output dict
                 cubes_predicted_xyz[object_id] = det['position']
                 
-                self.debug_print(f"Created new track: {object_id} with conf {det['conf']:.2f}")
+                self.debug_message(f"Created new track: {object_id} with conf {det['conf']:.2f}")
                 
                 # Save data for analysis
                 if save_video and det['ground_truth'] is not None:
@@ -1125,7 +1150,7 @@ class Executor_Diffusion(Executor):
                 # Check if object has been outlier for too long
                 outlier_count = self.detection_outlier_count.get(track_id, 0)
                 if outlier_count >= self.max_outlier_frames:
-                    self.debug_print(f"Object {track_id} marked as lost (outlier for {outlier_count} frames)")
+                    self.debug_message(f"Object {track_id} marked as lost (outlier for {outlier_count} frames)")
                     continue
                 
                 if missing_frames <= max_missing_frames:
@@ -1143,7 +1168,7 @@ class Executor_Diffusion(Executor):
                     self.tracked_objects[track_id]['position'] = estimated_pos_3d
                     cubes_predicted_xyz[track_id] = estimated_pos_3d
                     
-                    self.debug_print(f"Estimating position for {track_id} (missing {missing_frames} frames)")
+                    self.debug_message(f"Estimating position for {track_id} (missing {missing_frames} frames)")
                     
                     
                     if save_video or render:
@@ -1171,7 +1196,7 @@ class Executor_Diffusion(Executor):
                                 cv2.imshow("Tracking", image1)
                                 cv2.waitKey(1)
                 else:
-                    self.debug_print(f"Object {track_id} lost after {missing_frames} frames")
+                    self.debug_message(f"Object {track_id} lost after {missing_frames} frames")
                     pass
 
         # STEP 7: Periodically clean noisy tracks
@@ -1182,14 +1207,23 @@ class Executor_Diffusion(Executor):
         if save_video:
             if not hasattr(self, "image_buffer"):
                 self.image_buffer = []
-            self.image_buffer.append(image1.copy())
+            #self.image_buffer.append(image1.copy())
+            self.image_buffer.append(ogi_image)
 
         self.detected_positions.update(cubes_predicted_xyz)
         return cubes_predicted_xyz
 
-    def save_video(self, output_path="output.mp4", fps=10):
+    def save_video(self, name, output_path="video/output", fps=10, format="jpeg"):
+        # path name is output_path/name
+        path_name = f"{output_path}/{name}/"
+        os.makedirs(path_name, exist_ok=True)
+        if format == "jpeg":
+            for idx, frame in enumerate(self.image_buffer):
+                cv2.imwrite(f"{path_name}{idx:04d}.jpg", frame)
+            self.debug_message(f"Frames saved at {path_name}/XXXX.jpg")
+            return
         if not self.image_buffer:
-            self.debug_print("No frames to save.")
+            self.debug_message("No frames to save.")
             return
         
         height, width, _ = self.image_buffer[0].shape
@@ -1200,16 +1234,16 @@ class Executor_Diffusion(Executor):
             out.write(frame)
 
         out.release()
-        self.debug_print(f"Video saved at {output_path}")
+        self.debug_message(f"Video saved at {output_path}")
 
     def save_csv_yolo(self, output_path="yolo_data.csv"):
         import pandas as pd
         if not self.bboxes_centers:
-            self.debug_print("No bounding boxes data to save.")
+            self.debug_message("No bounding boxes data to save.")
             return
         
         pd.DataFrame(self.bboxes_centers).to_csv(output_path, index=False)
-        self.debug_print(f"YOLO data saved at {output_path}")
+        self.debug_message(f"YOLO data saved at {output_path}")
 
     def reset_tracking(self):
         """Reset all tracking data. Call this at the start of a new episode."""
@@ -1220,7 +1254,7 @@ class Executor_Diffusion(Executor):
         self.particle_filters_2d = {}
         self.particle_filters_3d = {}
         self.detection_outlier_count = {}
-        self.debug_print("Tracking data reset")
+        self.debug_message("Tracking data reset")
     
     def set_tracking_data(self, tracking_data_dict):
         """Sets all the variables related to tracking from an external source."""
@@ -1294,59 +1328,61 @@ class Executor_Diffusion(Executor):
         right_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")])
         aperture = np.linalg.norm(left_finger_pos - right_finger_pos)*1000.
 
-        # self.debug_print keys
-        # self.debug_print("objects_pos keys: ", objects_pos.keys())
-        # self.debug_print("predicted_pos keys: ", predicted_pos.keys())
-        # self.debug_print()
+        # self.debug_message keys
+        # self.debug_message("objects_pos keys: ", objects_pos.keys())
+        # self.debug_message("predicted_pos keys: ", predicted_pos.keys())
+        # self.debug_message()
 
         # Get relationships between predicted objects
         predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id]) for obj_id in predicted_pos.keys()]
         update_object_metadata(predicted_objs, eps=1e-3)
-        # pretty_self.debug_print_scene(predicted_objs)
+        # pretty_self.debug_message_scene(predicted_objs)
         # Query example:
         # a = objs[0]
         # b = objs[1]
-        # self.debug_print(f"{a.id} relations to {b.id}:", a.get_relations_to(b.id))
+        # self.debug_message(f"{a.id} relations to {b.id}:", a.get_relations_to(b.id))
 
         # Get relationships between sim objects
         cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() if obj_id != "gripper" and 'cube' in obj_id}
         sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) for obj_id in cubes_only.keys()]
         update_object_metadata(sim_objs, eps=1e-3)
-        # pretty_self.debug_print_scene(sim_objs)
+        # pretty_self.debug_message_scene(sim_objs)
 
-        if not self.relations:
-            # Map predicted positions to object positions based on relationships
-            self.relations = match_objects_by_relationships(sim_objs, predicted_objs)
-            self.debug_print("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
+        # if not self.relations:
+        #     # Map predicted positions to object positions based on relationships
+        #     self.relations = match_objects_by_relationships(sim_objs, predicted_objs)
+        #     self.debug_message("\n=== Detected-to-Pddl Mapping (based on relational similarity) ===")
 
-            for pred_id, sim_id in self.relations.items():
-                if sim_id:
-                    self.debug_print(f"{pred_id}  -->  {sim_id}")
-                else:
-                    self.debug_print(f"{pred_id}  -->  (no confident match found)")
-        
+        #     for pred_id, sim_id in self.relations.items():
+        #         if sim_id:
+        #             self.debug_message(f"{pred_id}  -->  {sim_id}")
+        #         else:
+        #             self.debug_message(f"{pred_id}  -->  (no confident match found)")
+            
+        #     # ADD THIS: Update the inverse mapping
+        #     self.update_yolo_to_pddl_mapping()
         # obj_to_pick_pos = predicted_pos[obj_to_pick] if obj_to_pick in predicted_pos else objects_pos[obj_to_pick]
         # place_to_drop_pos = predicted_pos[place_to_drop] if place_to_drop in predicted_pos else objects_pos[place_to_drop]
 
         obj_to_pick_yolo_id = self.relations.get(obj_to_pick, None)
         place_to_drop_yolo_id = self.relations.get(place_to_drop, None)
 
-        # if None, self.debug_print warning
+        # if None, self.debug_message warning
         if obj_to_pick_yolo_id is None and self.warnings["obj_to_pick"]:
-            self.debug_print(f"Warning: No YOLO prediction matched for object to pick: {obj_to_pick}")
+            self.debug_message(f"Warning: No YOLO prediction matched for object to pick: {obj_to_pick}")
             self.warnings["obj_to_pick"] = False  # Only warn once per episode
         if place_to_drop_yolo_id is None and self.warnings["place_to_drop"]:
-            self.debug_print(f"Warning: No YOLO prediction matched for place to drop: {place_to_drop}")
+            self.debug_message(f"Warning: No YOLO prediction matched for place to drop: {place_to_drop}")
             self.warnings["place_to_drop"] = False  # Only warn once per episode
 
         if obj_to_pick_yolo_id is not None and obj_to_pick_yolo_id not in predicted_pos:
-            self.debug_print(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
+            self.debug_message(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
             obj_to_pick_pos = self.tracking_metadata.get(obj_to_pick_yolo_id, {}).get('last_position', objects_pos[obj_to_pick])
         else:
             obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id] if obj_to_pick_yolo_id is not None else objects_pos[obj_to_pick]
         
         if place_to_drop_yolo_id is not None and place_to_drop_yolo_id not in predicted_pos:
-            self.debug_print(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
+            self.debug_message(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
             place_to_drop_pos = self.tracking_metadata.get(place_to_drop_yolo_id, {}).get('last_position', objects_pos[place_to_drop])
         else:
             place_to_drop_pos = predicted_pos[place_to_drop_yolo_id] if place_to_drop_yolo_id is not None else objects_pos[place_to_drop]
@@ -1369,53 +1405,243 @@ class Executor_Diffusion(Executor):
             action_gripper = np.array([-0.1])
         action = np.concatenate([action[:3], action_gripper])
         return action
+    
+    def build_object_relations(self, predicted_pos, objects_pos):
+        """
+        Build relations mapping between YOLO detections and PDDL semantic IDs.
+        
+        Args:
+            predicted_pos: Dict of YOLO track IDs -> 3D positions
+            objects_pos: Dict of PDDL semantic IDs -> 3D positions from sim
+        
+        Returns:
+            relations dict: PDDL semantic ID -> YOLO track ID
+        """
+        # Get relationships between predicted objects
+        predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id]) 
+                        for obj_id in predicted_pos.keys()]
+        update_object_metadata(predicted_objs, eps=1e-3)
+        
+        # Get relationships between sim objects
+        cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() 
+                    if obj_id != "gripper" and 'cube' in obj_id}
+        sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) 
+                    for obj_id in cubes_only.keys()]
+        update_object_metadata(sim_objs, eps=1e-3)
+        
+        # Map predicted positions to object positions based on relationships
+        relations = match_objects_by_relationships(sim_objs, predicted_objs)
+        
+        self.debug_message("\n=== Detected-to-PDDL Mapping (based on relational similarity) ===")
+        for pddl_id, yolo_id in relations.items():
+            if yolo_id:
+                self.debug_message(f"{pddl_id}  -->  {yolo_id}")
+            else:
+                self.debug_message(f"{pddl_id}  -->  (no confident match found)")
+        
+        return relations
+    
+    def update_relations_with_new_detections(self, new_predicted_pos, objects_pos):
+        """
+        Update relations when new objects are detected or tracking IDs change.
+        Only updates if there are significant changes.
+        
+        Args:
+            new_predicted_pos: Dict of current YOLO track IDs -> 3D positions
+            objects_pos: Dict of PDDL semantic IDs -> 3D positions from sim
+        """
+        # Check if we need to rebuild relations
+        needs_update = False
+        
+        # Case 1: No relations exist yet
+        if not self.relations:
+            needs_update = True
+        
+        # Case 2: New YOLO tracks appeared
+        current_yolo_ids = set(new_predicted_pos.keys())
+        mapped_yolo_ids = set(self.relations.values())
+        if current_yolo_ids - mapped_yolo_ids:
+            self.debug_message(f"New YOLO tracks detected: {current_yolo_ids - mapped_yolo_ids}")
+            needs_update = True
+        
+        # Case 3: Mapped YOLO tracks disappeared (need remapping)
+        missing_yolo_ids = mapped_yolo_ids - current_yolo_ids
+        if missing_yolo_ids:
+            self.debug_message(f"Mapped YOLO tracks disappeared: {missing_yolo_ids}")
+            needs_update = True
+        
+        if needs_update:
+            new_relations = self.build_object_relations(new_predicted_pos, objects_pos)
+            
+            # Merge with existing relations, preferring stable mappings
+            if self.relations:
+                # Keep stable mappings where YOLO ID still exists
+                for pddl_id, yolo_id in self.relations.items():
+                    if yolo_id in current_yolo_ids:
+                        # Check if position is consistent
+                        old_pos = self.tracked_objects.get(yolo_id, {}).get('position')
+                        new_pos = new_predicted_pos.get(yolo_id)
+                        if old_pos is not None and new_pos is not None:
+                            dist = np.linalg.norm(np.array(new_pos) - np.array(old_pos))
+                            if dist < 0.05:  # 5cm threshold for stability
+                                new_relations[pddl_id] = yolo_id  # Keep stable mapping
+            
+            self.relations = new_relations
+            self.update_yolo_to_pddl_mapping()
+
+    def correct_grasped_object_positions(self, predicted_pos, ee_pos, image_shape):
+        """
+        After YOLO detection and relations mapping, correct positions of grasped objects.
+        Also adds back grasped objects that weren't detected.
+        
+        Args:
+            predicted_pos: Dict of YOLO track IDs -> 3D positions (will be modified in-place)
+            ee_pos: Current end effector position
+            image_shape: Shape of image for 2D projection
+        
+        Returns:
+            Updated predicted_pos dict
+        """
+        if not self.map_id_semantic:
+            # No mapping available yet
+            return predicted_pos
+        
+        grasped_objects = self.get_grasped_objects()
+        self.debug_message(f"  -> Currently grasped objects (PDDL): {grasped_objects}")
+        
+        # Check all known YOLO tracks
+        for yolo_id, pddl_id in self.map_id_semantic.items():
+            if pddl_id in grasped_objects:
+                self.debug_message(f"  -> [GRASP CORRECTION] {yolo_id} (PDDL: {pddl_id}) is grasped")
+                
+                # Override position with EE position
+                predicted_pos[yolo_id] = ee_pos
+                
+                # Update tracked object data
+                if yolo_id in self.tracked_objects:
+                    self.tracked_objects[yolo_id]['position'] = ee_pos
+                    self.tracked_objects[yolo_id]['conf'] = 1.0  # High confidence
+                    
+                    # Update bbox to projected EE position
+                    bbox_2d = self.project_3d_to_2d_approximate(ee_pos, image_shape)
+                    self.tracked_objects[yolo_id]['bbox'] = [bbox_2d[0], bbox_2d[1], 
+                                                            self.tracked_objects[yolo_id]['bbox'][2],
+                                                            self.tracked_objects[yolo_id]['bbox'][3]]
+                else:
+                    # Object was not detected but is grasped - add it back!
+                    self.debug_message(f"  -> [GRASP ADD] Adding undetected grasped object {yolo_id}")
+                    bbox_2d = self.project_3d_to_2d_approximate(ee_pos, image_shape)
+                    
+                    # Get last known bbox size or use default
+                    if yolo_id in self.tracking_metadata:
+                        last_bbox = self.tracking_metadata[yolo_id].get('last_bbox', [0, 0, 50, 50])
+                        bbox_w, bbox_h = last_bbox[2], last_bbox[3]
+                    else:
+                        bbox_w, bbox_h = 50, 50  # Default size
+                    
+                    self.tracked_objects[yolo_id] = {
+                        'bbox': [bbox_2d[0], bbox_2d[1], bbox_w, bbox_h],
+                        'position': ee_pos,
+                        'class': yolo_id.rsplit('_', 1)[0],  # Extract class from 'blue cube_0'
+                        'conf': 1.0,
+                        'grasped': True
+                    }
+                
+                # Update tracking metadata
+                if yolo_id in self.tracking_metadata:
+                    self.tracking_metadata[yolo_id]['last_position'] = ee_pos
+                    self.tracking_metadata[yolo_id]['grasped'] = True
+                    self.tracking_metadata[yolo_id]['missing_frames'] = 0  # Reset missing frames
+                    
+                    # Save bbox size for future reference
+                    if yolo_id in self.tracked_objects:
+                        self.tracking_metadata[yolo_id]['last_bbox'] = self.tracked_objects[yolo_id]['bbox']
+                else:
+                    # Initialize metadata for this grasped object
+                    self.tracking_metadata[yolo_id] = {
+                        'missing_frames': 0,
+                        'last_position': ee_pos,
+                        'last_velocity': np.array([0.0, 0.0, 0.0]),
+                        'bbox_velocity': np.array([0.0, 0.0]),
+                        'grasped': True,
+                        'position_history': [ee_pos],
+                        'last_bbox': [bbox_2d[0], bbox_2d[1], 50, 50]
+                    }
+                
+                # Update particle filters
+                bbox_center = np.array([bbox_2d[0], bbox_2d[1]])
+                if yolo_id in self.particle_filters_2d:
+                    self.particle_filters_2d[yolo_id].predict()
+                    self.particle_filters_2d[yolo_id].update(bbox_center)
+                else:
+                    # Initialize particle filter
+                    self.update_particle_filter_2d(yolo_id, bbox_center)
+                
+                if yolo_id in self.particle_filters_3d:
+                    self.particle_filters_3d[yolo_id].predict()
+                    self.particle_filters_3d[yolo_id].update(ee_pos)
+                else:
+                    # Initialize particle filter
+                    self.update_particle_filter_3d(yolo_id, ee_pos)
+        
+        return predicted_pos
 
     def execute(self, env, observations, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
         self.image_buffer = []
         self.detected_positions = {}
-        self.yolo_frequency = 2  # Run YOLO every 2 policy calls
+        self.yolo_frequency = 2
         horizon = self.horizon if self.horizon is not None else 50
-        self.debug_print("\tTask goal: ", symgoal)
+        self.debug_message("\tTask goal: ", symgoal)
 
         step_executor = 0
         done = False
         success = False 
-        self.debug_print("\tStarting executor for step: ", self.id)
+        self.debug_message("\tStarting executor for step: ", self.id)
 
         while not done:
             processed_obs = []
-            self.relations = {}
+            
             for obs_num, observation in enumerate(observations):
                 if self.use_yolo or self.save_data:
                     objects_pos = observation["objects_pos"]
-                    state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
                     agentview_image = np.array(observation["agentview_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
                     wrist_image = np.array(observation["robot0_eye_in_hand_image"].reshape((self.image_size, self.image_size, 3)), dtype=np.uint8)
                     ee_pos = observation["robot0_eef_pos"]
-                    #cubes_obs = {k: np.asarray(v, dtype=np.float32).copy() for k, v in objects_pos.items() if 'cube' in k}
-                    #self.debug_print("cubes_obs: ", cubes_obs)
-                    #self.debug_print("Image shape: ", image.shape)
-                    # if len(self.detected_positions) >= 3 and not(self.save_data) and self.id in ["Grasp", "Drop"]:
-                    #     cubes_xyz = copy.deepcopy(self.detected_positions)
-                    # else:
-                    cubes_obs = {}
-                    if (step_executor % self.yolo_frequency == 0 and obs_num==0) or self.save_data:
-                        predicted_cubes_xyz = self.yolo_estimate(image1 = agentview_image, 
-                                                        image2 = wrist_image, 
-                                                        save_video=self.save_data, 
-                                                        cubes_obs=cubes_obs,
-                                                        ee_pos=ee_pos,
-                                                        conf_threshold=0.8,
-                                                        max_missing_frames=200,
-                                                        render=render)
+                    
+                    # STEP 1: Run YOLO detection (without grasp heuristics)
+                    if (step_executor % self.yolo_frequency == 0 and obs_num == 0) or self.save_data:
+                        predicted_cubes_xyz = self.yolo_estimate(
+                            image1=agentview_image, 
+                            image2=wrist_image, 
+                            save_video=self.save_data, 
+                            cubes_obs={},
+                            ee_pos=ee_pos,
+                            conf_threshold=0.8,
+                            max_missing_frames=200,
+                            render=render
+                        )
                     else:
+                        # Use tracked positions
                         tracked_positions = {}
                         for obj_id in self.tracked_objects.keys():
                             tracked_positions[obj_id] = self.tracking_metadata[obj_id]['last_position']
                         predicted_cubes_xyz = copy.deepcopy(tracked_positions)
-
-                    obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, symgoal[0], symgoal[1], relative_obs=self.oracle)
+                    
+                    # STEP 2: Build/update relations mapping
+                    if predicted_cubes_xyz:
+                        self.update_relations_with_new_detections(predicted_cubes_xyz, objects_pos)
+                    
+                    # STEP 3: Correct positions of grasped objects (for both detected and undetected)
+                    predicted_cubes_xyz = self.correct_grasped_object_positions(
+                        predicted_cubes_xyz, 
+                        ee_pos, 
+                        image_shape=agentview_image.shape  # Pass image shape
+                    )
+                    
+                    # STEP 4: Build observation for policy
+                    obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, 
+                                            symgoal[0], symgoal[1], relative_obs=self.oracle)
                     
                 processed_obs.append(obs)
             
@@ -1451,18 +1677,18 @@ class Executor_Diffusion(Executor):
                 observations.append(obs)
             
             if done:
-                self.debug_print("Environment terminated")
+                self.debug_message("Environment terminated")
             
             step_executor += 1
             state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             success = self.Beta(state, symgoal)
 
-            self.debug_print()
-            self.debug_print("Checking goal predicates: ")
-            self.debug_print(state)
+            self.debug_message()
+            self.debug_message("Checking goal predicates: ")
+            self.debug_message(state)
             goal_reached = True
             for predicate in task_goals:
-                self.debug_print("Checking predicate: ", predicate)
+                self.debug_message("Checking predicate: ", predicate)
                 predicate_parts = predicate.split(' ')
                 predicate_name = predicate_parts[0]
                 predicate_args = ','.join(predicate_parts[1:]).replace(' ', '')
@@ -1474,11 +1700,12 @@ class Executor_Diffusion(Executor):
             if success:
                 done = True
             if step_executor > horizon:
-                self.debug_print("Reached executor horizon")
+                self.debug_message("Reached executor horizon")
                 done = True 
         
         if self.save_data:
-            self.save_csv_yolo(output_path=f"{self.id}_dualcam_{self.count}.csv")
-            self.count += 1
-        
+            self.save_csv_yolo(output_path=f"{self.id}_dualcam_{self.count_save}.csv")
+            self.save_video(name=f"{self.id}_{self.count_save}")
+            self.count_save += 1
+
         return observations, success, goal_reached
