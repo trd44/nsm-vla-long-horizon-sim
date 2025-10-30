@@ -331,7 +331,7 @@ if __name__ == "__main__":
             init_predicates.pop(predicate)
     print("Initial predicates: ", init_predicates)
 
-    reset_gripper_pos = np.array([-0.14193391, -0.03391656,  1.05828137])
+    reset_gripper_pos = np.array([-0.080193391, -0.03391656,  1.05828137])
     episode_successes = 0
     num_valid_pick_place_queries = 0
     pick_place_success = 0
@@ -344,6 +344,7 @@ if __name__ == "__main__":
         # First open the gripper
         state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
         while not(state["open_gripper(gripper)"]):
+            #print(state["open_gripper(gripper)"])
             action = np.array([0, 0, 0, -1])
             env.step(action)
             state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
@@ -359,7 +360,8 @@ if __name__ == "__main__":
         delta = reset_gripper_pos - gripper_pos
         action = 5*np.array([delta[0], delta[1], delta[2], 0])
         while np.linalg.norm(delta) > 0.01:
-            #print("Curent pos: ", current_pos)
+            #print("Curent pos: ", gripper_pos)
+            #print("Reset pos: ", reset_gripper_pos)
             action = 5*np.array([delta[0], delta[1], delta[2], 0])
             action = action * 0.9
             env.step(action)
@@ -367,13 +369,14 @@ if __name__ == "__main__":
                 env.render()
             gripper_pos = env._get_observations()["robot0_eef_pos"]
             delta = reset_gripper_pos - gripper_pos
-            #print(f"Delta: {delta}, Current pos: {current_pos}, Reset pos: {reset_gripper_pos}")
+            #print(f"Delta: {delta}, Current pos: {gripper_pos}, Reset pos: {reset_gripper_pos}, Action: {action}")
 
     for i in range(100):
         print("Episode: ", i)
         success = False
         valid_state = False
         plan = False
+        goal_reached = False
         np.random.seed(args.seed + i)
         # Reset the environment until a valid state is reached
         while plan == False:
@@ -401,6 +404,7 @@ if __name__ == "__main__":
         # Execute the first operator in the plan
         reset_gripper(env)
         tracking_data = {}
+        sim_reset = False
         for j, operator in enumerate(plan):
             print("\nExecuting operator: ", operator)
             # Concatenate the observations with the operator effects
@@ -435,12 +439,11 @@ if __name__ == "__main__":
                 print("\tExecuting action: ", action_step.id)
                 sub_goal = (obj_to_pick, obj_to_drop)
                 task_goals = goal_predicates.copy()
-                observations, success = action_step.execute(env, observations, sub_goal, task_goals, args.render)
+                observations, success, goal_reached = action_step.execute(env, observations, sub_goal, task_goals, args.render)
                 tracking_data = action_step.get_tracking_data()
 
                 state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-                # Compute if the goal has been reached based on the current state and the goal predicates
-                goal_reached = True
+
                 if not success:
                     print("Execution failed.\n")
             if success:
@@ -450,19 +453,29 @@ if __name__ == "__main__":
                 print(f"Successfull operations: {pick_place_success}, Out of: {len(plan)/2}, Percentage advancement: {pick_place_success/(len(plan)/2)}")
                 if operator == plan[-1]:
                     continue
-                reset_gripper(env)
+                try:
+                    reset_gripper(env)
+                except ValueError:
+                    i -= 1
+                    sim_reset = True
+                    break
             else:
                 # Print the number of operators that were successfully executed out of the total number of operators in the plan
                 print("--- Object not picked and placed.")
                 print(f"Successfull operations: {pick_place_success}, Out of: {len(plan)/2}, Percentage advancement: {pick_place_success/(len(plan)/2)}")
-                reset_gripper(env)
+                try:
+                    reset_gripper(env)
+                except ValueError:
+                    i -= 1
+                    sim_reset = True
+                    break
                 continue
             
         pick_place_successes.append(pick_place_success)
         percentage_advancement.append(pick_place_success/(len(plan)/2))
-        if success:
+        if goal_reached:
             episode_successes += 1
-            print("Hanoi Execution succeeded.\n")
+            print("Episode Execution succeeded.\n")
         print("Success rate: ", episode_successes/(i+1))
         print("\n\n")
 

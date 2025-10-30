@@ -1481,4 +1481,4 @@ class Executor_Diffusion(Executor):
             self.save_csv_yolo(output_path=f"{self.id}_dualcam_{self.count}.csv")
             self.count += 1
         
-        return observations, success
+        return observations, success, goal_reached
