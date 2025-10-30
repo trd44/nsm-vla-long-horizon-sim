@@ -182,6 +182,7 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=int, default=256, help='Size of the rendered images')
     parser.add_argument('--rnd_reset', action='store_true', help='Randomize the object positions at reset')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--n_act', type=int, default=4, help='Number of actions to execute per policy call')
     args = parser.parse_args()
     np.random.seed(args.seed)
 
@@ -253,28 +254,28 @@ if __name__ == "__main__":
                        Beta=termination_indicator('pick'),
                        nulified_action_indexes=[0, 1],
                        oracle=True,
-                       horizon=25,
+                       horizon=8/args.n_act*25,
                        debug=args.debug)
     reach_pick = Executor_Diffusion(id='ReachPick', 
                             policy=policies_paths[args.env]['reach_pick'],
                             Beta=termination_indicator('reach_pick'),
                             nulified_action_indexes=[3],
                             oracle=True,
-                            horizon=25,
+                            horizon=8/args.n_act*25,
                             debug=args.debug)
     reach_place = Executor_Diffusion(id='ReachDrop', 
                             policy=policies_paths[args.env]['reach_place'],
                             Beta=termination_indicator('reach_drop'),
                             nulified_action_indexes=[3],
                             oracle=True,
-                            horizon=25,
+                            horizon=8/args.n_act*35,
                             debug=args.debug)
     drop = Executor_Diffusion(id='Drop', 
                     policy=policies_paths[args.env]['drop'],
                     Beta=termination_indicator('drop'),
                     nulified_action_indexes=[0, 1],
                     oracle=True,
-                    horizon=25,
+                    horizon=8/args.n_act*25,
                     debug=args.debug)
 
     Move_action = [reach_pick, pick, reach_place, drop]
@@ -307,7 +308,6 @@ if __name__ == "__main__":
     obj_mapping = env_pddl_mapping[args.env]
     yolo_model = YOLO(yolo_model_paths[args.env])
     regressor_model = joblib.load(regressor_model_paths[args.env])
-    n_actions = 8
     n_obs = 4
 
     env.reset()
@@ -337,7 +337,7 @@ if __name__ == "__main__":
             init_predicates.pop(predicate)
     print("Initial predicates: ", init_predicates)
 
-    reset_gripper_pos = np.array([-0.080193391, -0.03391656,  1.05828137])
+    reset_gripper_pos = np.array([-0.080193391, -0.03391656,  0.95828137])
     episode_successes = 0
     num_valid_pick_place_queries = 0
     pick_place_success = 0
@@ -391,7 +391,7 @@ if __name__ == "__main__":
             if args.render:
                 env.render()
             observations = []
-            for _ in range(n_actions):
+            for _ in range(args.n_act):
                 env.step(np.zeros(env.action_space.shape))
                 obs = env._get_observations()
                 objects_pos = detector.get_all_objects_pos()
@@ -410,7 +410,6 @@ if __name__ == "__main__":
         # Execute the first operator in the plan
         reset_gripper(env)
         tracking_data = {}
-        sim_reset = False
         for j, operator in enumerate(plan):
             print("\nExecuting operator: ", operator)
             # Concatenate the observations with the operator effects
@@ -445,13 +444,10 @@ if __name__ == "__main__":
                 print("\tExecuting action: ", action_step.id)
                 sub_goal = (obj_to_pick, obj_to_drop)
                 task_goals = goal_predicates.copy()
-                observations, success, goal_reached = action_step.execute(env, observations, sub_goal, task_goals, args.render)
+                observations, success, goal_reached = action_step.execute(env, observations, args.n_act, sub_goal, task_goals, args.render)
                 tracking_data = action_step.get_tracking_data()
 
                 state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-
-                if not success:
-                    print("Execution failed.\n")
             if success:
                 pick_place_success += 1
                 valid_pick_place_success += 1
@@ -463,7 +459,6 @@ if __name__ == "__main__":
                     reset_gripper(env)
                 except ValueError:
                     i -= 1
-                    sim_reset = True
                     break
             else:
                 # Print the number of operators that were successfully executed out of the total number of operators in the plan
@@ -473,13 +468,12 @@ if __name__ == "__main__":
                     reset_gripper(env)
                 except ValueError:
                     i -= 1
-                    sim_reset = True
                     break
                 continue
             
         pick_place_successes.append(pick_place_success)
         percentage_advancement.append(pick_place_success/(len(plan)/2))
-        if goal_reached:
+        if goal_reached or pick_place_success/(len(plan)/2) == 1.0:
             episode_successes += 1
             print("Episode Execution succeeded.\n")
         print("Success rate: ", episode_successes/(i+1))
