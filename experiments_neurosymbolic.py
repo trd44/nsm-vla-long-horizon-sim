@@ -192,6 +192,12 @@ if __name__ == "__main__":
                 return condition
         elif operator == 'drop':
             def Beta(state, symgoal):
+            # print("State in drop Beta: ", state)
+            # print("Symgoal in drop Beta: ", symgoal)
+            # print("Checking condition: ", f"on({symgoal[0]},{symgoal[1]})", state[f"on({symgoal[0]},{symgoal[1]})"])
+            # print("Checking condition: ", f"grasped({symgoal[0]})", state[f"grasped({symgoal[0]})"])
+            # print("Condition value: ", state[f"on({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"])
+            # print("-----------------------------------")
                 condition = state[f"on({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"]
                 return condition
         elif operator == 'reach_pick':
