@@ -394,7 +394,7 @@ if __name__ == "__main__":
             # Get only the last n_obs observations
             observations = observations[-n_obs:]
             state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-            print("Initial state: ", state)
+            #print("Initial state: ", state)
             # Generate a plan
             plan, goal_predicates = get_plan(state, pddl_path, mode=planning_mode[args.env])
         print("Plan: ", plan)
