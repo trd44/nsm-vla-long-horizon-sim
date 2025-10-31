@@ -8,8 +8,12 @@ from dataset_making.utils import cap, to_osc_pose
 np.set_printoptions(linewidth=200, precision=4, suppress=True)
 
 # ===== DEBUG PLOTTING FLAG =====
-DEBUG_PLOTS = True  # Set to True to enable control debugging plots
+DEBUG_PLOTS = False  # Set to True to enable control debugging plots
 DEBUG_PLOTS_DIR = "./debug_plots"
+# ================================
+
+# ===== HEIGHT CONFIGURATION =====
+MAX_HEIGHT = 0.9  # Maximum height for ascend operations
 # ================================
 
 if DEBUG_PLOTS:
@@ -412,7 +416,7 @@ class TaskOperation:
         return dz
     
 
-    def _ascend(self, target_z, speed=8.0, max_steps=500):
+    def _ascend(self, target_z, speed=10.0, max_steps=500):
         """Move gripper vertically upward. Fast in free space."""
         self._reset_z_pid()
         self._init_debug_data("ascend", has_xy=False, has_z=True)
@@ -452,7 +456,7 @@ class TaskOperation:
         return result
 
 
-    def _descend(self, target_z, speed=5.0, max_steps=500,
+    def _descend(self, target_z, speed=10.0, max_steps=500,
                  track_body_id=None, track_obj_name=None):
         """
         Descend while tracking target in XY. Slower speed for stability near contact.
@@ -514,7 +518,7 @@ class TaskOperation:
         self._plot_debug_data()
         return result
 
-    def _descend_xy_until_on(self, pick_str, goal_str, target_z, speed=4.0, max_steps=500,
+    def _descend_xy_until_on(self, pick_str, goal_str, target_z, speed=10.0, max_steps=500,
                               track_body_id=None, track_obj_name=None):
         """
         Descend while tracking XY until on(pick, goal) detected.
@@ -739,7 +743,7 @@ class PickOperation(TaskOperation):
     def execute(self, obs):
         # Compute a dynamic hover height: 10 cm above the object
         object_z = float(self.env.sim.data.body_xpos[self.body_id][2]) + 0.0125
-        ref_z = 1.0 #object_z + 0.10
+        ref_z = MAX_HEIGHT #object_z + 0.10
 
         # 1) Move up to hover
         ok, obs = self._ascend(target_z=ref_z)
@@ -764,7 +768,7 @@ class PickOperation(TaskOperation):
             target_z=object_z,
             track_body_id=self.body_id,
             track_obj_name=self.object_id,
-            speed=5,
+            speed=10,
         )
         if not ok:
             print(f"[PickOperation] ❌ failed to descend to z={object_z}")
@@ -805,21 +809,15 @@ class PlaceOperation(TaskOperation):
 
     def execute(self, obs):
         # Move above placement
-        ok, obs = self._ascend(target_z=1.0)
+        ok, obs = self._ascend(target_z=MAX_HEIGHT)
         if not ok: 
-            print(f"[PlaceOperation] ❌ failed to ascend to {1.0}")
+            print(f"[PlaceOperation] ❌ failed to ascend to {MAX_HEIGHT}")
             return False, obs
         
         ok, obs = self._move_xy(self.body_id, self.placement_id, speed=10, max_steps=1000)
         if not ok: 
             print(f"[PlaceOperation] ❌ failed to move over {self.placement_id}")
             return False, obs
-        
-        # # Descend to drop
-        # ok, obs = self._descend(target_z=place_z)
-        # if not ok: 
-        #     print(f"[PlaceOperation] ❌ failed to descend to {place_z}")
-        #     return False, obs
 
         place_z = float(self.env.sim.data.body_xpos[self.body_id][2])
         ok, obs = self._descend_xy_until_on(
@@ -840,15 +838,15 @@ class PlaceOperation(TaskOperation):
         # Open to release
         ok, obs = self._gripper_actuate(open_grip=True)
         if not ok: 
-            print(f"[PlaceOperation] ❌ failed to ascend to open gripper")
+            print(f"[PlaceOperation] ❌ failed to open gripper")
             return False, obs
         
         # Retract
-        for _ in range(15):
-            obs = self.env.env._get_observations()
-            action = to_osc_pose(np.array([0,0,1,0]))
-            self.record(obs, action)
-            obs, *_ = self.env.step(action)
+        retract_height = self._gripper_pos()[2] + 0.05  # Lift 5cm
+        ok, obs = self._ascend(target_z=retract_height)
+        if not ok:
+            print(f"[PlaceOperation] ❌ failed to retract after placing")
+            return False, obs
 
         print(f"[PlaceOperation] ✅ placed {self.object_id} on {self.placement_id}")
         return True, obs
@@ -863,7 +861,7 @@ class TurnOnOperation(TaskOperation):
 
     def execute(self, obs):
         # Move above
-        ok, obs = self._ascend(target_z=1.1)
+        ok, obs = self._ascend(target_z=MAX_HEIGHT)
         if not ok: return False, obs
         ok, obs = self._move_xy(self.body_id, self.object_id)
         if not ok: return False, obs
@@ -875,11 +873,11 @@ class TurnOnOperation(TaskOperation):
         ok, obs = self._gripper_actuate(open_grip=False)
         if not ok: return False, obs
         # Retract
-        for _ in range(15):
-            obs = self.env.env._get_observations()
-            action = to_osc_pose(np.array([0,0,1,0]))
-            self.record(obs, action)
-            obs, *_ = self.env.step(action)
+        retract_height = self._gripper_pos()[2] + 0.05  # Lift 5cm
+        ok, obs = self._ascend(target_z=retract_height)
+        if not ok:
+            print(f"[TurnOnOperation] ❌ failed to retract after actuation")
+            return False, obs
         return True, obs
     
 
