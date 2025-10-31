@@ -376,8 +376,10 @@ if __name__ == "__main__":
             gripper_pos = env._get_observations()["robot0_eef_pos"]
             delta = reset_gripper_pos - gripper_pos
             #print(f"Delta: {delta}, Current pos: {gripper_pos}, Reset pos: {reset_gripper_pos}, Action: {action}")
-
+    retry_reset = False
     for i in range(100):
+        if retry_reset:
+            i -= 1
         print("Episode: ", i)
         success = False
         valid_state = False
@@ -458,7 +460,7 @@ if __name__ == "__main__":
                 try:
                     reset_gripper(env)
                 except ValueError:
-                    i -= 1
+                    retry_reset = True
                     break
             else:
                 # Print the number of operators that were successfully executed out of the total number of operators in the plan
@@ -467,7 +469,7 @@ if __name__ == "__main__":
                 try:
                     reset_gripper(env)
                 except ValueError:
-                    i -= 1
+                    retry_reset = True
                     break
                 continue
             
