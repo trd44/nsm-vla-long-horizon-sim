@@ -59,6 +59,7 @@ robomimic
 # ==============================================================================
 # Project-Specific Directories
 # ==============================================================================
+debug_plots/
 lerobot/
 object_detection/
 rlds_dataset_builder
@@ -76,3 +77,5 @@ planning/PDDL/hanoi/problem_dummy.pddl
 planning/PDDL/assemblyline/problem_dummy.pddl
 planning/PDDL/nut_assembly/problem_dummy.pddl
 planning/PDDL/kitchen/problem_dummy.pddl
+
+DEBUG_PLOTS_README.md
