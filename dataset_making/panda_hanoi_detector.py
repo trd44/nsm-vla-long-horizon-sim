@@ -130,14 +130,13 @@ class PandaHanoiDetector(_BaseHanoiDetector):
         return True
 
     def open(self, gripper_pddl_name, return_distance=False): # gripper_pddl_name likely "gripper"
-        # Your existing open logic seems fine for Panda based on qpos
-        j1 = float(self.env.sim.data.get_joint_qpos('gripper0_finger_joint1'))
-        j2 = float(self.env.sim.data.get_joint_qpos('gripper0_finger_joint2'))
-        qpos_diff = abs(j1 - j2)
-        
+        # Use finger positions like other detectors do for Robotiq gripper
+        left_finger_pos = np.asarray(self.env.sim.data.body_xpos[self.env.sim.model.body_name2id("gripper0_left_inner_finger")])
+        right_finger_pos = np.asarray(self.env.sim.data.body_xpos[self.env.sim.model.body_name2id("gripper0_right_inner_finger")])
+        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)
         if return_distance:
-            return qpos_diff
-        return qpos_diff > 0.075 # Threshold for "open"
+            return aperture
+        return bool(aperture > 0.13)
 
     def grasped(self, obj_pddl_name, return_distance=False):
         # Your existing grasped logic

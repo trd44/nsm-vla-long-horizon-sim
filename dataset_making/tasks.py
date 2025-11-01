@@ -13,7 +13,7 @@ DEBUG_PLOTS_DIR = "./debug_plots"
 # ================================
 
 # ===== HEIGHT CONFIGURATION =====
-MAX_HEIGHT = 0.9  # Maximum height for ascend operations
+MAX_HEIGHT = 1.1  # Maximum height for ascend operations
 # ================================
 
 if DEBUG_PLOTS:
@@ -310,7 +310,7 @@ class TaskOperation:
         if track_body_id is not None and track_obj_name is not None:
             # Use peg center map if available, otherwise use body position
             if hasattr(self.detector, 'peg_target_positions') and track_obj_name in self.detector.peg_target_positions:
-                tgt_xy = np.array(self.detector.peg_target_positions[track_obj_name])
+                tgt_xy = np.array(self.detector.peg_target_positions[track_obj_name])[:2]
             else:
                 tgt = np.array(self.env.sim.data.body_xpos[track_body_id])
                 tgt_xy = tgt[:2]
@@ -582,7 +582,7 @@ class TaskOperation:
         return result
 
 
-    def _move_xy(self, body_id, obj_name, speed=6.0, max_steps=500):
+    def _move_xy(self, body_id, obj_name, speed=10.0, max_steps=500):
         """
         Center gripper over target in XY plane. Moderate speed for accuracy.
         """
@@ -671,24 +671,10 @@ class TaskOperation:
             return move * speed
 
         return self._loop(predicate, action_fn, max_steps)
-
-    ### For Kinova gripper
-    # def _gripper_actuate(self, open_grip=True, max_steps=50):
-    #     """Open or close the gripper."""
-    #     pred = 'open_gripper' if open_grip else 'grasped'
-    #     def predicate():
-    #         # Force a dict result so .get(...) works
-    #         state = self.detector.get_groundings(
-    #             as_dict=True, binary_to_float=False, return_distance=False
-    #         )
-    #         return state.get(f"{pred}(gripper)", False)
-    #     def action_fn(obs):
-    #         val = -1 if open_grip else 1
-    #         return np.array([0, 0, 0, val])
-    #     return self._loop(predicate, action_fn, max_steps)
     
-    ### For Panda gripper
+
     def _gripper_actuate(self, open_grip=True, max_steps=50):
+        """Open or close the gripper."""
         pred = 'open_gripper' if open_grip else 'grasped'
 
         def predicate():
@@ -701,6 +687,7 @@ class TaskOperation:
                 return any(v for k, v in st.items() if k.startswith("grasped(") and v)
 
         sign = self._open_sign if open_grip else -self._open_sign
+        
         def action_fn(obs):
             return np.array([0, 0, 0, sign])
 
@@ -715,8 +702,11 @@ class TaskOperation:
     
 
     def _descend_until_on(self, pick_str, goal_str, target_z, speed=10.0, max_steps=200):
+        """Descend until the object is on the goal."""
         def predicate():
-            state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+            state = self.detector.get_groundings(
+                as_dict=True, binary_to_float=False, return_distance=False
+                )
             return state.get(f'on({pick_str},{goal_str})', False)
         def action_fn(obs):
             gripper_z = float(self._gripper_pos()[2])
@@ -768,7 +758,6 @@ class PickOperation(TaskOperation):
             target_z=object_z,
             track_body_id=self.body_id,
             track_obj_name=self.object_id,
-            speed=10,
         )
         if not ok:
             print(f"[PickOperation] ❌ failed to descend to z={object_z}")
@@ -808,17 +797,19 @@ class PlaceOperation(TaskOperation):
         self.body_id = env.sim.model.body_name2id(detector.object_id[placement_id])
 
     def execute(self, obs):
-        # Move above placement
+        # Ascend to transport height
         ok, obs = self._ascend(target_z=MAX_HEIGHT)
         if not ok: 
             print(f"[PlaceOperation] ❌ failed to ascend to {MAX_HEIGHT}")
             return False, obs
         
-        ok, obs = self._move_xy(self.body_id, self.placement_id, speed=10, max_steps=1000)
+        # Move over placement
+        ok, obs = self._move_xy(self.body_id, self.placement_id, max_steps=1000)
         if not ok: 
             print(f"[PlaceOperation] ❌ failed to move over {self.placement_id}")
             return False, obs
 
+        # Descend until on(pick, goal) detected
         place_z = float(self.env.sim.data.body_xpos[self.body_id][2])
         ok, obs = self._descend_xy_until_on(
             pick_str=self.object_id,
@@ -826,10 +817,6 @@ class PlaceOperation(TaskOperation):
             target_z=place_z,
             track_body_id=self.body_id,
             track_obj_name=self.placement_id,
-            speed=8.0,
-            # xy_k=3.0,
-            # xy_deadband=0.0015,
-            # xy_max=0.0035,
         )
         if not ok:
             print(f"[PlaceOperation] ❌ failed to descend until on({self.object_id},{self.placement_id})")

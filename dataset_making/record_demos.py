@@ -30,7 +30,7 @@ planning_mode = {
     "CubeSorting": 0,
     "HeightStacking": 0,
     "AssemblyLineSorting": 0,
-    "PatternReplication": 0,
+    "PatternReplication": 1,
 }
 
 def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path: str):
@@ -211,12 +211,11 @@ class RecordDemos(gym.Wrapper):
         if self.verbose:
             print("Detector groundings:", state)
         
-        # Include all relevant predicates, not just the True ones
-        # The planner needs to know both what IS and what ISN'T true
+        # Include only TRUE predicates that are in planning_predicates
         init_predicates = {}
         for predicate, value in state.items():
-            if predicate.split('(')[0] in planning_predicates[self.args.env]:
-                init_predicates[predicate] = value
+            if value and predicate.split('(')[0] in planning_predicates[self.args.env]:
+                init_predicates[predicate] = True
 
         # After add_predicates_to_pddl:
         # Pass detected objects to dynamically generate PDDL
@@ -224,6 +223,9 @@ class RecordDemos(gym.Wrapper):
         # Get detector attributes safely, as not all detectors have them
         detector_objects = getattr(self.detector, 'objects', [])
         object_areas = getattr(self.detector, 'object_areas', [])
+        
+        # Get environment name early for filtering logic
+        env_name = self.args.env
         
         active_cubes = []
         if detector_objects:
@@ -241,10 +243,21 @@ class RecordDemos(gym.Wrapper):
                 if is_active:
                     active_cubes.append(cube)
         
+        # For PatternReplication, remove all reference cube predicates and table clear predicates
+        # (ref_cubes are only used for goal generation, table should not be a placement target)
+        if env_name == "PatternReplication":
+            filtered_predicates = {}
+            for predicate in init_predicates.keys():
+                # Skip ref_cube predicates and any clear predicate involving table
+                if "ref_cube" in predicate:
+                    continue
+                if predicate.startswith("clear(") and "table" in predicate:
+                    continue
+                filtered_predicates[predicate] = True
         # Filter predicates to only include those involving active cubes or pegs
         # (This is primarily for Hanoi-like environments)
-        filtered_predicates = {}
-        if active_cubes or object_areas:
+        elif active_cubes or object_areas:
+            filtered_predicates = {}
             # Apply filtering if we have objects to filter on
             for predicate, value in init_predicates.items():
                 if value:
@@ -283,7 +296,6 @@ class RecordDemos(gym.Wrapper):
         add_predicates_to_pddl(self.pddl_path, filtered_predicates)
         
         # Generate environment-specific goals for certain environments
-        env_name = self.args.env
         if env_name in ["CubeSorting", "HeightStacking", "AssemblyLineSorting", "PatternReplication"]:
             goal_predicates = _generate_env_specific_goal(env_name, state, self.detector, self.pddl_path)
             if self.verbose:
@@ -324,7 +336,7 @@ class RecordDemos(gym.Wrapper):
         """Convert PDDL plan to natural language commands."""
         natural_commands = []
         for op_str in plan:
-            natural_commands.append(symbolic_to_natural_instruction(op_str))
+            natural_commands.append(symbolic_to_natural_instruction(op_str, self.env))
         return natural_commands
 
     def _map_operator(self, op_str: str):
@@ -355,7 +367,7 @@ class RecordDemos(gym.Wrapper):
                 self.noise_std,
                 **params
             )
-            self.current_instruction = symbolic_to_natural_instruction(op_str)
+            self.current_instruction = symbolic_to_natural_instruction(op_str, self.env)
             success, obs = op.execute(obs)
             if not success:
                 print(f"Failed to perform task: {op_str}")
@@ -447,21 +459,53 @@ class RecordDemos(gym.Wrapper):
             print(f"Error saving episode {episode_idx}: {e}")
             return False
 
-def symbolic_to_natural_instruction(op_str):
+def symbolic_to_natural_instruction(op_str, env=None):
     # Check if op_str is already in natural language. Natural language instructions start with 'pick the' or 'place the'
-    if op_str.lower().startswith("pick the") or op_str.lower().startswith("place the"):
+    if op_str.lower().startswith("pick up the") or op_str.lower().startswith("place the"):
         return op_str  # Already in natural language
-    # Example: "pick cube1" or "place cube1 cube3" etc.
-    colors = {"cube1": "blue block", "cube2": "red block", "cube3": "green block", "cube4": "yellow block"}
-    areas  = {"peg1": "left area", "peg2": "middle area", "peg3": "right area"}
+    
+    # Build dynamic color mapping from environment if available
+    colors = {}
+    if env is not None and hasattr(env, 'cube_colors') and hasattr(env, 'color_categories'):
+        # For AssemblyLineSorting environment, get actual cube colors
+        for i in range(len(env.cube_colors)):
+            color_idx = env.cube_colors[i]
+            color_name = env.color_categories[color_idx][0]
+            colors[f"cube{i}"] = f"{color_name} block"
+    elif env is not None and hasattr(env, 'cube_sizes'):
+        # For CubeSorting environment, get colors from sizes
+        # Small cubes are blue, large cubes are red
+        for i in range(len(env.cube_sizes)):
+            size_type = env.cube_sizes[i]
+            color_name = "blue" if size_type == "small" else "red"
+            colors[f"cube{i}"] = f"{color_name} block"
+    elif env is not None and hasattr(env, 'cube_colors') and hasattr(env, 'rgba_semantic_colors'):
+        # For PatternReplication and HeightStacking environments
+        # Map RGBA values to color names
+        rgba_to_name = {tuple(v[:3]): k for k, v in env.rgba_semantic_colors.items()}
+        for i in range(len(env.cube_colors)):
+            rgba = tuple(env.cube_colors[i][:3])
+            color_name = rgba_to_name.get(rgba, "unknown")
+            colors[f"cube{i}"] = f"{color_name} block"
+    else:
+        # Fallback to hardcoded colors for environments without dynamic colors
+        colors = {
+            "cube1": "blue block", "cube2": "red block", "cube3": "green block",
+            "cube4": "yellow block"}
+    
+    areas  = {
+        "peg1": "left area", "peg2": "middle area", "peg3": "right area", 
+        "bin0": "red zone", "bin1": "green zone", "bin2": "blue zone",
+        "platform1": "blue zone", "platform2": "red zone", "platform": "gray zone",
+        "reference_platform": "reference area", "target_platform": "gray zone", "table": "table"
+        }
     op = op_str.lower().split()
     if not op: return ""
     if op[0] == "pick":
         block = colors.get(op[1], op[1])
         if len(op) > 2:
-            # PICK CUBE1 CUBE2 means pick cube1 from cube2
             from_obj = colors.get(op[2], op[2])
-            return f"Pick the {block}."
+            return f"Pick up the {block}."
         else:
             return f"Pick up the {block}."
     if op[0] == "place":
@@ -472,13 +516,13 @@ def symbolic_to_natural_instruction(op_str):
             return f"Place the {block} on top of the {target}."
         else:
             area = areas.get(op[2], op[2])
-            return f"Place the {block} in the {area}."
-    # Add any other op cases as needed
-    return op_str  # fallback
+            return f"Place the {block} on the {area}."
+    return op_str
 
 def _quat2axisangle(quat):
     """
-    Copied from robosuite: https://github.com/ARISE-Initiative/robosuite/blob/eafb81f54ffc104f905ee48a16bb15f059176ad3/robosuite/utils/transform_utils.py#L490C1-L512C55
+    Copied from robosuite: 
+    https://github.com/ARISE-Initiative/robosuite/blob/eafb81f54ffc104f905ee48a16bb15f059176ad3/robosuite/utils/transform_utils.py#L490C1-L512C55
     """
     # clip quaternion
     if quat[3] > 1.0:

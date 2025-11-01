@@ -47,7 +47,7 @@ def make_env(args):
 
 def get_detector(env, env_name):
     """Instantiate the correct detector for the chosen environment."""
-    if env_name == 'Hanoi':
+    if env_name == 'Hanoi' or env_name == 'Hanoi4x3':
         return HanoiDetector(env)
     if env_name == 'KitchenEnv':
         return KitchenDetector(env)
@@ -125,7 +125,7 @@ def record_episode_video(env, recorder, epi_idx, camera="agentview", fps=20, sav
 def main():
     parser = argparse.ArgumentParser(description="Record robot demos via symbolic planning and execution.")
     parser.add_argument('--env', type=str, 
-                        choices=['Hanoi', 'KitchenEnv', 'NutAssembly', 'CubeSorting', 
+                        choices=['Hanoi', 'Hanoi4x3', 'KitchenEnv', 'NutAssembly', 'CubeSorting', 
                                 'HeightStacking', 'AssemblyLineSorting', 'PatternReplication'], 
                         default='Hanoi')
     parser.add_argument('--dir', type=str, default='./datasets', help='Base directory for experiment outputs')
@@ -134,12 +134,11 @@ def main():
     parser.add_argument('--name', type=str, default=None, help='Optional name override for experiment ID')
     parser.add_argument('--vision', action='store_true', help='Use vision-based observations')
     parser.add_argument('--relative_obs', action='store_true', help='Use relative gripper-goal features')
-    parser.add_argument('--vla', action='store_true', help='Enable VLA-friendly formatting')
-    parser.add_argument('--noise-std', type=float, default=0.03,
+    parser.add_argument('--noise-std', type=float, default=0.0,
                         help='Std factor for Gaussian action noise (scaled by remaining distance).')
-    parser.add_argument('--noisy-fraction', type=float, default=0.30,
+    parser.add_argument('--noisy-fraction', type=float, default=0.0,
                         help='Fraction of episodes that should use action noise (deterministic scheduling of the last fraction).')
-    parser.add_argument('--cube-init-pos-noise-std', type=float, default=0.01,
+    parser.add_argument('--cube-init-pos-noise-std', type=float, default=0.0,
                         help='Std dev (meters) for XY jitter of the initial tower position.')
     parser.add_argument('--random-block-placement', action='store_true', help='Place block on pegs randomly according to the rules of Towers of Hanoi')
     parser.add_argument('--random-block-selection', action='store_true', help='Randomly select 3 out of 4 blocks')
@@ -151,13 +150,12 @@ def main():
     parser.add_argument('--render', action='store_true', help='Render during execution')
 
     args = parser.parse_args()
-    args.vla = True  # enforce VLA format
 
     # Seed everything
     np.random.seed(args.seed)
 
     # Build experiment directory structure
-    exp_name = f"{args.env.lower()}_dataset"
+    exp_name = f"{args.env}_dataset"
     timestamp = to_datestring(time.time())
     exp_id = args.name if args.name else timestamp
     args.env_dir = os.path.join(args.dir, exp_name, exp_id)
@@ -192,6 +190,7 @@ def main():
     # Map environment names to PDDL directory names
     pddl_dir_map = {
         'Hanoi': 'hanoi',
+        'Hanoi4x3': 'hanoi4x3',
         'KitchenEnv': 'kitchen',
         'NutAssembly': 'nut_assembly',
         'CubeSorting': 'cubesorting',
