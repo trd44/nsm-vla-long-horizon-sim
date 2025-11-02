@@ -326,10 +326,24 @@ class RecordDemos(gym.Wrapper):
 
     def record_step(self, obs_dict: dict, action: np.ndarray):
         """Store a single step's data."""
+        # Calculate actual gripper width from finger positions in sim
+        try:
+            left_finger_pos = self.env.sim.data.body_xpos[
+                self.env.sim.model.body_name2id("gripper0_left_inner_finger")
+            ]
+            right_finger_pos = self.env.sim.data.body_xpos[
+                self.env.sim.model.body_name2id("gripper0_right_inner_finger")
+            ]
+            gripper_width = float(np.linalg.norm(left_finger_pos - right_finger_pos))
+        except:
+            # Fallback: use first joint position as proxy
+            gripper_width = float(obs_dict.get('robot0_gripper_qpos', [0.0])[0])
+        
         self.sequential_episode_buffer.append({
             'obs_dict': copy.deepcopy(obs_dict),
             'action': np.array(action, dtype=np.float32),
-            'language_instruction': str(self.current_instruction)
+            'language_instruction': str(self.current_instruction),
+            'gripper_width': gripper_width
         })
 
     def _convert_plan_to_natural_language(self, plan):
@@ -390,6 +404,7 @@ class RecordDemos(gym.Wrapper):
             obs = step_data['obs_dict']
             action = step_data['action']
             instr = step_data['language_instruction']
+            gripper_width = step_data.get('gripper_width', 0.0)
 
             # MAIN IMAGE
             agent_img = obs.get('agentview_image')
@@ -410,16 +425,30 @@ class RecordDemos(gym.Wrapper):
                 wrist_img = np.ascontiguousarray(wrist_img[::-1, ::-1], dtype=np.uint8)
 
             # JOINT STATE
-            joint_state = np.asarray(obs.get('robot0_joint_pos', np.zeros(7)), dtype=np.float32)
+            # Reconstruct joint positions from cos/sin if needed
+            if 'robot0_joint_pos' in obs:
+                joint_state = np.asarray(obs['robot0_joint_pos'], dtype=np.float32)
+            elif 'robot0_joint_pos_cos' in obs and 'robot0_joint_pos_sin' in obs:
+                joint_cos = obs['robot0_joint_pos_cos']
+                joint_sin = obs['robot0_joint_pos_sin']
+                joint_state = np.arctan2(joint_sin, joint_cos).astype(np.float32)
+            else:
+                joint_state = np.zeros(7, dtype=np.float32)
 
             # STATE (END EFFECTOR)
             eef_pos = obs.get('robot0_eef_pos', np.zeros(3, dtype=np.float32))
             eef_quat = obs.get('robot0_eef_quat', np.array([0., 0., 0., 1.], dtype=np.float32))
-            eef_gripper = obs.get('robot0_gripper_qpos', np.zeros(2, dtype=np.float32))
+            
+            # Use the gripper width calculated from actual finger positions in sim
+            eef_gripper = np.array([gripper_width], dtype=np.float32)
+            
             # Convert quaternion to axis angle
             eef_axis_angle = _quat2axisangle(eef_quat)
 
             eef_state = np.concatenate((eef_pos, eef_axis_angle, eef_gripper)).astype(np.float32)
+
+            # State is the concatenation of joint state and gripper opening
+            state = np.concatenate((joint_state, eef_gripper)).astype(np.float32)
 
             # RLDS step dict
             step_dict = {
@@ -433,8 +462,8 @@ class RecordDemos(gym.Wrapper):
                 "observation": {
                     "wrist_image": wrist_img,
                     "image": agent_img,
-                    "state": eef_state,        
-                    "joint_state": joint_state,
+                    "state": state,        
+                    # "joint_state": joint_state,
                 }
             }
             steps.append(step_dict)

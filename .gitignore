@@ -62,7 +62,6 @@ robomimic
 debug_plots/
 lerobot/
 object_detection/
-rlds_dataset_builder
 runs/
 wandb/
 
