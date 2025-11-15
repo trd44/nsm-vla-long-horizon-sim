@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from itertools import islice
 
-DATASET_PATH = "/home/hrilab/tensorflow_datasets/hanoi300/1.0.0"
+DATASET_PATH = "/home/hrilab/tensorflow_datasets/assembly_line_sorting/1.0.0"
 SAVE_GIF_DIR = Path("inspection_videos/rlds")
 SAVE_GIF_DIR.mkdir(exist_ok=True)
 
@@ -291,5 +291,5 @@ def validate_for_lerobot():
 
 if __name__ == "__main__":
     main()
-    # validate_for_lerobot()
+    validate_for_lerobot()
     # inspect_for_consistency()

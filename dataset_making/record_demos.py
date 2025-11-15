@@ -7,7 +7,10 @@ import gym
 import cv2
 import numpy as np
 from planning.planner import add_predicates_to_pddl, call_planner, define_goal_in_pddl
-# from openpi.src.openpi.planning.hanoi_vlm_planner import query_model #COmmenting bc its breaking pi inference
+# Commenting bc its breaking pi inference
+# from openpi.src.openpi.planning.hanoi_vlm_planner import query_model 
+
+from dataset_making.args import Args
 from dataset_making.utils import to_datestring
 from dataset_making.tasks import PickOperation, PlaceOperation, TurnOnOperation, TurnOffOperation
 
@@ -33,122 +36,84 @@ planning_mode = {
     "PatternReplication": 1,
 }
 
-def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path: str):
-    """Generate environment-specific goals for CubeSorting, HeightStacking, AssemblyLineSorting, and PatternReplication."""
-    goal_predicates = []
-    
-    if env_name == "CubeSorting":
-        # Find all small cubes and assign them to target zones
-        for predicate in state.keys():
-            if "small" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
-                goal_predicates.append(f'on {objs[0]} platform1')
-            elif "small" in predicate and not state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
-                goal_predicates.append(f'on {objs[0]} platform2')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "HeightStacking":
-        # Create stacking order based on sizes
-        sizes = {}
-        for predicate in state.keys():
-            if "smaller" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
-                sizes[objs[0]] = objs[1]
-        # Create stacking order based on sizes
-        sorted_sizes = sorted(sizes.items(), key=lambda x: x[1])
-        for i in range(len(sorted_sizes)-1):
-            goal_predicates.append(f'on {sorted_sizes[i][0]} {sorted_sizes[i+1][0]}')
-        # Add largest cube on platform
-        if sorted_sizes:
-            goal_predicates.append(f'on {sorted_sizes[-1][0]} platform')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "AssemblyLineSorting":
-        # Match types
-        types = {}
-        for predicate in state.keys():
-            if "type_match" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
-                types[objs[0]] = objs[1]
-        for obj, type_ in types.items():
-            goal_predicates.append(f'on {obj} {type_}')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "PatternReplication":
-        # Get pattern from detector
-        goal_predicates = detector.get_pattern_replication_goal()
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-    
-    return goal_predicates
-
-
 class RecordDemos(gym.Wrapper):
-    """Gym wrapper to record demonstrations by symbolically planning and executing."""
+    """Gym wrapper to record demonstrations by symbolically planning 
+    and executing.
+    
+    Args:
+        args: Args object containing the arguments for the dataset making script
+        env: gym.Env object representing the environment
+        detector: Detector object representing the detector
+        pddl_path: str path to the PDDL files
+        randomize: bool whether to randomize the actions
+    """
     def __init__(
         self,
+        args: Args,
         env,
-        vision_based: bool,
         detector,
         pddl_path: str,
-        args,
-        render: bool=False,
         randomize: bool=True,
-        noise_std_factor: float=0.03
     ):
         super().__init__(env)
+        self.args = args
         self.env = env
-        self.vision_based = vision_based
         self.detector = detector
         self.pddl_path = pddl_path
-        # Ensure trailing slash for pddl path so planner joins files correctly
-        if not self.pddl_path.endswith(os.sep):
-            self.pddl_path += os.sep
-        self.args = args
-        self.render = render
+        self.randomize = randomize
 
-        # Randomization / noise controls
-        self.base_randomize_flag = randomize
-        # Prefer CLI override if provided, else fall back to constructor default
-        self.noise_std = float(getattr(args, "noise_std", noise_std_factor))
-        # Fraction of episodes that should be noisy (deterministic schedule: last X%)
-        self.noisy_fraction = float(getattr(args, "noisy_fraction", 0.30))
-        # Total episodes (support either --episodes or --num_episodes)
-        self.total_episodes = int(getattr(args, "episodes", getattr(args, "num_episodes", 0)) or 0)
-        # Episode index (incremented in reset)
-        self.episode_idx = -1
-        # Will be computed per-episode in reset()
-        self.this_episode_randomize = False
-        # Deterministic scheduling state
-        self.schedule_override = False
-        self.scheduled_ep_index = -1
+        # Attributes set from args
+        self.total_episodes = args.episodes
+        self.vision_based = args.vision
+        self.verbose = args.verbose
+        self.render = args.render
+        
+        # Randomization / noise controls        
+        self.noise_std = args.noise_std
+        # Fraction of episodes that should be noisy 
+        # (deterministic schedule: last X%)
+        self.noisy_fraction = args.noisy_fraction
+        self.schedule_override = False       # Deterministic scheduling state
+        self.randomize_this_episode = False  # Computed per-episode in reset()
+        self.scheduled_ep_index = -1         # Not sure why necessary
         self.reset_count = 0
-        # Verbose mode flag
-        self.verbose = getattr(args, "verbose", False)
-
+        
         # Buffer for recording
         self.sequential_episode_buffer = []
+        #TODO: AI Slop, remove ASAP. 
+        self.episode_idx = -1  # Episode index (incremented in reset)
 
-        # Plan will be generated during reset()
-        self.plan = None
+        # Generated in reset()
+        self.plan = None  # Plan will be generated during reset()
 
-    def set_schedule(self, ep_index: int, total_episodes: int):
-        """Externally force the scheduling for this recording episode.
-        This ensures deterministic application of noise regardless of how many resets occur."""
-        self.total_episodes = int(total_episodes)
-        self.scheduled_ep_index = int(ep_index)
-        self.schedule_override = True
-        # Compute and store the flag immediately
-        if self.base_randomize_flag and self.total_episodes > 0:
-            start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
-            self.this_episode_randomize = (self.scheduled_ep_index >= start_noisy_idx)
-        else:
-            # If totals unknown, fall back to probabilistic
-            self.this_episode_randomize = self.base_randomize_flag and (np.random.rand() < self.noisy_fraction)
+        # TODO: Remove? Unnecessary AI slop?
+        # # Ensure trailing slash for pddl path so planner joins files correctly
+        # if not self.pddl_path.endswith(os.sep):
+        #     self.pddl_path += os.sep
+
+    def set_schedule(self, ep_index: int) -> None:
+        """
+        Determine if this episode should be noisy deteministically based on
+        episodes recorded when randomize is True.
+        
+        Args:
+            ep_index: int index of the episode to set the schedule for
+        
+        TODO: Possibly unnecessary AI slop? Atleast needs to be renamed
+        """
+        # If not randomizing, do nothing.
+        if not self.randomize:
+            return 
+        
+        self.scheduled_ep_index = ep_index
+        self.schedule_override = True  # TODO Idk what this does.
+        
+        non_noisy_frac = 1.0 - self.noisy_fraction
+        non_noisy_eps = math.floor(non_noisy_frac * self.total_episodes)
+        self.randomize_this_episode = (self.scheduled_ep_index >= non_noisy_eps)
+        if self.verbose:
+            print(f"[RecordDemos] ep={self.episode_idx} \
+                    randomize={self.randomize_this_episode}")
 
     def reset(self, seed=None) -> dict:
         """Reset environment and clear buffers."""
@@ -161,20 +126,20 @@ class RecordDemos(gym.Wrapper):
         if self.schedule_override and self.total_episodes > 0:
             start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
             # self.this_episode_randomize was already computed in set_schedule, but recompute for clarity
-            self.this_episode_randomize = (self.scheduled_ep_index >= start_noisy_idx) and self.base_randomize_flag
+            self.randomize_this_episode = (self.scheduled_ep_index >= start_noisy_idx) and self.randomize
             schedule_info = (
                 f"deterministic override (record_ep={self.scheduled_ep_index}; noisy starts at {start_noisy_idx} of {self.total_episodes}; resets={self.reset_count})"
             )
-        elif self.base_randomize_flag and self.total_episodes > 0:
+        elif self.randomize and self.total_episodes > 0:
             start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
-            self.this_episode_randomize = (self.episode_idx >= start_noisy_idx)
+            self.randomize_this_episode = (self.episode_idx >= start_noisy_idx)
             schedule_info = f"deterministic (noisy episodes start at {start_noisy_idx} of {self.total_episodes}; resets={self.reset_count})"
         else:
             # Fallback: probabilistic if total not known
-            self.this_episode_randomize = self.base_randomize_flag and (np.random.rand() < self.noisy_fraction)
+            self.randomize_this_episode = self.randomize and (np.random.rand() < self.noisy_fraction)
             schedule_info = f"probabilistic (total episodes unknown; resets={self.reset_count})"
         if self.verbose:
-            print(f"[RecordDemos] ep={self.episode_idx} randomize={self.this_episode_randomize} | {schedule_info}")
+            print(f"[RecordDemos] ep={self.episode_idx} randomize={self.randomize_this_episode} | {schedule_info}")
         
         # Reset the environment, handling varied return signatures
         try:
@@ -377,7 +342,7 @@ class RecordDemos(gym.Wrapper):
             op = OpClass(
                 self.env,
                 self.detector,
-                self.this_episode_randomize,
+                self.randomize_this_episode,
                 self.noise_std,
                 **params
             )
@@ -487,6 +452,63 @@ class RecordDemos(gym.Wrapper):
         except Exception as e:
             print(f"Error saving episode {episode_idx}: {e}")
             return False
+
+
+def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path: str):
+    """Generate environment-specific goals for CubeSorting, HeightStacking, AssemblyLineSorting, and PatternReplication."""
+    goal_predicates = []
+    
+    if env_name == "CubeSorting":
+        # Find all small cubes and assign them to target zones
+        for predicate in state.keys():
+            if "small" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
+                goal_predicates.append(f'on {objs[0]} platform1')
+            elif "small" in predicate and not state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
+                goal_predicates.append(f'on {objs[0]} platform2')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "HeightStacking":
+        # Create stacking order based on sizes
+        sizes = {}
+        for predicate in state.keys():
+            if "smaller" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
+                sizes[objs[0]] = objs[1]
+        # Create stacking order based on sizes
+        sorted_sizes = sorted(sizes.items(), key=lambda x: x[1])
+        for i in range(len(sorted_sizes)-1):
+            goal_predicates.append(f'on {sorted_sizes[i][0]} {sorted_sizes[i+1][0]}')
+        # Add largest cube on platform
+        if sorted_sizes:
+            goal_predicates.append(f'on {sorted_sizes[-1][0]} platform')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "AssemblyLineSorting":
+        # Match types
+        types = {}
+        for predicate in state.keys():
+            if "type_match" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
+                types[objs[0]] = objs[1]
+        for obj, type_ in types.items():
+            goal_predicates.append(f'on {obj} {type_}')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "PatternReplication":
+        # Get pattern from detector
+        goal_predicates = detector.get_pattern_replication_goal()
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+    
+    return goal_predicates
+
+
+
 
 def symbolic_to_natural_instruction(op_str, env=None):
     # Check if op_str is already in natural language. Natural language instructions start with 'pick the' or 'place the'
