@@ -93,13 +93,14 @@ def perform_demonstration(
     env,
     recorder,
     attempt,
+    successes,
     fps: int = 30,
 ) -> bool:
     """Record a single episode video and return success status."""
     agent_camera="agentview"
     wrist_camera="robot0_eye_in_hand"
-    save_hd_agent_video: bool = args.save_hd_agent_video,
-    save_hd_wrist_video: bool = args.save_hd_wrist_video,
+    save_hd_agent_video: bool = args.save_hd_agent_video
+    save_hd_wrist_video: bool = args.save_hd_wrist_video
     if save_hd_agent_video:
         hd_agent_frames = []
     if save_hd_wrist_video:
@@ -122,7 +123,7 @@ def perform_demonstration(
     recorder.env.record_step = hooked_env_record
 
     # Reset and grab the initial frame from both cameras
-    obs = recorder.reset()
+    obs = recorder.reset(successes=successes)
     if args.verbose:
         print(f"Obs: {obs}")
         print(f"Plan: {recorder.plan}")
@@ -130,7 +131,7 @@ def perform_demonstration(
     # Used to be an issue with the plan being None. Haven't seen it in a while.
     # TODO: Remove?
     while recorder.plan is None or obs is None:
-        obs = recorder.reset()
+        obs = recorder.reset(successes=successes)
         print("Plan is None, resetting")
     
     # Save initial frames. Not captured normally?
@@ -242,16 +243,12 @@ def main(args: Args) -> None:
     successes = 0   
     while successes < args.episodes:
         print(f"\n=== Attempt {attempt} ===")
-        recorder.set_schedule(successes)  # Determine if episode should be noisy
-        
-        success = perform_demonstration(args, env, recorder, attempt)
-        
+        success = perform_demonstration(args, env, recorder, attempt, successes)        
         if success:
             recorder.save_trajectory(attempt)
             successes += 1
         else:
-            print(f"Attempt {attempt} failed.")
-            
+            print(f"Attempt {attempt} failed.")            
         # recorder.reset()
         attempt += 1
         print(f"\n=== Successes {successes}/{args.episodes} ===")

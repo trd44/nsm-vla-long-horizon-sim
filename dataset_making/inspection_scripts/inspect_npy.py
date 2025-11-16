@@ -210,7 +210,7 @@ def inspect_episode(path):
 
 if __name__ == "__main__":
     # Point to either a directory or a file
-    arg = sys.argv[1] if len(sys.argv) > 1 else "/home/hrilab/Documents/.vlas/cycliclxm-slim/CyclicLxM/rlds_dataset_builder/hanoi_300/data/train"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "/home/train/vlas/CyclicLxM/rlds_dataset_builder/hanoi_50/data/train"
     data_dir = Path(arg)
     if data_dir.is_file():
         files = [data_dir]

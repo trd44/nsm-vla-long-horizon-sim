@@ -10,10 +10,11 @@ np.set_printoptions(linewidth=200, precision=4, suppress=True)
 # ===== DEBUG PLOTTING FLAG =====
 DEBUG_PLOTS = False  # Set to True to enable control debugging plots
 DEBUG_PLOTS_DIR = "./debug_plots"
-# ================================
+# ===============================
 
-# ===== HEIGHT CONFIGURATION =====
-MAX_HEIGHT = 1.1  # Maximum height for ascend operations
+# ======== PATH VARIABLES ========
+PARABOLIC_PATHS = True  # Use parabolic paths for XY movement
+MAX_HEIGHT = 1.1        # Maximum height for ascend operations
 # ================================
 
 if DEBUG_PLOTS:
@@ -64,13 +65,11 @@ class TaskOperation:
             return np.array(self.env.sim.data.site_xpos[self._gripper_site])
         else:
             return np.array(self.env.sim.data.body_xpos[self._gripper_body])
-
     
     def _measure_aperture(self):
         j1 = float(self.env.sim.data.get_joint_qpos('gripper0_finger_joint1'))
         j2 = float(self.env.sim.data.get_joint_qpos('gripper0_finger_joint2'))
         return abs(j1 - j2)
-
 
     def _calibrate_open_sign(self, steps: int = 20):
         """Try +1 and -1 for `steps` frames and see which increases aperture more."""
@@ -87,23 +86,19 @@ class TaskOperation:
         best = max(deltas, key=deltas.get)
         return best
 
-
     def record(self, obs, action):
         if hasattr(self.env, 'record_step'):
             self.env.record_step(obs, action)
-    
     
     def _reset_xy_pid(self):
         """Reset XY PID controller state."""
         self._xy_integral = np.zeros(2, dtype=float)
         self._xy_prev_error = np.zeros(2, dtype=float)
     
-    
     def _reset_z_pid(self):
         """Reset Z PID controller state."""
         self._z_integral = 0.0
         self._z_prev_error = 0.0
-    
     
     def _init_debug_data(self, operation_name, has_xy=True, has_z=True):
         """Initialize debug data collection for plotting."""
@@ -273,6 +268,7 @@ class TaskOperation:
             raw_action = action_fn(obs)
             raw_action[3] = self._grip_cmd
             action = to_osc_pose(raw_action)
+            # print(f"Action: {action}")
             self.record(obs, action)
             obs, *_ = self.env.step(action)
             if render:
@@ -281,7 +277,7 @@ class TaskOperation:
     
 
     def _compute_xy_action(self, track_body_id=None, track_obj_name=None, 
-                          add_noise=True, kp=1.0, ki=0.05, kd=0.15, 
+                          add_noise=True, kp=1.0, ki=0.1, kd=0.15, 
                           dt=0.02, integral_limit=0.05, return_debug=False):
         """
         PID controller for XY action toward target object/peg.
@@ -337,7 +333,8 @@ class TaskOperation:
         pid_output = p_term + i_term + d_term
         
         # Cap the output
-        pid_output = cap(pid_output)
+        # pid_output = cap(pid_output)
+        # print(f"PID Output: {pid_output}")
         
         # Add noise if enabled
         if add_noise and self.randomize:
@@ -352,7 +349,7 @@ class TaskOperation:
     
 
     def _compute_z_action(self, target_z, direction='up', add_noise=False,
-                         kp=1.0, ki=0.0, kd=0.2, dt=0.02, integral_limit=0.05,
+                         kp=2.0, ki=0.2, kd=0.1, dt=0.05, integral_limit=0.05,
                          return_debug=False):
         """
         PID controller for Z action toward target height.
@@ -397,7 +394,10 @@ class TaskOperation:
         pid_output = p_term + i_term + d_term
         
         # Cap the magnitude
-        dz = cap(np.array([pid_output]))[0]
+        # dz = cap(np.array([pid_output]))[0]
+        dz = np.array([pid_output])[0]
+
+        # print(f" Z Action PID Output: {pid_output}")
         
         # Add noise if enabled and moving
         if add_noise and self.randomize and abs(dz) > 0.0:
@@ -660,7 +660,7 @@ class TaskOperation:
             pos3 = self._gripper_pos()
             tgt3 = np.array(self.env.sim.data.body_xpos[body_id])  # force body pos
             dist_xy = tgt3[:2] - pos3[:2]
-            dist_xy = cap(dist_xy)
+            # dist_xy = cap(dist_xy)
             move = np.array([dist_xy[0], dist_xy[1], 0.0, 0.0])
             if self.randomize:
                 sigma = self.noise_std * float(np.linalg.norm(dist_xy))
@@ -723,6 +723,112 @@ class TaskOperation:
             return move * speed
         return self._loop(predicate, action_fn, max_steps)
 
+    def _move_xy_parabolic(
+        self, target_id, target_name, speed=10.0, max_steps=500
+    ):
+        """ Move the gripper over the object or placement in a parabolic path.
+        """
+        step = {"i": 0}
+        # print(f"Moving gripper over {target_name} in a parabolic path")
+        # print(f"Target ID: {target_id}")
+        # print(f"Target Name: {target_name}")
+
+        def predicate():
+            # Use detector.over distance if available for consistent measurement
+            dist = None
+            over_flag = False
+            try:
+                dist = float(self.detector.over('gripper', target_name, return_distance=True))
+                over_flag = bool(self.detector.over('gripper', target_name))
+            except Exception:
+                pos = self._gripper_pos()[:2]
+                tgt = np.array(self.env.sim.data.body_xpos[target_id])[:2]
+                dist = float(np.linalg.norm(tgt - pos))
+                # Fallback to state dict boolean
+                state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+                over_flag = bool(state.get(f"over(gripper,{target_name})", False))
+            return over_flag
+
+        def generate_parabolic_path(target_id, num_waypts=50):
+            """Generate a parabolic path for the gripper to move over the objec
+            or placement.
+            """
+            start_pos = self._gripper_pos()
+            goal_pos = np.array(self.env.sim.data.body_xpos[target_id])
+            start_x, start_y, start_z = start_pos
+            goal_x, goal_y, goal_z = goal_pos
+            goal_z = goal_z + 0.0625  # Offset to not bump object
+
+            # print(f"Start Position: {start_pos}")
+            # print(f"Goal Position: {goal_pos}")
+
+            waypoints = []
+            for i in range(num_waypts):
+                t = i / (num_waypts - 1)
+
+                # Linear XY
+                wp_x = start_x + (goal_x - start_x) * t
+                wp_y = start_y + (goal_y - start_y) * t
+
+                # Quadratic Bezier curve Z
+                start_bias = (1 - t)**2 * start_z
+                mid_bias = 2*(1 - t)*t * MAX_HEIGHT
+                end_bias = t**2 * goal_z
+
+                wp_z = start_bias + mid_bias + end_bias
+                
+                waypoints.append(np.array([wp_x, wp_y, wp_z]))
+            
+            return waypoints
+
+        # Precompute waypoints once, before the loop
+        waypoints = generate_parabolic_path(target_id)
+        num_waypts = len(waypoints)
+
+        def action_fn(obs):
+            pos3 = self._gripper_pos()
+
+            # Clamp index so once we hit the last waypoint we just keep tracking it
+            idx = min(step["i"], num_waypts - 1)
+            target = waypoints[idx]
+
+            # Move toward this waypoint
+            delta = target - pos3  # [dx, dy, dz]
+            # delta_xy = cap(delta[:2])
+            delta_z = cap(np.array([delta[2]]))[0]
+            if delta_z > 0.0:
+                dir = 'up'
+            else:
+                dir = 'down'
+            # move = np.array([delta_xy[0], delta_xy[1], delta_z, 0.0])
+            move_xy = self._compute_xy_action(
+                track_body_id=target_id,
+                track_obj_name=target_name,
+                # add_noise=True,
+                # return_debug=True
+            )
+            move_z = self._compute_z_action(
+                target_z=target[2],
+                direction=dir,
+                # add_noise=True,
+                # return_debug=True
+            )
+
+            move = np.array([move_xy[0], move_xy[1], move_z, 0.0])
+            move = move * speed
+
+            if self.randomize:
+                sigma = self.noise_std * float(np.linalg.norm(move[:3]))
+                if sigma > 0.0:
+                    move[:3] += np.random.normal(0.0, sigma, size=3)
+
+            move[3] = self._grip_cmd
+
+            step["i"] += 1
+            return move
+
+        return self._loop(predicate, action_fn, max_steps)
+
 class PickOperation(TaskOperation):
     """Pick up the specified object."""
     def __init__(self, env, detector, randomize, noise_std, object_id):
@@ -732,28 +838,37 @@ class PickOperation(TaskOperation):
 
     def execute(self, obs):
         # Compute a dynamic hover height: 10 cm above the object
-        object_z = float(self.env.sim.data.body_xpos[self.body_id][2]) + 0.0125
+        offset = 0.0075
+        object_z = float(self.env.sim.data.body_xpos[self.body_id][2]) + offset
         ref_z = MAX_HEIGHT #object_z + 0.10
 
-        # 1) Move up to hover
-        ok, obs = self._ascend(target_z=ref_z)
-        if not ok:
-            print(f"[PickOperation] ❌ failed to move above object at z={ref_z}")
-            return False, obs
-
-        # 2) Center in XY over the object
-        ok, obs = self._move_xy_object(self.body_id, self.object_id)
-        if not ok:
-            print(f"[PickOperation] ❌ failed to XY-center over {self.object_id}")
-            return False, obs
-
-        # 3) Open the gripper
+        # 1) Open the gripper
         ok, obs = self._gripper_actuate(open_grip=True)
         if not ok:
             print("[PickOperation] ❌ failed to open gripper")
             return False, obs
 
-        # 4) Descend straight down onto the object
+        if PARABOLIC_PATHS:
+            # 2) Move over the object
+            ok, obs = self._move_xy_parabolic(self.body_id, self.object_id)
+            if not ok:
+                print(f"[Pick] ❌ failed parabolic move to {self.object_id}")
+                return False, obs
+
+        else:
+            # 2) Move up to hover
+            ok, obs = self._ascend(target_z=ref_z)
+            if not ok:
+                print(f"[PickOperation] ❌ failed to move above object at z={ref_z}")
+                return False, obs
+
+            # 2.5) Center in XY over the object
+            ok, obs = self._move_xy_object(self.body_id, self.object_id)
+            if not ok:
+                print(f"[PickOperation] ❌ failed to XY-center over {self.object_id}")
+                return False, obs
+
+        # 3) Descend straight down onto the object
         ok, obs = self._descend(
             target_z=object_z,
             track_body_id=self.body_id,
@@ -763,13 +878,13 @@ class PickOperation(TaskOperation):
             print(f"[PickOperation] ❌ failed to descend to z={object_z}")
             return False, obs
 
-        # 5) Close the gripper
+        # 4) Close the gripper
         ok, obs = self._gripper_actuate(open_grip=False)
         if not ok:
             print("[PickOperation] ❌ failed to close on object")
             return False, obs
 
-        # 7) Keep closing for a few more steps to ensure full closure
+        # 5) Keep closing for a few more steps to ensure full closure
         EXTRA_CLOSE_STEPS = 10
         for _ in range(EXTRA_CLOSE_STEPS):
             obs = self.env.env._get_observations()
@@ -778,7 +893,8 @@ class PickOperation(TaskOperation):
             obs, *_ = self.env.step(action)
 
         # 6) Lift the object slightly
-        ok, obs = self._ascend(target_z=0.2)
+        lift_height = self._gripper_pos()[2] + 0.05
+        ok, obs = self._ascend(target_z=lift_height)
         if not ok:
             print("[PickOperation] ❌ failed to lift object")
             return False, obs
@@ -797,17 +913,26 @@ class PlaceOperation(TaskOperation):
         self.body_id = env.sim.model.body_name2id(detector.object_id[placement_id])
 
     def execute(self, obs):
-        # Ascend to transport height
-        ok, obs = self._ascend(target_z=MAX_HEIGHT)
-        if not ok: 
-            print(f"[PlaceOperation] ❌ failed to ascend to {MAX_HEIGHT}")
-            return False, obs
-        
-        # Move over placement
-        ok, obs = self._move_xy(self.body_id, self.placement_id, max_steps=1000)
-        if not ok: 
-            print(f"[PlaceOperation] ❌ failed to move over {self.placement_id}")
-            return False, obs
+
+        if PARABOLIC_PATHS:
+            # 1) Move over placement location
+            ok, obs = self._move_xy_parabolic(self.body_id, self.placement_id)
+            if not ok:
+                print(f"[Pick] ❌ failed parabolic move to {self.placement_id}")
+                return False, obs
+                
+        else:
+            # Ascend to transport height
+            ok, obs = self._ascend(target_z=MAX_HEIGHT)
+            if not ok: 
+                print(f"[PlaceOperation] ❌ failed to ascend to {MAX_HEIGHT}")
+                return False, obs
+            
+            # Move over placement
+            ok, obs = self._move_xy(self.body_id, self.placement_id, max_steps=1000)
+            if not ok: 
+                print(f"[PlaceOperation] ❌ failed to move over {self.placement_id}")
+                return False, obs
 
         # Descend until on(pick, goal) detected
         place_z = float(self.env.sim.data.body_xpos[self.body_id][2])
