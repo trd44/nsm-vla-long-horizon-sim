@@ -10,8 +10,8 @@ DATASETS = [
     # ("cube_sorting",          TFDS_PATH + "cube_sorting/1.0.0"),
     # ("height_stacking",       TFDS_PATH + "height_stacking/1.0.0"),
     # ("pattern_replication",   TFDS_PATH + "pattern_replication/1.0.0"),
-    # ("hanoi_50",              TFDS_PATH + "hanoi50/1.0.0"),
-    ("hanoi4x3_50",           TFDS_PATH + "hanoi4x350/1.0.0"),
+    ("hanoi_50",              TFDS_PATH + "hanoi50/1.0.0"),
+    # ("hanoi4x3_50",           TFDS_PATH + "hanoi4x350/1.0.0"),
 ]
 
 def convert_individual_datasets():

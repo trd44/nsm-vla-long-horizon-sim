@@ -68,9 +68,7 @@ class RecordDemos(gym.Wrapper):
 
         # Attributes set from args
         self.total_episodes = args.episodes
-        self.vision_based = args.vision
         self.verbose = args.verbose
-        self.render = args.render
         
         # Randomization / noise controls        
         self.noise_std = args.noise_std
