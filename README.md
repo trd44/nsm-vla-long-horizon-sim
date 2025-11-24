@@ -53,6 +53,10 @@ First modify the `openpi/examples/robosuite/compose.yml` to point to the name of
 environment:
     - SERVER_ARGS=policy:checkpoint --policy.config {TrainConfig} --policy.dir /app/checkpoints/{TrainConfig}/{TrainConfig}/29999
 ```
+if the policy is plan guided, set it to true in `openpi/examples/robosuite/args.py`
+```
+planner_guided: bool =True
+```
 then docker compose
 ```
 docker compose -f examples/robosuite/compose.yml up
