@@ -47,7 +47,16 @@ uv run scripts/compute_norm_stats.py --config-name {TrainConfig}
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py {TrainConfig} --exp-name=my_experiment --overwrite
 ```
-
+## Run Inferece on Finetuned Model
+First modify the `openpi/examples/robosuite/compose.yml` to point to the name of the finetuned checkpoint. This is the same as the TrainConfig above.
+```
+environment:
+    - SERVER_ARGS=policy:checkpoint --policy.config {TrainConfig} --policy.dir /app/checkpoints/{TrainConfig}/{TrainConfig}/29999
+```
+then docker compose
+```
+docker compose -f examples/robosuite/compose.yml up
+```
 ## Dependencies
 
 Clone MimicGen in /OpLearn directory
