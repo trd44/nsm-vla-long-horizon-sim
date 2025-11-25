@@ -3,7 +3,7 @@
 ## Create training config
 Record your demo and put it in `.datasets/{task_name}`
 Create training config in `openpi/src/openpi/training/config.py`
-Add a train config, make necessary modifications
+Add a train config, make necessary modifications. Pay special attention to the `extra_
 
 ```bash
     TrainConfig(
@@ -42,6 +42,7 @@ Calculate the norm stats of your data
 ```bash
 uv run scripts/compute_norm_stats.py --config-name {TrainConfig}
 ```
+The norm stats will show up in `openpi/assets/{TrainConfig}/`
 
 ## Finetune
 ```bash
