@@ -24,8 +24,8 @@ class Args:
 
     # --- Episodes ---
     episodes: int = 50                # Number of episodes to record
-    save_hd_agent_video: bool = False  # Save full resolution videos
-    save_hd_wrist_video: bool = False  # Save full resolution videos
+    save_hd_agent_video: bool = True  # Save full resolution videos
+    save_hd_wrist_video: bool = True  # Save full resolution videos
 
     # --- Random Seed ---
     seed: int = 0

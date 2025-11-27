@@ -389,6 +389,7 @@ class RecordDemos(gym.Wrapper):
         for i, step_data in enumerate(buffer):
             obs = step_data['obs_dict']
             action = step_data['action']
+            print(f"Action: {action}")
             instr = step_data['language_instruction']
             gripper_width = step_data.get('gripper_width', 0.0)
 

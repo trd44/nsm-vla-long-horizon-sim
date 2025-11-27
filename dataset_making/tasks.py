@@ -277,17 +277,20 @@ class TaskOperation:
     
 
     def _compute_xy_action(self, track_body_id=None, track_obj_name=None, 
+                          target_x=None, target_y=None,
                           add_noise=True, kp=1.0, ki=0.1, kd=0.15, 
                           dt=0.02, integral_limit=0.05, return_debug=False):
         """
-        PID controller for XY action toward target object/peg.
+        PID controller for XY action toward target object/peg or direct coordinates.
         
         Conservative tuning: PD with small integral to handle steady-state error
         without overshoot. Suitable for both free-space and near-contact motions.
         
         Args:
-            track_body_id: Body ID to track (if not using peg position)
+            track_body_id: Body ID to track (if not using peg position or direct coords)
             track_obj_name: Object name (used for peg lookup or general tracking)
+            target_x: Direct X target coordinate (if provided, overrides object tracking)
+            target_y: Direct Y target coordinate (if provided, overrides object tracking)
             add_noise: Whether to add randomization noise
             kp: Proportional gain (default: 1.0)
             ki: Integral gain (default: 0.05 - small to prevent overshoot)
@@ -303,7 +306,11 @@ class TaskOperation:
         pos = self._gripper_pos()
         
         # Compute error (target - current)
-        if track_body_id is not None and track_obj_name is not None:
+        if target_x is not None and target_y is not None:
+            # Use direct target coordinates (e.g., for waypoint tracking)
+            tgt_xy = np.array([target_x, target_y])
+            error = tgt_xy - pos[:2]
+        elif track_body_id is not None and track_obj_name is not None:
             # Use peg center map if available, otherwise use body position
             if hasattr(self.detector, 'peg_target_positions') and track_obj_name in self.detector.peg_target_positions:
                 tgt_xy = np.array(self.detector.peg_target_positions[track_obj_name])[:2]
@@ -438,7 +445,7 @@ class TaskOperation:
                     timestep=step_counter['i'],
                     pos=pos,
                     goal=np.array([pos[0], pos[1], target_z]),
-                    error=np.array([0.0, 0.0, error_z]),
+                    error=np.array( [0.0, 0.0, error_z]),
                     p_term=np.array([0.0, 0.0, p_z]),
                     i_term=np.array([0.0, 0.0, i_z]),
                     d_term=np.array([0.0, 0.0, d_z]),
@@ -754,7 +761,12 @@ class TaskOperation:
             or placement.
             """
             start_pos = self._gripper_pos()
-            goal_pos = np.array(self.env.sim.data.body_xpos[target_id])
+            # Use peg center if available, otherwise use body position
+            if hasattr(self.detector, 'peg_target_positions') and target_name in self.detector.peg_target_positions:
+                peg_center = np.array(self.detector.peg_target_positions[target_name])
+                goal_pos = np.array([peg_center[0], peg_center[1], self.env.sim.data.body_xpos[target_id][2]])
+            else:
+                goal_pos = np.array(self.env.sim.data.body_xpos[target_id])
             start_x, start_y, start_z = start_pos
             goal_x, goal_y, goal_z = goal_pos
             goal_z = goal_z + 0.0625  # Offset to not bump object
@@ -801,9 +813,10 @@ class TaskOperation:
             else:
                 dir = 'down'
             # move = np.array([delta_xy[0], delta_xy[1], delta_z, 0.0])
+            # Use waypoint coordinates (which now use peg center for pegs)
             move_xy = self._compute_xy_action(
-                track_body_id=target_id,
-                track_obj_name=target_name,
+                target_x=target[0],
+                target_y=target[1],
                 # add_noise=True,
                 # return_debug=True
             )
