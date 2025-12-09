@@ -3,7 +3,7 @@
 ## Create training config
 Record your demo and put it in `.datasets/{task_name}`
 Create training config in `openpi/src/openpi/training/config.py`
-Add a train config, make necessary modifications. Pay special attention to the `extra_
+Add a train config, make necessary modifications. Pay special attention to the `extra_delta_transform` boolean flag in the `DataConfig`
 
 ```bash
     TrainConfig(
