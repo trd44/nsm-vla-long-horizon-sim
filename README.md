@@ -3,14 +3,13 @@
 ## Create training config
 Record your demo and put it in `.datasets/{task_name}`
 Create training config in `openpi/src/openpi/training/config.py`
-Add a train config, make necessary modifications
+Add a train config, make necessary modifications. Pay special attention to the `extra_
 
 ```bash
     TrainConfig(
         name="pi0_{task_name}",
         # Here is an example of loading a pi0 model for LoRA fine-tuning.
         model=pi0.Pi0Config(
-            action_horizon=10,
             paligemma_variant="gemma_2b_lora",
             action_expert_variant="gemma_300m_lora",
         ),
@@ -42,12 +41,26 @@ Calculate the norm stats of your data
 ```bash
 uv run scripts/compute_norm_stats.py --config-name {TrainConfig}
 ```
+The norm stats will show up in `openpi/assets/{TrainConfig}/`
 
 ## Finetune
 ```bash
 XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py {TrainConfig} --exp-name=my_experiment --overwrite
 ```
-
+## Run Inferece on Finetuned Model
+First modify the `openpi/examples/robosuite/compose.yml` to point to the name of the finetuned checkpoint. This is the same as the TrainConfig above.
+```
+environment:
+    - SERVER_ARGS=policy:checkpoint --policy.config {TrainConfig} --policy.dir /app/checkpoints/{TrainConfig}/{TrainConfig}/29999
+```
+if the policy is plan guided, set it to true in `openpi/examples/robosuite/args.py`
+```
+planner_guided: bool =True
+```
+then docker compose
+```
+docker compose -f examples/robosuite/compose.yml up
+```
 ## Dependencies
 
 Clone MimicGen in /OpLearn directory
