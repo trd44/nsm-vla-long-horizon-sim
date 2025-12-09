@@ -10,7 +10,6 @@ Add a train config, make necessary modifications. Pay special attention to the `
         name="pi0_{task_name}",
         # Here is an example of loading a pi0 model for LoRA fine-tuning.
         model=pi0.Pi0Config(
-            action_horizon=10,
             paligemma_variant="gemma_2b_lora",
             action_expert_variant="gemma_300m_lora",
         ),

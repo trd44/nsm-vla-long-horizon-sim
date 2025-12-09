@@ -123,12 +123,7 @@ class RecordDemos(gym.Wrapper):
         elif self.verbose and not self.randomize_this_episode:
             print(f"[RecordDemos] Episode {self.successes} is non-noisy.")
         
-        # Reset the environment, handling varied return signatures
-        # TODO: Probably not necessary?
-        try:
-            raw = self.env.reset(seed=self.args.seed)
-        except TypeError:
-            raw = self.env.reset()
+        raw = self.env.reset()
         
         # Extract observation if reset returns tuple or list
         if isinstance(raw, (tuple, list)):
@@ -339,16 +334,22 @@ class RecordDemos(gym.Wrapper):
         parts = op_str.lower().split()
         cmd = parts[0]
         if cmd == 'pick':
-            return PickOperation, {'object_id': parts[1]}
+            return PickOperation, {
+                'object_id': parts[1],
+            }
         if cmd == 'place':
             return PlaceOperation, {
                 'object_id': parts[1],
-                'placement_id': parts[2]
+                'placement_id': parts[2],
             }
         if cmd == 'turn-on':
-            return TurnOnOperation, {'object_id': parts[1]}
+            return TurnOnOperation, {
+                'object_id': parts[1],
+            }
         if cmd == 'turn-off':
-            return TurnOffOperation, {'object_id': parts[1]}
+            return TurnOffOperation, {
+                'object_id': parts[1],
+            }
         raise ValueError(f"Unsupported operator: {op_str}")
 
     def run_trajectory(self, obs: dict) -> bool:
@@ -357,6 +358,7 @@ class RecordDemos(gym.Wrapper):
         for i, op_str in enumerate(self.plan):  
             OpClass, params = self._map_operator(op_str)  # Map to operator
             op = OpClass(
+                self.args,
                 self.env,
                 self.detector,
                 self.randomize_this_episode,
@@ -419,7 +421,7 @@ class RecordDemos(gym.Wrapper):
                 joint_sin = obs['robot0_joint_pos_sin']
                 joint_state = np.arctan2(joint_sin, joint_cos).astype(np.float32)
             else:
-                joint_state = np.zeros(7, dtype=np.float32)
+                raise KeyError("No joint position keys found in observation!")
 
             # STATE (END EFFECTOR)
             eef_pos = obs.get('robot0_eef_pos', np.zeros(3, dtype=np.float32))
@@ -448,8 +450,8 @@ class RecordDemos(gym.Wrapper):
                 "observation": {
                     "wrist_image": wrist_img,
                     "image": agent_img,
-                    "state": eef_state,        
-                    "joint_state": joint_state,
+                    "state": joint_state,        
+                    "ee_state": eef_state,
                 }
             }
             steps.append(step_dict)
@@ -515,8 +517,25 @@ def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path:
             if "type_match" in predicate and state[predicate]:
                 objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
                 types[objs[0]] = objs[1]
-        for obj, type_ in types.items():
-            goal_predicates.append(f'on {obj} {type_}')
+        
+        # Collect all cubes with their positions and target bins
+        cube_info = []
+        for obj, bin_name in types.items():
+            try:
+                body_name = detector.object_id[obj]
+                body_id = detector.env.sim.model.body_name2id(body_name)
+                y_pos = detector.env.sim.data.body_xpos[body_id][1]
+                cube_info.append((y_pos, obj, bin_name))
+            except (KeyError, ValueError):
+                cube_idx = int(obj.replace('cube', '')) if 'cube' in obj else 999
+                cube_info.append((float(cube_idx), obj, bin_name))
+        
+        # Sort all cubes by Y position (left to right)
+        cube_info.sort(key=lambda x: x[0])
+        
+        # Generate predicates in left-to-right order (cube_info is already sorted)
+        for y_pos, cube_name, bin_name in cube_info:
+            goal_predicates.append(f'on {cube_name} {bin_name}')
         if goal_predicates:
             define_goal_in_pddl(pddl_path, goal_predicates)
         
@@ -576,7 +595,7 @@ def symbolic_to_natural_instruction(op_str, env=None):
     
     areas  = {
         "peg1": "left area", "peg2": "middle area", "peg3": "right area", 
-        "bin0": "red zone", "bin1": "green zone", "bin2": "blue zone",
+        "bin0": "red bin", "bin1": "green bin", "bin2": "blue bin",
         "platform1": "blue zone", "platform2": "red zone", 
         "platform": "gray zone",
         "reference_platform": "reference area", "target_platform": "gray zone", 

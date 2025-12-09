@@ -8,13 +8,14 @@ import tyro
 from dataset_making.args import Args
 from dataset_making.utils import to_datestring
 from dataset_making.record_demos import RecordDemos
-from dataset_making.panda_hanoi_detector import (
-    PandaHanoiDetector as HanoiDetector
-)
+# from dataset_making.panda_hanoi_detector import (
+#     PandaHanoiDetector as HanoiDetector
+# )
 
 import robosuite as suite
 from robosuite.wrappers import GymWrapper
 from robosuite.utils.detector import (
+    HanoiDetector,
     KitchenDetector, 
     NutAssemblyDetector, 
     CubeSortingDetector,
@@ -27,8 +28,7 @@ from robosuite.utils.detector import (
 def make_env(args):
     """Create and return a wrapped robosuite environment."""
     ctrl_cfg = suite.load_controller_config(default_controller='OSC_POSE')
-
-    if args.env[:4] == 'Hanoi':  # Hanoi environments
+    if args.env[:5] == 'Hanoi':  # Hanoi environments
         env = suite.make(
             args.env,
             robots=args.robot,
@@ -43,8 +43,10 @@ def make_env(args):
             camera_widths=256,
             random_block_placement=args.random_block_placement,
             random_block_selection=args.random_block_selection,
-            cube_init_pos_noise_std=args.cube_init_pos_noise_std
+            cube_init_pos_noise_std=args.cube_placement_noise,
+            peg_xy_jitter=args.peg_xy_jitter
         )
+        print(f"Peg XY jitter: {args.peg_xy_jitter}")
         print(f"Environment settings: \
             random_block_placement={args.random_block_placement}, \
             random_block_selection={args.random_block_selection}")
@@ -62,6 +64,7 @@ def make_env(args):
             camera_names=["agentview", "robot0_eye_in_hand"],
             camera_heights=256,
             camera_widths=256,
+            cube_placement_noise=args.cube_placement_noise,
         )
 
     # Gym-compatible wrapper, proprio_obs toggles vision-based vs proprio inputs
@@ -184,44 +187,12 @@ def main(args: Args) -> None:
     # Seed everything
     np.random.seed(args.seed)
 
-    # TODO: Remove monkey patch? AI slop? Never using panda again?
-    # Monkey‐patch Panda gripper names on the MjModel class
-    # model_cls = env.sim.model.__class__
-    # orig_body_name2id = model_cls.body_name2id
-    # def patched_body_name2id(self, name: str) -> int:
-    #     try:
-    #         return orig_body_name2id(self, name)
-    #     except ValueError:
-    #         # Panda names the fingers without "_inner_finger"
-    #         alt = name.replace('_inner_finger', 'finger')
-    #         return orig_body_name2id(self, alt)
-    # # Override the method on the class, so all instances use it
-    # model_cls.body_name2id = patched_body_name2id
-
     # Build experiment directory structure
-    exp_id = args.name if args.name else to_datestring(time.time())
-    
-    args.env_dir = os.path.join(args.dir, args.env, exp_id)
-    # traces_dir = os.path.join(args.env_dir, 'traces')  # TODO: Remove?
-    
+    exp_id = args.name if args.name else to_datestring(time.time())    
+    args.env_dir = os.path.join(args.dir, args.env, exp_id)    
     os.makedirs(args.env_dir, exist_ok=True)
-    # os.makedirs(traces_dir, exist_ok=True)  # TODO: Remove?
     print(f"Saving dataset to {args.env_dir}")
 
-    # TODO: Remove this? Seems like unnecessary AI slop. Just need to use
-    # one standard for the path names.
-    # Map environment names to PDDL directory names
-    # pddl_dir_map = {
-    #     'Hanoi': 'hanoi',
-    #     'Hanoi4x3': 'hanoi4x3',
-    #     'KitchenEnv': 'kitchen',
-    #     'NutAssembly': 'nut_assembly',
-    #     'CubeSorting': 'cubesorting',
-    #     'HeightStacking': 'heightstacking',
-    #     'AssemblyLineSorting': 'assemblyline',
-    #     'PatternReplication': 'patternreplication',
-    # }
-    # pddl_dir = pddl_dir_map.get(args.env, args.env.lower())
     pddl_path = os.path.join('planning', 'PDDL', args.env.lower()) + os.sep
 
     # 1) Make the env
@@ -249,7 +220,6 @@ def main(args: Args) -> None:
             successes += 1
         else:
             print(f"Attempt {attempt} failed.")            
-        # recorder.reset()
         attempt += 1
         print(f"\n=== Successes {successes}/{args.episodes} ===")
 

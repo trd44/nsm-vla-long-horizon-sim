@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 from itertools import islice
 
-DATASET_PATH = "/home/hrilab/tensorflow_datasets/assembly_line_sorting/1.0.0"
+DATASET_PATH = "/home/hrilab/tensorflow_datasets/hanoi50/1.0.0"
 SAVE_GIF_DIR = Path("inspection_videos/rlds")
 SAVE_GIF_DIR.mkdir(exist_ok=True)
 
@@ -165,6 +165,14 @@ def inspect_for_consistency():
                     n_broken += 1
                     error_counts["inf"] = error_counts.get("inf", 0) + 1
 
+                # Check that rotation components (action[3:6]) are all zeros
+                if len(action) >= 6:
+                    rotation_components = action[3:6]
+                    if not np.allclose(rotation_components, 0.0, atol=1e-6):
+                        print(f"Episode {i}, step {j}: Rotation components (action[3:6]) are not all zeros: {rotation_components}")
+                        n_broken += 1
+                        error_counts["non_zero_rotation"] = error_counts.get("non_zero_rotation", 0) + 1
+
                 # Check consistency of shapes within episode
                 if step_shapes is None:
                     step_shapes = shapes
@@ -268,6 +276,15 @@ def validate_for_lerobot():
                         print(f"Episode {i}, step {j}: Inf found in '{k}'")
                         n_broken += 1
                         error_counts[f"inf_{k}"] = error_counts.get(f"inf_{k}", 0) + 1
+
+                # Check that rotation components (action[3:6]) are all zeros
+                action = step["action"]
+                if len(action) >= 6:
+                    rotation_components = action[3:6]
+                    if not np.allclose(rotation_components, 0.0, atol=1e-6):
+                        print(f"Episode {i}, step {j}: Rotation components (action[3:6]) are not all zeros: {rotation_components}")
+                        n_broken += 1
+                        error_counts["non_zero_rotation"] = error_counts.get("non_zero_rotation", 0) + 1
 
                 # After dtype and shape checks, add:
                 for k in expected_shapes:
