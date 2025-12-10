@@ -1,4 +1,13 @@
-"""Main script for recording demonstrations of the Robosuite environments."""
+"""
+main.py
+
+Use dataset_making conda env
+
+Example usage:
+python -m dataset_making.main --env HeightStacking --episodes 50
+
+"""
+
 import os
 import time
 import numpy as np
