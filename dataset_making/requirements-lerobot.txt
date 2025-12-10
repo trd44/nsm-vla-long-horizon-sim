@@ -1,0 +1,3 @@
+tensorflow-datasets
+lerobot==0.3.2
+tensorflow

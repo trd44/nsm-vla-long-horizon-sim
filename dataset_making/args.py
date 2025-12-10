@@ -27,8 +27,8 @@ class Args:
     vision: bool = False        # Use vision-based observations
 
     # --- Episodes ---
-    episodes: int = 5                # Number of episodes to record
-    save_hd_agent_video: bool = True  # Save full resolution videos
+    episodes: int = 50                 # Number of episodes to record
+    save_hd_agent_video: bool = False  # Save full resolution videos
     save_hd_wrist_video: bool = False  # Save full resolution videos
 
     # --- Random Seed ---
