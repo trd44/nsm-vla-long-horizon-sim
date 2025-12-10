@@ -490,6 +490,31 @@ def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path:
             elif "small" in predicate and not state[predicate]:
                 objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
                 goal_predicates.append(f'on {objs[0]} platform2')
+
+        types = {}
+        for predicate in state.keys():
+            if "type_match" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
+                types[objs[0]] = objs[1]
+        
+        # Collect all cubes with their positions and target bins
+        cube_info = []
+        for obj, bin_name in types.items():
+            try:
+                body_name = detector.object_id[obj]
+                body_id = detector.env.sim.model.body_name2id(body_name)
+                y_pos = detector.env.sim.data.body_xpos[body_id][1]
+                cube_info.append((y_pos, obj, bin_name))
+            except (KeyError, ValueError):
+                cube_idx = int(obj.replace('cube', '')) if 'cube' in obj else 999
+                cube_info.append((float(cube_idx), obj, bin_name))
+        
+        # Sort all cubes by Y position (left to right)
+        cube_info.sort(key=lambda x: x[0])
+        
+        # Generate predicates in left-to-right order (cube_info is already sorted)
+        for y_pos, cube_name, bin_name in cube_info:
+            goal_predicates.append(f'on {cube_name} {bin_name}')
         if goal_predicates:
             define_goal_in_pddl(pddl_path, goal_predicates)
         

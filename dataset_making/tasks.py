@@ -701,7 +701,7 @@ class TaskOperation:
         step = {"i": 0}
         # Store the noisy goal position for bins (computed once, used consistently)
         noisy_goal_xy = None
-        if target_name.startswith('bin') and place and self.args.bin_placement_noise > 0:
+        if target_name.startswith(('bin', 'platform')) and place and self.args.bin_placement_noise > 0:
             base_goal = np.array(self.env.sim.data.body_xpos[target_id])[:2]
             noise = self.args.bin_placement_noise
             if noise > 0:
@@ -716,7 +716,7 @@ class TaskOperation:
             dist = None
             over_flag = False
             try:
-                if target_name.startswith('bin'):
+                if target_name.startswith(('bin', 'platform')):
                     # For bins during placement, check distance to noisy goal position
                     pos = self._gripper_pos()[:2]
                     dist_xy = np.linalg.norm(pos - noisy_goal_xy)
@@ -755,7 +755,7 @@ class TaskOperation:
                 goal_pos = np.array(self.env.sim.data.body_xpos[target_id])
                 if place:
                     goal_pos[2] = goal_pos[2] + 0.05
-                    if target_name.startswith('bin'):
+                    if target_name.startswith(('bin', 'platform')):
                         noise = self.args.bin_placement_noise
                         if noise > 0:
                             goal_pos[0] = noisy_goal_xy[0]

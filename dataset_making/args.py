@@ -9,7 +9,7 @@ class Args:
     """
 
     # --- Environment ---
-    env: str = "AssemblyLineSorting"
+    env: str = "CubeSorting"
     robot: str = "Kinova3"
     noise_std: float = 0.0       # Std for Gaussian action noise (scaled by remaining distance)
     noisy_fraction: float = 0.0  # Fraction of episodes that should use action noise (deterministic scheduling of the last fraction)
@@ -18,7 +18,7 @@ class Args:
     peg_xy_jitter: float = 0.025  # Std dev (meters) for XY jitter of the peg centers
     planner: str = "pddl"      # Planner type to use    
 
-    # --- Assembly Line Specific ---
+    # --- Assembly & CubeSorting Specific ---
     cube_placement_noise: float = 0.025  # Uniform noise in meters to add to cube x and y positions during spawn
     bin_placement_noise: float = 0.025  # Uniform noise in meters to add to bin x and y positions during spawn
 
@@ -27,8 +27,8 @@ class Args:
     vision: bool = False        # Use vision-based observations
 
     # --- Episodes ---
-    episodes: int = 5                # Number of episodes to record
-    save_hd_agent_video: bool = True  # Save full resolution videos
+    episodes: int = 50                 # Number of episodes to record
+    save_hd_agent_video: bool = False  # Save full resolution videos
     save_hd_wrist_video: bool = False  # Save full resolution videos
 
     # --- Random Seed ---
