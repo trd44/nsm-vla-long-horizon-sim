@@ -1,17 +1,23 @@
 import tensorflow_datasets as tfds
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
+from lerobot.common.datasets.lerobot_dataset import HF_LEROBOT_HOME
+from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from huggingface_hub import HfApi
+from requests import HTTPError
+
 
 HF_USERNAME = "tduggan93"  # Change to your HuggingFace username
 ROBOT_TYPE = "kinova3"
 TFDS_PATH = "/home/hrilab/tensorflow_datasets/"
+CODEBASE_VERSION = "1.0.0"
+PUSH_TO_HUB = True
+BRANCH = None
 DATASETS = [
-    ("assembly_line_sorting", TFDS_PATH + "assembly_line_sorting/1.0.0"),
+    # ("assembly_line_sorting", TFDS_PATH + "assembly_line_sorting/1.0.0"),
     # ("cube_sorting",          TFDS_PATH + "cube_sorting/1.0.0"),
     # ("height_stacking",       TFDS_PATH + "height_stacking/1.0.0"),
     # ("pattern_replication",   TFDS_PATH + "pattern_replication/1.0.0"),
     # ("hanoi_50",              TFDS_PATH + "hanoi50/1.0.0"),
-    # ("hanoi4x3_50",           TFDS_PATH + "hanoi4x350/1.0.0"),
+    ("hanoi4x3_50",           TFDS_PATH + "hanoi4x350/1.0.0"),
 ]
 
 def convert_individual_datasets():
@@ -51,6 +57,11 @@ def convert_individual_datasets():
                     "shape": (7,), 
                     "names": ["actions"]
                 },
+                # "task": {
+                #     "dtype": "string",
+                #     "shape": (),
+                #     "names": ["task"]
+                # },
             },
             image_writer_threads=10,
             image_writer_processes=5,
@@ -79,6 +90,23 @@ def convert_individual_datasets():
         
         print(f"✓ Finished converting {task_name}")
         # print(f"  Pushing {repo_id} to HuggingFace Hub using upload_large_folder...")
+
+        # if PUSH_TO_HUB:
+        #     hub_api = HfApi()
+        #     try:
+        #         hub_api.delete_tag(repo_id, tag=CODEBASE_VERSION, repo_type="dataset")
+        #     except HTTPError as e:
+        #         print(f"tag={CODEBASE_VERSION} probably doesn't exist. Skipping exception ({e})")
+        #         pass
+        #     hub_api.delete_files(
+        #         delete_patterns=["data/chunk*/episode_*", "meta/*.jsonl", "videos/chunk*"],
+        #         repo_id=repo_id,
+        #         revision=BRANCH,
+        #         repo_type="dataset",
+        #     )
+        #     hub_api.create_tag(repo_id, tag=CODEBASE_VERSION, revision=BRANCH, repo_type="dataset")
+
+        #     LeRobotDataset(repo_id).push_to_hub()
         
         # # Push to HuggingFace using upload_large_folder for better handling of large datasets
         # api = HfApi()

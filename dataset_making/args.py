@@ -9,13 +9,13 @@ class Args:
     """
 
     # --- Environment ---
-    env: str = "CubeSorting"
+    env: str = "Hanoi4x3"
     robot: str = "Kinova3"
     noise_std: float = 0.0       # Std for Gaussian action noise (scaled by remaining distance)
     noisy_fraction: float = 0.0  # Fraction of episodes that should use action noise (deterministic scheduling of the last fraction)
     random_block_placement: bool = False  # Place block on pegs randomly according to the rules of Towers of Hanoi
     random_block_selection: bool = False  # Randomly select 3 out of 4 blocks
-    peg_xy_jitter: float = 0.025  # Std dev (meters) for XY jitter of the peg centers
+    peg_xy_jitter: float = 0.0225  # Std dev (meters) for XY jitter of the peg centers
     planner: str = "pddl"      # Planner type to use    
 
     # --- Assembly & CubeSorting Specific ---
@@ -28,7 +28,7 @@ class Args:
 
     # --- Episodes ---
     episodes: int = 50                 # Number of episodes to record
-    save_hd_agent_video: bool = False  # Save full resolution videos
+    save_hd_agent_video: bool = True  # Save full resolution videos
     save_hd_wrist_video: bool = False  # Save full resolution videos
 
     # --- Random Seed ---
