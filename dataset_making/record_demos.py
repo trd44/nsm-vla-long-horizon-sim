@@ -3,7 +3,7 @@
 import os
 import copy
 import math
-import gym
+import gymnasium as gym
 import cv2
 import numpy as np
 # Commenting bc its breaking pi inference
