@@ -199,7 +199,7 @@ if __name__ == "__main__":
             # print("Checking condition: ", f"grasped({symgoal[0]})", state[f"grasped({symgoal[0]})"])
             # print("Condition value: ", state[f"on({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"])
             # print("-----------------------------------")
-                condition = state[f"on({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"]
+                condition = state[f"in({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"]
                 return condition
         elif operator == 'reach_pick':
             def Beta(state, symgoal):

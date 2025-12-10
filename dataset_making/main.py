@@ -10,13 +10,21 @@ python -m dataset_making.main --env HeightStacking --episodes 50
 
 import os
 import time
-import argparse
 import numpy as np
-import robosuite as suite
-from robosuite.wrappers import GymWrapper
+import imageio
+import tyro
+
+from dataset_making.args import Args
 from dataset_making.utils import to_datestring
 from dataset_making.record_demos import RecordDemos
+# from dataset_making.panda_hanoi_detector import (
+#     PandaHanoiDetector as HanoiDetector
+# )
+
+import robosuite as suite
+from robosuite.wrappers import GymWrapper
 from robosuite.utils.detector import (
+    HanoiDetector,
     KitchenDetector, 
     NutAssemblyDetector, 
     CubeSortingDetector,
@@ -24,30 +32,50 @@ from robosuite.utils.detector import (
     AssemblyLineSortingDetector,
     PatternReplicationDetector
 )
-from dataset_making.panda_hanoi_detector import PandaHanoiDetector as HanoiDetector
-import imageio
 
 
 def make_env(args):
     """Create and return a wrapped robosuite environment."""
-    cube_noise = getattr(args, 'cube_init_pos_noise_std', 0.01)
     ctrl_cfg = suite.load_controller_config(default_controller='OSC_POSE')
-    env = suite.make(
-        args.env,
-        robots="Kinova3",
-        controller_configs=ctrl_cfg,
-        has_renderer=args.render,
-        has_offscreen_renderer=True,
-        horizon=1e8,
-        use_camera_obs=True,
-        use_object_obs=True,
-        camera_names=["agentview", "robot0_eye_in_hand"],
-        camera_heights=256,
-        camera_widths=256,
-        # random_block_placement=args.random_block_placement,
-        # random_block_selection=args.random_block_selection,
-        # cube_init_pos_noise_std=cube_noise
-    )
+    if args.env[:5] == 'Hanoi':  # Hanoi environments
+        env = suite.make(
+            args.env,
+            robots=args.robot,
+            controller_configs=ctrl_cfg,
+            has_renderer=args.render,
+            has_offscreen_renderer=True,
+            horizon=1e8,
+            use_camera_obs=True,
+            use_object_obs=True,
+            camera_names=["agentview", "robot0_eye_in_hand"],
+            camera_heights=256,
+            camera_widths=256,
+            random_block_placement=args.random_block_placement,
+            random_block_selection=args.random_block_selection,
+            cube_init_pos_noise_std=args.cube_placement_noise,
+            peg_xy_jitter=args.peg_xy_jitter
+        )
+        print(f"Peg XY jitter: {args.peg_xy_jitter}")
+        print(f"Environment settings: \
+            random_block_placement={args.random_block_placement}, \
+            random_block_selection={args.random_block_selection}")
+        
+    else:  # Other environments
+        env = suite.make(
+            args.env,
+            robots=args.robot,
+            controller_configs=ctrl_cfg,
+            has_renderer=args.render,
+            has_offscreen_renderer=True,
+            horizon=1e8,
+            use_camera_obs=True,
+            use_object_obs=True,
+            camera_names=["agentview", "robot0_eye_in_hand"],
+            camera_heights=256,
+            camera_widths=256,
+            cube_placement_noise=args.cube_placement_noise,
+        )
+
     # Gym-compatible wrapper, proprio_obs toggles vision-based vs proprio inputs
     env = GymWrapper(env, proprio_obs=not args.vision)
     return env
@@ -55,71 +83,104 @@ def make_env(args):
 
 def get_detector(env, env_name):
     """Instantiate the correct detector for the chosen environment."""
+    if env_name == 'AssemblyLineSorting':
+        return AssemblyLineSortingDetector(env)
+    if env_name == 'CubeSorting':
+        return CubeSortingDetector(env)
     if env_name == 'Hanoi' or env_name == 'Hanoi4x3':
         return HanoiDetector(env)
+    if env_name == 'HeightStacking':
+        return HeightStackingDetector(env)
     if env_name == 'KitchenEnv':
         return KitchenDetector(env)
     if env_name == 'NutAssembly':
         return NutAssemblyDetector(env)
-    if env_name == 'CubeSorting':
-        return CubeSortingDetector(env)
-    if env_name == 'HeightStacking':
-        return HeightStackingDetector(env)
-    if env_name == 'AssemblyLineSorting':
-        return AssemblyLineSortingDetector(env)
     if env_name == 'PatternReplication':
         return PatternReplicationDetector(env)
     raise ValueError(f"Unknown env {env_name}")
 
 
-def record_episode_video(env, recorder, epi_idx, camera="agentview", fps=20, save_full_res_vid=False):
-    if save_full_res_vid:
-        frames = []
-        wrist_frames = []
+def perform_demonstration(
+    args,
+    env,
+    recorder,
+    attempt,
+    successes,
+    fps: int = 30,
+) -> bool:
+    """Record a single episode video and return success status."""
+    agent_camera="agentview"
+    wrist_camera="robot0_eye_in_hand"
+    save_hd_agent_video: bool = args.save_hd_agent_video
+    save_hd_wrist_video: bool = args.save_hd_wrist_video
+    if save_hd_agent_video:
+        hd_agent_frames = []
+    if save_hd_wrist_video:
+        hd_wrist_frames = []
 
     # Hook into the recorder so that every time it records a step,
     # we grab a frame from both cameras
     original_env_record = getattr(recorder.env, "record_step", None)
     def hooked_env_record(obs, action):
-        if save_full_res_vid:
-            frames.append(env.sim.render(width=640, height=480, camera_name=camera))
-            wrist_frames.append(env.sim.render(width=640, height=480, camera_name="robot0_eye_in_hand"))
+        if save_hd_agent_video:
+            f = env.sim.render(width=640, height=480, camera_name=agent_camera)
+            hd_agent_frames.append(f)
+        if save_hd_wrist_video:
+            f = env.sim.render(width=640, height=480, camera_name=wrist_camera)
+            hd_wrist_frames.append(f)
         return recorder.record_step(obs, action)
+    
+    # Override the environment's record_step method with our hooked version to 
+    # capture video frames during each step
     recorder.env.record_step = hooked_env_record
 
     # Reset and grab the initial frame from both cameras
-    obs = recorder.reset()
-    print(f"Obs: {obs}")
-    print(f"Plan: {recorder.plan}")
+    obs = recorder.reset(successes=successes)
+    if args.verbose:
+        print(f"Obs: {obs}")
+        print(f"Plan: {recorder.plan}")
+    
+    # Used to be an issue with the plan being None. Haven't seen it in a while.
+    # TODO: Remove?
     while recorder.plan is None or obs is None:
-        obs = recorder.reset()
+        obs = recorder.reset(successes=successes)
         print("Plan is None, resetting")
     
-    if save_full_res_vid:
-        frames.append(env.sim.render(width=640, height=480, camera_name=camera))
-        wrist_frames.append(env.sim.render(width=640, height=480, camera_name="robot0_eye_in_hand"))
-
+    # Save initial frames. Not captured normally?
+    if save_hd_agent_video:
+        f = env.sim.render(width=640, height=480, camera_name=agent_camera)
+        hd_agent_frames.append(f)
+    if save_hd_wrist_video:
+        f = env.sim.render(width=640, height=480, camera_name=wrist_camera)
+        hd_wrist_frames.append(f)
+    
     # Run the whole trajectory (will call hooked_record_step under the hood)
     success = recorder.run_trajectory(obs)
 
     # Finally grab one more frame from both cameras
-    if save_full_res_vid:
-        frames.append(env.sim.render(width=640, height=480, camera_name=camera))
-        wrist_frames.append(env.sim.render(width=640, height=480, camera_name="robot0_eye_in_hand"))
-
-
-    if save_full_res_vid:
-        # Write out both videos
-        video_path = f"episode_{epi_idx:03d}_{camera}.mp4"
-        wrist_video_path = f"episode_{epi_idx:03d}_robot0_eye_in_hand.mp4"
-        
+    if save_hd_agent_video:
+        f = env.sim.render(width=640, height=480, camera_name=agent_camera)
+        hd_agent_frames.append(f)
+        filename = f"episode_{attempt:03d}_seed{args.seed}_agentview.mp4"
+        path = os.path.join('dataset_making', 'hd_videos', args.env, filename)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         # Flip frames vertically to fix upside-down issue
-        flipped_frames = [np.flipud(frame) for frame in frames]
-        flipped_wrist_frames = [np.flipud(frame) for frame in wrist_frames]
-        imageio.mimwrite(video_path, flipped_frames, fps=fps, macro_block_size=None)
-        imageio.mimwrite(wrist_video_path, flipped_wrist_frames, fps=fps, macro_block_size=None)
-        
-        print(f"Saved episode videos to {video_path} and {wrist_video_path}    (success={success}, frames={len(frames)})")
+        flipped_frames = [np.flipud(frame) for frame in hd_agent_frames]
+        imageio.mimwrite(path, flipped_frames, fps=fps, macro_block_size=None)
+        print(f"Saved hd agentview video to {path}")
+        print(f"(success={success}, frames={len(hd_agent_frames)})")
+
+    if save_hd_wrist_video:
+        f = env.sim.render(width=640, height=480, camera_name=wrist_camera)
+        hd_wrist_frames.append(f)
+        filename = f"episode_{attempt:03d}_seed{args.seed}_wrist.mp4"
+        path = os.path.join('dataset_making', 'hd_videos', args.env, filename)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        # Flip frames vertically to be consistent with agentview video
+        flipped_frames = [np.flipud(frame) for frame in hd_wrist_frames]
+        imageio.mimwrite(path, flipped_frames, fps=fps, macro_block_size=None)
+        print(f"Saved hd wrist video to {path}")
+        print(f"(success={success}, frames={len(hd_wrist_frames)})")
 
     # Restore original hook in case you want to reuse recorder
     if original_env_record:
@@ -130,116 +191,47 @@ def record_episode_video(env, recorder, epi_idx, camera="agentview", fps=20, sav
     return success
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Record robot demos via symbolic planning and execution.")
-    parser.add_argument('--env', type=str, 
-                        choices=['Hanoi', 'Hanoi4x3', 'KitchenEnv', 'NutAssembly', 'CubeSorting', 
-                                'HeightStacking', 'AssemblyLineSorting', 'PatternReplication'], 
-                        default='Hanoi')
-    parser.add_argument('--dir', type=str, default='./datasets', help='Base directory for experiment outputs')
-    parser.add_argument('--episodes', type=int, default=1, help='Number of episodes to record')
-    parser.add_argument('--seed', type=int, default=0, help='Random seed')
-    parser.add_argument('--name', type=str, default=None, help='Optional name override for experiment ID')
-    parser.add_argument('--vision', action='store_true', help='Use vision-based observations')
-    parser.add_argument('--relative_obs', action='store_true', help='Use relative gripper-goal features')
-    parser.add_argument('--noise-std', type=float, default=0.0,
-                        help='Std factor for Gaussian action noise (scaled by remaining distance).')
-    parser.add_argument('--noisy-fraction', type=float, default=0.0,
-                        help='Fraction of episodes that should use action noise (deterministic scheduling of the last fraction).')
-    parser.add_argument('--cube-init-pos-noise-std', type=float, default=0.0,
-                        help='Std dev (meters) for XY jitter of the initial tower position.')
-    parser.add_argument('--random-block-placement', action='store_true', help='Place block on pegs randomly according to the rules of Towers of Hanoi')
-    parser.add_argument('--random-block-selection', action='store_true', help='Randomly select 3 out of 4 blocks')
-    parser.add_argument('--verbose', action='store_true', help='Enable verbose debug output')
-    parser.add_argument('--save-full-res-vid', action='store_true', help='Enable verbose debug output')
-    parser.add_argument('--planner', type=str, default='pddl', choices=['pddl', 'vlm'], help='Planner type to use')
-
-    # Currently not working
-    parser.add_argument('--render', action='store_true', help='Render during execution')
-
-    args = parser.parse_args()
-
+def main(args: Args) -> None:
+    """Main function for running the dataset making script"""
     # Seed everything
     np.random.seed(args.seed)
 
     # Build experiment directory structure
-    exp_name = f"{args.env}_dataset"
-    timestamp = to_datestring(time.time())
-    exp_id = args.name if args.name else timestamp
-    args.env_dir = os.path.join(args.dir, exp_name, exp_id)
+    exp_id = args.name if args.name else to_datestring(time.time())    
+    args.env_dir = os.path.join(args.dir, args.env, exp_id)    
     os.makedirs(args.env_dir, exist_ok=True)
-    traces_dir = os.path.join(args.env_dir, 'traces')
-    os.makedirs(traces_dir, exist_ok=True)
+    print(f"Saving dataset to {args.env_dir}")
 
-    print(f"Starting experiment at {args.env_dir}")
-    print(f"Environment settings: random_block_placement={args.random_block_placement}, random_block_selection={args.random_block_selection}")
+    pddl_path = os.path.join('planning', 'PDDL', args.env.lower()) + os.sep
 
     # 1) Make the env
     env = make_env(args)
 
-    # Monkey‐patch Panda gripper names on the MjModel class
-    model_cls = env.sim.model.__class__
-    orig_body_name2id = model_cls.body_name2id
-
-    def patched_body_name2id(self, name: str) -> int:
-        try:
-            return orig_body_name2id(self, name)
-        except ValueError:
-            # Panda names the fingers without "_inner_finger"
-            alt = name.replace('_inner_finger', 'finger')
-            return orig_body_name2id(self, alt)
-
-    # Override the method on the class, so all instances use it
-    model_cls.body_name2id = patched_body_name2id
-
-    # 3) Now create the detector
+    # 2) Create the detector
     detector = get_detector(env, args.env)
     
-    # Map environment names to PDDL directory names
-    pddl_dir_map = {
-        'Hanoi': 'hanoi',
-        'Hanoi4x3': 'hanoi4x3',
-        'KitchenEnv': 'kitchen',
-        'NutAssembly': 'nut_assembly',
-        'CubeSorting': 'cubesorting',
-        'HeightStacking': 'heightstacking',
-        'AssemblyLineSorting': 'assemblyline',
-        'PatternReplication': 'patternreplication',
-    }
-    pddl_dir = pddl_dir_map.get(args.env, args.env.lower())
-    pddl_path = os.path.join('planning', 'PDDL', pddl_dir) + os.sep
-
-    # Wrap with recorder
+    # 3) Create the recorder
     recorder = RecordDemos(
-        env,
-        vision_based=args.vision,
+        args=args,
+        env=env,
         detector=detector,
         pddl_path=pddl_path,
-        args=args,
-        render=args.render,
         randomize=True,
-        noise_std_factor=args.noise_std
     )
-    # Align recorder episode indexing so warmup reset in __init__ does not shift the schedule.
-    # recorder.episode_idx = -1
 
-    # Main loop: reset, run, save
-    successes = 0
-    epi = 0
+    attempt = 0
+    successes = 0   
     while successes < args.episodes:
-        print(f"\n=== Episode {epi} ===")
-        recorder.set_schedule(epi, args.episodes)
-        print(f"[main] Scheduled ep {successes} / {args.episodes}: randomize={recorder.this_episode_randomize}")
-        ok = record_episode_video(env, recorder, epi, save_full_res_vid=args.save_full_res_vid)
-        if not ok:
-            print(f"Episode {epi} failed.")
-        else:
-            recorder.save_trajectory(epi)
+        print(f"\n=== Attempt {attempt} ===")
+        success = perform_demonstration(args, env, recorder, attempt, successes)        
+        if success:
+            recorder.save_trajectory(attempt)
             successes += 1
-        # recorder.reset()
-        epi += 1
+        else:
+            print(f"Attempt {attempt} failed.")            
+        attempt += 1
         print(f"\n=== Successes {successes}/{args.episodes} ===")
 
 
 if __name__ == '__main__':
-    main()
+    tyro.cli(main)

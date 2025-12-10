@@ -3,13 +3,20 @@
 import os
 import copy
 import math
-import gym
+import gymnasium as gym
 import cv2
 import numpy as np
-from planning.planner import add_predicates_to_pddl, call_planner, define_goal_in_pddl
-# from openpi.src.openpi.planning.hanoi_vlm_planner import query_model #COmmenting bc its breaking pi inference
+# Commenting bc its breaking pi inference
+# from openpi.src.openpi.planning.hanoi_vlm_planner import query_model 
+
+from dataset_making.args import Args
 from dataset_making.utils import to_datestring
-from dataset_making.tasks import PickOperation, PlaceOperation, TurnOnOperation, TurnOffOperation
+from dataset_making.tasks import (
+    PickOperation, PlaceOperation, TurnOnOperation, TurnOffOperation
+)
+from planning.planner import (
+    add_predicates_to_pddl, call_planner, define_goal_in_pddl
+)
 
 # Define which predicates to include per domain and planner mode
 planning_predicates = {
@@ -33,154 +40,90 @@ planning_mode = {
     "PatternReplication": 1,
 }
 
-def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path: str):
-    """Generate environment-specific goals for CubeSorting, HeightStacking, AssemblyLineSorting, and PatternReplication."""
-    goal_predicates = []
-    
-    if env_name == "CubeSorting":
-        # Find all small cubes and assign them to target zones
-        for predicate in state.keys():
-            if "small" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
-                goal_predicates.append(f'on {objs[0]} platform1')
-            elif "small" in predicate and not state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
-                goal_predicates.append(f'on {objs[0]} platform2')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "HeightStacking":
-        # Create stacking order based on sizes
-        sizes = {}
-        for predicate in state.keys():
-            if "smaller" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
-                sizes[objs[0]] = objs[1]
-        # Create stacking order based on sizes
-        sorted_sizes = sorted(sizes.items(), key=lambda x: x[1])
-        for i in range(len(sorted_sizes)-1):
-            goal_predicates.append(f'on {sorted_sizes[i][0]} {sorted_sizes[i+1][0]}')
-        # Add largest cube on platform
-        if sorted_sizes:
-            goal_predicates.append(f'on {sorted_sizes[-1][0]} platform')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "AssemblyLineSorting":
-        # Match types
-        types = {}
-        for predicate in state.keys():
-            if "type_match" in predicate and state[predicate]:
-                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
-                types[objs[0]] = objs[1]
-        for obj, type_ in types.items():
-            goal_predicates.append(f'on {obj} {type_}')
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-        
-    elif env_name == "PatternReplication":
-        # Get pattern from detector
-        goal_predicates = detector.get_pattern_replication_goal()
-        if goal_predicates:
-            define_goal_in_pddl(pddl_path, goal_predicates)
-    
-    return goal_predicates
-
-
 class RecordDemos(gym.Wrapper):
-    """Gym wrapper to record demonstrations by symbolically planning and executing."""
+    """Gym wrapper to record demonstrations by symbolically planning 
+    and executing.
+    
+    Args:
+        args: Args object containing the arguments for the dataset making script
+        env: gym.Env object representing the environment
+        detector: Detector object representing the detector
+        pddl_path: str path to the PDDL files
+        randomize: bool whether to randomize the actions
+    """
     def __init__(
         self,
+        args: Args,
         env,
-        vision_based: bool,
         detector,
         pddl_path: str,
-        args,
-        render: bool=False,
         randomize: bool=True,
-        noise_std_factor: float=0.03
     ):
         super().__init__(env)
+        self.args = args
         self.env = env
-        self.vision_based = vision_based
         self.detector = detector
         self.pddl_path = pddl_path
-        # Ensure trailing slash for pddl path so planner joins files correctly
-        if not self.pddl_path.endswith(os.sep):
-            self.pddl_path += os.sep
-        self.args = args
-        self.render = render
+        self.randomize = randomize
 
-        # Randomization / noise controls
-        self.base_randomize_flag = randomize
-        # Prefer CLI override if provided, else fall back to constructor default
-        self.noise_std = float(getattr(args, "noise_std", noise_std_factor))
-        # Fraction of episodes that should be noisy (deterministic schedule: last X%)
-        self.noisy_fraction = float(getattr(args, "noisy_fraction", 0.30))
-        # Total episodes (support either --episodes or --num_episodes)
-        self.total_episodes = int(getattr(args, "episodes", getattr(args, "num_episodes", 0)) or 0)
-        # Episode index (incremented in reset)
-        self.episode_idx = -1
-        # Will be computed per-episode in reset()
-        self.this_episode_randomize = False
-        # Deterministic scheduling state
-        self.schedule_override = False
-        self.scheduled_ep_index = -1
+        # Attributes set from args
+        self.total_episodes = args.episodes
+        self.verbose = args.verbose
+        
+        # Randomization / noise controls        
+        self.noise_std = args.noise_std
+        # Fraction of episodes that should be noisy 
+        # (deterministic schedule: last X%)
+        self.noisy_fraction = args.noisy_fraction
+        self.schedule_override = False       # Deterministic scheduling state
+        self.randomize_this_episode = False  # Computed per-episode in reset()
+        self.scheduled_ep_index = -1         # Not sure why necessary
         self.reset_count = 0
-        # Verbose mode flag
-        self.verbose = getattr(args, "verbose", False)
-
+        
         # Buffer for recording
         self.sequential_episode_buffer = []
+        self.successes = 0
 
-        # Plan will be generated during reset()
-        self.plan = None
+        # Generated in reset()
+        self.plan = None          # Generated during reset()
+        self.natural_plan = None  # Generated during reset()
+        self.non_noisy_eps = self.set_non_noisy_eps()
 
-    def set_schedule(self, ep_index: int, total_episodes: int):
-        """Externally force the scheduling for this recording episode.
-        This ensures deterministic application of noise regardless of how many resets occur."""
-        self.total_episodes = int(total_episodes)
-        self.scheduled_ep_index = int(ep_index)
-        self.schedule_override = True
-        # Compute and store the flag immediately
-        if self.base_randomize_flag and self.total_episodes > 0:
-            start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
-            self.this_episode_randomize = (self.scheduled_ep_index >= start_noisy_idx)
-        else:
-            # If totals unknown, fall back to probabilistic
-            self.this_episode_randomize = self.base_randomize_flag and (np.random.rand() < self.noisy_fraction)
+        # TODO: Remove? Unnecessary AI slop?
+        # # Ensure trailing slash for pddl path so planner joins files correctly
+        # if not self.pddl_path.endswith(os.sep):
+        #     self.pddl_path += os.sep
 
-    def reset(self, seed=None) -> dict:
+    def set_non_noisy_eps(self) -> int:
+        """
+        Determine the number of episodes that should be non-noisy 
+        deteministically based on the number of episodes recorded when 
+        randomize is True.
+        """
+        # If not randomizing, return the total number of episodes.
+        if not self.randomize:
+            return self.total_episodes
+        
+        non_noisy_frac = 1.0 - self.noisy_fraction
+        non_noisy_eps = math.floor(non_noisy_frac * self.total_episodes)
+        return non_noisy_eps
+
+    def reset(self, successes: int) -> dict:
         """Reset environment and clear buffers."""
+        self.successes = successes
         self.reset_count += 1
-        self.episode_idx += 1
+        
         # Clear any previous trajectory data
         self.sequential_episode_buffer = []
+
+        # Check if this episode should be noisy
+        self.randomize_this_episode = (self.successes >= self.non_noisy_eps)
+        if self.verbose and self.randomize_this_episode:
+            print(f"[RecordDemos] Episode {self.successes} is noisy.")
+        elif self.verbose and not self.randomize_this_episode:
+            print(f"[RecordDemos] Episode {self.successes} is non-noisy.")
         
-        # Decide whether this episode uses action noise
-        if self.schedule_override and self.total_episodes > 0:
-            start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
-            # self.this_episode_randomize was already computed in set_schedule, but recompute for clarity
-            self.this_episode_randomize = (self.scheduled_ep_index >= start_noisy_idx) and self.base_randomize_flag
-            schedule_info = (
-                f"deterministic override (record_ep={self.scheduled_ep_index}; noisy starts at {start_noisy_idx} of {self.total_episodes}; resets={self.reset_count})"
-            )
-        elif self.base_randomize_flag and self.total_episodes > 0:
-            start_noisy_idx = max(0, int(math.floor((1.0 - self.noisy_fraction) * self.total_episodes)))
-            self.this_episode_randomize = (self.episode_idx >= start_noisy_idx)
-            schedule_info = f"deterministic (noisy episodes start at {start_noisy_idx} of {self.total_episodes}; resets={self.reset_count})"
-        else:
-            # Fallback: probabilistic if total not known
-            self.this_episode_randomize = self.base_randomize_flag and (np.random.rand() < self.noisy_fraction)
-            schedule_info = f"probabilistic (total episodes unknown; resets={self.reset_count})"
-        if self.verbose:
-            print(f"[RecordDemos] ep={self.episode_idx} randomize={self.this_episode_randomize} | {schedule_info}")
-        
-        # Reset the environment, handling varied return signatures
-        try:
-            raw = self.env.reset(seed=seed)
-        except TypeError:
-            raw = self.env.reset()
+        raw = self.env.reset()
         
         # Extract observation if reset returns tuple or list
         if isinstance(raw, (tuple, list)):
@@ -196,30 +139,36 @@ class RecordDemos(gym.Wrapper):
         self.env.sim.forward()
         
         # Let the simulation settle for 50 timesteps
-        action_space = self.env.action_space # Determine action shape for the robot
+        action_space = self.env.action_space  # Determine action shape
         neutral_action = np.zeros(action_space.shape, dtype=action_space.dtype)
-        for _ in range(50):  # Let things settle for 50 timesteps
+        for _ in range(50):
             obs, *_ = self.env.step(neutral_action)
 
+        # Print body positions for debugging
         if self.verbose:
             print("After env.reset(), block positions:")
             for name in ["cube1_main", "cube2_main", "cube3_main"]:
-                print(f"{name}: {self.env.sim.data.body_xpos[self.env.sim.model.body_name2id(name)]}")
+                body_id = self.env.sim.model.body_name2id(name)
+                print(f"{name}: {self.env.sim.data.body_xpos[body_id]}")
 
         # Detect init state
-        state = self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+        state = self.detector.get_groundings(
+            as_dict=True, binary_to_float=False, return_distance=False
+        )
         if self.verbose:
             print("Detector groundings:", state)
         
         # Include only TRUE predicates that are in planning_predicates
         init_predicates = {}
         for predicate, value in state.items():
-            if value and predicate.split('(')[0] in planning_predicates[self.args.env]:
+            pp = planning_predicates[self.args.env]
+            if value and predicate.split('(')[0] in pp:
                 init_predicates[predicate] = True
 
         # After add_predicates_to_pddl:
         # Pass detected objects to dynamically generate PDDL
-        # Filter predicates to only include those that involve active cubes (for Hanoi-like environments)
+        # Filter predicates to only include those that involve active cubes 
+        #   (for Hanoi-like environments)
         # Get detector attributes safely, as not all detectors have them
         detector_objects = getattr(self.detector, 'objects', [])
         object_areas = getattr(self.detector, 'object_areas', [])
@@ -230,7 +179,7 @@ class RecordDemos(gym.Wrapper):
         active_cubes = []
         if detector_objects:
             for cube in detector_objects:
-                # Check if this cube is part of the tower by looking for 'on' predicates
+                # Check if cube is part of tower by looking for 'on' predicates
                 is_active = False
                 for pred, value in init_predicates.items():
                     if pred.startswith('on(') and value:
@@ -243,17 +192,21 @@ class RecordDemos(gym.Wrapper):
                 if is_active:
                     active_cubes.append(cube)
         
-        # For PatternReplication, remove all reference cube predicates and table clear predicates
-        # (ref_cubes are only used for goal generation, table should not be a placement target)
+        # For PatternReplication: 
+        # remove all reference cube predicates and table clear predicates
+        # - ref_cubes are only used for goal generation
+        # - table should not be a placement target
         if env_name == "PatternReplication":
             filtered_predicates = {}
             for predicate in init_predicates.keys():
-                # Skip ref_cube predicates and any clear predicate involving table
+                # Skip ref_cube predicates 
                 if "ref_cube" in predicate:
                     continue
+                # Clear predicates involving table
                 if predicate.startswith("clear(") and "table" in predicate:
                     continue
                 filtered_predicates[predicate] = True
+        
         # Filter predicates to only include those involving active cubes or pegs
         # (This is primarily for Hanoi-like environments)
         elif active_cubes or object_areas:
@@ -261,7 +214,7 @@ class RecordDemos(gym.Wrapper):
             # Apply filtering if we have objects to filter on
             for predicate, value in init_predicates.items():
                 if value:
-                    # For smaller predicates, only include if both objects are active cubes or pegs
+                    # Only include smaller predicates if both objects are active
                     if predicate.startswith('smaller('):
                         parts = predicate.split('(')[1].split(',')
                         obj1 = parts[0]
@@ -270,14 +223,14 @@ class RecordDemos(gym.Wrapper):
                            (obj2 in active_cubes or obj2 in object_areas):
                             filtered_predicates[predicate] = value
                     else:
-                        # Check if this predicate involves any active cubes
+                        # Check if predicate involves any active cubes
                         predicate_involves_active_cube = False
                         for cube in active_cubes:
                             if cube in predicate:
                                 predicate_involves_active_cube = True
                                 break
                         
-                        # Also check if it involves any pegs (pegs are always valid)
+                        # Check if predicate involves any pegs
                         if not predicate_involves_active_cube and object_areas:
                             for peg in object_areas:
                                 if peg in predicate:
@@ -290,39 +243,69 @@ class RecordDemos(gym.Wrapper):
             # No filtering needed - use all True predicates
             filtered_predicates = {k: v for k, v in init_predicates.items() if v}
         
-        # Note: detected_objects (cubes and pegs) are embedded in the filtered_predicates
+        # Detected objects are embedded in the filtered predicates
         # The PDDL files should define objects in their problem files
         
         add_predicates_to_pddl(self.pddl_path, filtered_predicates)
         
         # Generate environment-specific goals for certain environments
-        if env_name in ["CubeSorting", "HeightStacking", "AssemblyLineSorting", "PatternReplication"]:
-            goal_predicates = _generate_env_specific_goal(env_name, state, self.detector, self.pddl_path)
+        envs_with_goals = [
+            "CubeSorting", 
+            "HeightStacking", 
+            "AssemblyLineSorting", 
+            "PatternReplication"
+        ]
+        if env_name in envs_with_goals:
+            goal_predicates = _generate_env_specific_goal(
+                env_name, state, self.detector, self.pddl_path
+            )
             if self.verbose:
-                print(f"Generated goal predicates for {env_name}: {goal_predicates}")
+                print(f"Generated goal predicates for {env_name}: \
+                    {goal_predicates}")
         
         # Generate a fresh plan for this episode based on current state
-        # check 'planner' in selr.args.planner
+        # check 'planner' in self.args.planner
         if self.args.planner == 'pddl':
-            self.plan, _ = call_planner(self.pddl_path, problem="problem_dummy.pddl", mode=planning_mode[self.args.env])
-        else:
-            # call a vlm
-            init_image = obs.get('agentview_image') #TODO: this obs does not have agentview_image. Figure out how to get the obs with agentview_image
+            self.plan, _ = call_planner(
+                self.pddl_path, 
+                problem="problem_dummy.pddl", 
+                mode=planning_mode[env_name]
+            )
+        else:  # VLM Planner
+            # TODO: this obs does not have agentview_image. 
+            # Figure out how to get the obs with agentview_image
+            # I don't know if I wrote this or an accidental tab complete.
+            init_image = obs.get('agentview_image') 
             cv2.imshow("init_image", init_image)
-            goal_image = self.args.goal_image_path #TODO: save the goal image in this path
-            self.plan = query_model(init_image, goal_image, model=self.args.planner)
-        print(f"Plan: {self.plan}")
+            #TODO: save the goal image in this path
+            # I don't know if I wrote this or an accidental tab complete.
+            goal_image = self.args.goal_image_path 
+            self.plan = query_model(
+                init_image, goal_image, model=self.args.planner
+            )
+        
+        if self.verbose:
+            print(f"Plan: {self.plan}")
+        
         if not self.plan:
             print("There is no plan, resetting")
             return 
         
         # Convert PDDL plan to natural language
-        natural_plan = self._convert_plan_to_natural_language(self.plan)
-        print("Natural language plan:")
-        for i, step in enumerate(natural_plan):
-            print(f"  {i+1}. {step}")
-        print()
+        self.natural_plan = self._convert_plan_to_natural_language(self.plan)
+        
         return obs
+
+    def _convert_plan_to_natural_language(self, plan):
+        """Convert PDDL plan to natural language commands."""
+        natural_commands = []
+        print("Natural language plan:")
+        for i, op_str in enumerate(plan):
+            nl_instruction = symbolic_to_natural_instruction(op_str, self.env)
+            natural_commands.append(nl_instruction)
+            print(f"  {i+1}. {nl_instruction}")
+        print()
+        return natural_commands
 
     def record_step(self, obs_dict: dict, action: np.ndarray):
         """Store a single step's data."""
@@ -346,46 +329,51 @@ class RecordDemos(gym.Wrapper):
             'gripper_width': gripper_width
         })
 
-    def _convert_plan_to_natural_language(self, plan):
-        """Convert PDDL plan to natural language commands."""
-        natural_commands = []
-        for op_str in plan:
-            natural_commands.append(symbolic_to_natural_instruction(op_str, self.env))
-        return natural_commands
-
     def _map_operator(self, op_str: str):
         """Map a PDDL operator string to a TaskOperation subclass and kwargs."""
         parts = op_str.lower().split()
         cmd = parts[0]
         if cmd == 'pick':
-            return PickOperation, {'object_id': parts[1]}
+            return PickOperation, {
+                'object_id': parts[1],
+            }
         if cmd == 'place':
             return PlaceOperation, {
                 'object_id': parts[1],
-                'placement_id': parts[2]
+                'placement_id': parts[2],
             }
         if cmd == 'turn-on':
-            return TurnOnOperation, {'object_id': parts[1]}
+            return TurnOnOperation, {
+                'object_id': parts[1],
+            }
         if cmd == 'turn-off':
-            return TurnOffOperation, {'object_id': parts[1]}
+            return TurnOffOperation, {
+                'object_id': parts[1],
+            }
         raise ValueError(f"Unsupported operator: {op_str}")
 
     def run_trajectory(self, obs: dict) -> bool:
         """Execute the full symbolic plan, recording each step."""
-        for op_str in self.plan:
-            OpClass, params = self._map_operator(op_str)
+        # Iterate over the plan and execute each operation
+        for i, op_str in enumerate(self.plan):  
+            OpClass, params = self._map_operator(op_str)  # Map to operator
             op = OpClass(
+                self.args,
                 self.env,
                 self.detector,
-                self.this_episode_randomize,
+                self.randomize_this_episode,
                 self.noise_std,
                 **params
             )
-            self.current_instruction = symbolic_to_natural_instruction(op_str, self.env)
-            success, obs = op.execute(obs)
+            
+            self.current_instruction = self.natural_plan[i]
+            
+            success, obs = op.execute(obs)  # Execute the operation
+            
             if not success:
                 print(f"Failed to perform task: {op_str}")
                 return False
+        
         return True
 
     def save_trajectory(self, episode_idx: int) -> bool:
@@ -433,7 +421,7 @@ class RecordDemos(gym.Wrapper):
                 joint_sin = obs['robot0_joint_pos_sin']
                 joint_state = np.arctan2(joint_sin, joint_cos).astype(np.float32)
             else:
-                joint_state = np.zeros(7, dtype=np.float32)
+                raise KeyError("No joint position keys found in observation!")
 
             # STATE (END EFFECTOR)
             eef_pos = obs.get('robot0_eef_pos', np.zeros(3, dtype=np.float32))
@@ -445,10 +433,10 @@ class RecordDemos(gym.Wrapper):
             # Convert quaternion to axis angle
             eef_axis_angle = _quat2axisangle(eef_quat)
 
-            eef_state = np.concatenate((eef_pos, eef_axis_angle, eef_gripper)).astype(np.float32)
+            eef_state = np.concatenate((eef_pos, eef_axis_angle, eef_gripper, np.array([0.0], dtype=np.float32))).astype(np.float32)
 
             # State is the concatenation of joint state and gripper opening
-            state = np.concatenate((joint_state, eef_gripper)).astype(np.float32)
+            joint_state = np.concatenate((joint_state, eef_gripper)).astype(np.float32)
 
             # RLDS step dict
             step_dict = {
@@ -462,8 +450,8 @@ class RecordDemos(gym.Wrapper):
                 "observation": {
                     "wrist_image": wrist_img,
                     "image": agent_img,
-                    "state": state,        
-                    # "joint_state": joint_state,
+                    "state": joint_state,        
+                    "ee_state": eef_state,
                 }
             }
             steps.append(step_dict)
@@ -488,27 +476,110 @@ class RecordDemos(gym.Wrapper):
             print(f"Error saving episode {episode_idx}: {e}")
             return False
 
+
+def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path: str):
+    """Generate environment-specific goals for CubeSorting, HeightStacking, AssemblyLineSorting, and PatternReplication."""
+    goal_predicates = []
+    
+    if env_name == "CubeSorting":
+        # Find all small cubes and assign them to target zones
+        for predicate in state.keys():
+            if "small" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
+                goal_predicates.append(f'on {objs[0]} platform1')
+            elif "small" in predicate and not state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(", ")
+                goal_predicates.append(f'on {objs[0]} platform2')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "HeightStacking":
+        # Create stacking order based on sizes
+        sizes = {}
+        for predicate in state.keys():
+            if "smaller" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
+                sizes[objs[0]] = objs[1]
+        # Create stacking order based on sizes
+        sorted_sizes = sorted(sizes.items(), key=lambda x: x[1])
+        for i in range(len(sorted_sizes)-1):
+            goal_predicates.append(f'on {sorted_sizes[i][0]} {sorted_sizes[i+1][0]}')
+        # Add largest cube on platform
+        if sorted_sizes:
+            goal_predicates.append(f'on {sorted_sizes[-1][0]} platform')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "AssemblyLineSorting":
+        # Match types
+        types = {}
+        for predicate in state.keys():
+            if "type_match" in predicate and state[predicate]:
+                objs = predicate[predicate.find("(")+1:predicate.find(")")].split(",")
+                types[objs[0]] = objs[1]
+        
+        # Collect all cubes with their positions and target bins
+        cube_info = []
+        for obj, bin_name in types.items():
+            try:
+                body_name = detector.object_id[obj]
+                body_id = detector.env.sim.model.body_name2id(body_name)
+                y_pos = detector.env.sim.data.body_xpos[body_id][1]
+                cube_info.append((y_pos, obj, bin_name))
+            except (KeyError, ValueError):
+                cube_idx = int(obj.replace('cube', '')) if 'cube' in obj else 999
+                cube_info.append((float(cube_idx), obj, bin_name))
+        
+        # Sort all cubes by Y position (left to right)
+        cube_info.sort(key=lambda x: x[0])
+        
+        # Generate predicates in left-to-right order (cube_info is already sorted)
+        for y_pos, cube_name, bin_name in cube_info:
+            goal_predicates.append(f'on {cube_name} {bin_name}')
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+        
+    elif env_name == "PatternReplication":
+        # Get pattern from detector
+        goal_predicates = detector.get_pattern_replication_goal()
+        if goal_predicates:
+            define_goal_in_pddl(pddl_path, goal_predicates)
+    
+    return goal_predicates
+
+
 def symbolic_to_natural_instruction(op_str, env=None):
-    # Check if op_str is already in natural language. Natural language instructions start with 'pick the' or 'place the'
-    if op_str.lower().startswith("pick up the") or op_str.lower().startswith("place the"):
+    """Convert a symbolic PDDL operator string to a natural language 
+    instruction.
+    """
+    # Check if op_str is already in natural language. 
+    # Natural language instructions start with 'pick up the' or 'place the'
+    op_str_l = op_str.lower()
+    if op_str_l.startswith("pick up the") or op_str_l.startswith("place the"):
         return op_str  # Already in natural language
     
     # Build dynamic color mapping from environment if available
     colors = {}
-    if env is not None and hasattr(env, 'cube_colors') and hasattr(env, 'color_categories'):
-        # For AssemblyLineSorting environment, get actual cube colors
+    cube_colors = hasattr(env, 'cube_colors')
+    color_cats = hasattr(env, 'color_categories')
+    cube_sizes = hasattr(env, 'cube_sizes')
+    rgba_semantic_colors = hasattr(env, 'rgba_semantic_colors')
+    
+    if env is not None and cube_colors and color_cats:  # AssemblyLine env  
         for i in range(len(env.cube_colors)):
             color_idx = env.cube_colors[i]
             color_name = env.color_categories[color_idx][0]
             colors[f"cube{i}"] = f"{color_name} block"
-    elif env is not None and hasattr(env, 'cube_sizes'):
-        # For CubeSorting environment, get colors from sizes
+    
+    elif env is not None and cube_sizes:  # CubeSorting env
+        # Get colors from sizes
         # Small cubes are blue, large cubes are red
         for i in range(len(env.cube_sizes)):
             size_type = env.cube_sizes[i]
             color_name = "blue" if size_type == "small" else "red"
             colors[f"cube{i}"] = f"{color_name} block"
-    elif env is not None and hasattr(env, 'cube_colors') and hasattr(env, 'rgba_semantic_colors'):
+    
+    elif env is not None and cube_colors and rgba_semantic_colors:
         # For PatternReplication and HeightStacking environments
         # Map RGBA values to color names
         rgba_to_name = {tuple(v[:3]): k for k, v in env.rgba_semantic_colors.items()}
@@ -524,19 +595,23 @@ def symbolic_to_natural_instruction(op_str, env=None):
     
     areas  = {
         "peg1": "left area", "peg2": "middle area", "peg3": "right area", 
-        "bin0": "red zone", "bin1": "green zone", "bin2": "blue zone",
-        "platform1": "blue zone", "platform2": "red zone", "platform": "gray zone",
-        "reference_platform": "reference area", "target_platform": "gray zone", "table": "table"
+        "bin0": "red bin", "bin1": "green bin", "bin2": "blue bin",
+        "platform1": "blue zone", "platform2": "red zone", 
+        "platform": "gray zone",
+        "reference_platform": "reference area", "target_platform": "gray zone", 
+        "table": "table"
         }
     op = op_str.lower().split()
     if not op: return ""
+    
     if op[0] == "pick":
         block = colors.get(op[1], op[1])
-        if len(op) > 2:
-            from_obj = colors.get(op[2], op[2])
+        if len(op) > 2:  # Could add picking from object. Not implemented.
+            # from_obj = colors.get(op[2], op[2])
             return f"Pick up the {block}."
         else:
             return f"Pick up the {block}."
+    
     if op[0] == "place":
         block = colors.get(op[1], op[1])
         # Place target can be area or another block
@@ -551,7 +626,6 @@ def symbolic_to_natural_instruction(op_str, env=None):
 def _quat2axisangle(quat):
     """
     Copied from robosuite: 
-    https://github.com/ARISE-Initiative/robosuite/blob/eafb81f54ffc104f905ee48a16bb15f059176ad3/robosuite/utils/transform_utils.py#L490C1-L512C55
     """
     # clip quaternion
     if quat[3] > 1.0:

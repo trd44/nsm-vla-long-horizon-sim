@@ -1,0 +1,9 @@
+numpy==1.24.4
+mujoco==3.2.3
+-e ../robosuite
+imageio[ffmpeg]
+tyro
+gymnasium
+-e ../tarski
+h5py
+matplotlib
