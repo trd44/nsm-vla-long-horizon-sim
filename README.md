@@ -16,8 +16,12 @@ Add a train config, make necessary modifications
         ),
         data=LeRobotLiberoDataConfig(
             repo_id="{username}/{task_name}",
+            assets=AssetsConfig(
+                asset_id="{username}/{task_name}",  # This should match the assets directory structure
+            ),
             base_config=DataConfig(
                 prompt_from_task=True,
+                offline_mode=True,  # Use only locally cached datasets, don't download from HuggingFace
             ),
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),
