@@ -6,11 +6,11 @@ HF_USERNAME = "tduggan93"  # Change to your HuggingFace username
 ROBOT_TYPE = "kinova3"
 TFDS_PATH = "/home/hrilab/tensorflow_datasets/"
 DATASETS = [
-    # ("assembly_line_sorting", TFDS_PATH + "assembly_line_sorting/1.0.0"),
+    ("assembly_line_sorting", TFDS_PATH + "assembly_line_sorting/1.0.0"),
     # ("cube_sorting",          TFDS_PATH + "cube_sorting/1.0.0"),
     # ("height_stacking",       TFDS_PATH + "height_stacking/1.0.0"),
     # ("pattern_replication",   TFDS_PATH + "pattern_replication/1.0.0"),
-    ("hanoi_50",              TFDS_PATH + "hanoi50/1.0.0"),
+    # ("hanoi_50",              TFDS_PATH + "hanoi50/1.0.0"),
     # ("hanoi4x3_50",           TFDS_PATH + "hanoi4x350/1.0.0"),
 ]
 
@@ -91,7 +91,7 @@ def convert_individual_datasets():
         # print(f"✓ Successfully pushed {repo_id}")
     
     print(f"\n{'='*60}")
-    print("All datasets converted and pushed!")
+    print("All datasets converted!")
     print(f"{'='*60}")
 
 if __name__ == "__main__":
