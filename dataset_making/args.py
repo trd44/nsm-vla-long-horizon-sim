@@ -9,7 +9,7 @@ class Args:
     """
 
     # --- Environment ---
-    env: str = "Hanoi4x3"
+    env: str = "HeightStacking"
     robot: str = "Kinova3"
     noise_std: float = 0.0       # Std for Gaussian action noise (scaled by remaining distance)
     noisy_fraction: float = 0.0  # Fraction of episodes that should use action noise (deterministic scheduling of the last fraction)

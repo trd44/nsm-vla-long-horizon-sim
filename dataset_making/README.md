@@ -4,16 +4,12 @@
 
 From CyclicLxM Directory:
 
+Generally I edit args.py  instead of adding arguments. I find it easier.
+
 Example usage
 ```bash
 # Single environment
-python -m dataset_making.main --env AssemblyLineSorting --episodes 50 --name box_movement_50ep
-
-# Run all environments at once
-bash dataset_making/run_all_environments.sh
-
-# Run selected environments (edit the script to choose which ones)
-bash dataset_making/run_selected_environments.sh
+python -m dataset_making.main --env AssemblyLineSorting --episodes 50
 ```
 
 ## 2. Convert to RLDS
