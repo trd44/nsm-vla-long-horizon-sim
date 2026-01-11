@@ -213,9 +213,7 @@ def download_wandb_history(
 # Need to make args available to helper function, simple way:
 args = None 
 
-def main() -> None:
-    global args
-    args = tyro.cli(Args)
+def main(args: Args) -> None:
     metric_keys = [m.strip() for m in args.metrics.split(",")]
     
     download_wandb_history(
@@ -229,4 +227,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    tyro.cli(main)
