@@ -1,12 +1,6 @@
 #!/usr/bin/env python3
 """
-Download W&B system metrics (Events Stream) to match UI Chart Exports.
-
-FINAL WORKING VERSION:
-  1. Auto-corrects key names (handles "system/" vs "system." mismatch).
-  2. Fetches high-density 'events' stream (run.history(stream="events")).
-  3. Resamples to 15s intervals to generate Mean/Min/Max columns.
-  4. Exports exact UI-style CSVs.
+Download W&B metrics (system events or custom history) into CSVs.
 """
 
 from __future__ import annotations
@@ -14,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import sys
 from pathlib import Path
+import difflib
 
 try:
     import pandas as pd
@@ -28,48 +23,95 @@ except ImportError:
 class Args:
     project: str = "openpi"
     run_name: str = "hanoi_50_ja_no_mask_50ah"
-    metrics: str = "system/gpu.0.powerWatts"
+    metrics: str = "system/gpu.0.powerWatts,cpu_power_watts"
     out_dir: Path = Path(f"data/finetuning_exports/{run_name}/")
-    interval: str = "15s"
+    list_metrics: bool = False
     debug: bool = True
 
 
-def get_system_event_series(run, metric_key: str, interval: str) -> pd.DataFrame | None:
-    """
-    Fetches the full 'events' stream, handles key mismatch, and resamples.
-    """
-    # 1. Fetch ALL events
+def _fetch_history(run, stream: str, samples: int) -> pd.DataFrame | None:
     try:
-        # Request 100k samples to ensure we get the full dense stream
-        df = run.history(stream="events", samples=100000)
-    except Exception as e:
-        print(f"  ❌ Error fetching events: {e}")
+        return run.history(stream=stream, samples=samples)
+    except Exception:
         return None
 
-    if df.empty:
-        return None
+
+def _list_all_metrics(run, debug: bool) -> list[str]:
+    events_df = _fetch_history(run, stream="events", samples=100000)
+    default_df = _fetch_history(run, stream="default", samples=100000)
+    columns: set[str] = set()
+    if events_df is not None and not events_df.empty:
+        columns.update([c for c in events_df.columns if not c.startswith("_")])
+    if default_df is not None and not default_df.empty:
+        columns.update([c for c in default_df.columns if not c.startswith("_")])
+    if debug:
+        print(f"  ℹ️  Found {len(columns)} metrics")
+    return sorted(columns)
+
+
+def _print_metric_hints(metric_key: str, columns: list[str], debug: bool) -> None:
+    if not debug:
+        return
+    matches = difflib.get_close_matches(metric_key, columns, n=5, cutoff=0.4)
+    print(f"  ⚠️  Metric '{metric_key}' (or variants) not found.")
+    if matches:
+        print("  ℹ️  Closest matches:")
+        for m in matches:
+            print(f"     - {m}")
+    else:
+        sample = ", ".join(columns[:20])
+        if sample:
+            print(f"  ℹ️  Sample available keys: {sample}")
+
+
+def get_event_series(run, metric_key: str, debug: bool) -> pd.DataFrame | None:
+    """
+    Searches for a metric in the 'events' stream (system) AND 'default' stream (user logs).
+    """
+    # 1. Define where to look
+    streams_to_check = ["events", "default"]
+    
+    df = None
+    target_key = None
+    
+    # 2. Search both streams for the key
+    for stream in streams_to_check:
+        temp_df = _fetch_history(run, stream=stream, samples=100000)
         
-    # 2. AUTO-CORRECT KEY (The Fix)
-    target_key = metric_key
-    if target_key not in df.columns:
-        # Try replacing / with .
-        alt_key = metric_key.replace("/", ".")
-        if alt_key in df.columns:
-            print(f"  ℹ️  Mapping '{metric_key}' -> '{alt_key}'")
-            target_key = alt_key
-        else:
-            # Try replacing . with /
-            alt_key_2 = metric_key.replace(".", "/")
-            if alt_key_2 in df.columns:
-                print(f"  ℹ️  Mapping '{metric_key}' -> '{alt_key_2}'")
-                target_key = alt_key_2
+        if temp_df is None or temp_df.empty:
+            continue
+            
+        # Check 1: Exact Match
+        if metric_key in temp_df.columns:
+            df = temp_df
+            target_key = metric_key
+            if debug: print(f"  ℹ️  Found '{metric_key}' in '{stream}' stream.")
+            break
+            
+        # Check 2: Auto-correct (System metrics often swap / for .)
+        alt_key_dot = metric_key.replace("/", ".")
+        if alt_key_dot in temp_df.columns:
+            df = temp_df
+            target_key = alt_key_dot
+            if debug: print(f"  ℹ️  Mapping '{metric_key}' -> '{alt_key_dot}' (in '{stream}')")
+            break
+            
+        alt_key_slash = metric_key.replace(".", "/")
+        if alt_key_slash in temp_df.columns:
+            df = temp_df
+            target_key = alt_key_slash
+            if debug: print(f"  ℹ️  Mapping '{metric_key}' -> '{alt_key_slash}' (in '{stream}')")
+            break
 
-    if target_key not in df.columns:
-        if args.debug:
-            print(f"  ⚠️  Metric '{metric_key}' (or variants) not found.")
+    # 3. If still not found, show hints and exit
+    if df is None or target_key is None:
+        # For hints, we just grab columns from the default stream as a best guess
+        hint_df = _fetch_history(run, stream="default", samples=1000)
+        cols = list(hint_df.columns) if hint_df is not None else []
+        _print_metric_hints(metric_key, cols, debug)
         return None
 
-    # 3. Handle Time (Use _runtime for Relative Time)
+    # 4. Handle Time Alignment (Use _runtime if available)
     if "_runtime" in df.columns:
         df = df.sort_values("_runtime")
         time_index = pd.to_timedelta(df["_runtime"], unit="s")
@@ -79,25 +121,23 @@ def get_system_event_series(run, metric_key: str, interval: str) -> pd.DataFrame
         rel_time = df["_timestamp"] - start_time
         time_index = pd.to_timedelta(rel_time, unit="s")
     else:
-        print("  ❌ Error: No time column found.")
+        print("  ❌ Error: No time column (_runtime or _timestamp) found.")
         return None
 
     df.index = time_index
     
-    # 4. Clean Data
+    # 5. Clean Data
     series = df[target_key].dropna()
     series = pd.to_numeric(series, errors='coerce').dropna()
 
     if series.empty:
         return None
 
-    # 5. Resample and Aggregate (Mean, Min, Max)
-    # This exactly matches the W&B UI Export format
-    resampled = series.resample(interval).agg(['mean', 'min', 'max'])
-    resampled = resampled.ffill()
-
-    resampled.index.name = "Relative Time (Process)"
-    return resampled
+    # Return as DataFrame
+    series = series.to_frame(name=metric_key)
+    series.index.name = "Relative Time (Process)"
+    
+    return series
 
 
 def download_wandb_history(
@@ -105,8 +145,8 @@ def download_wandb_history(
     metric_keys: list[str],
     out_dir: Path,
     run_name_filter: str,
-    interval: str,
     debug: bool,
+    list_metrics: bool,
 ) -> None:
     
     api = wandb.Api()
@@ -117,6 +157,15 @@ def download_wandb_history(
     
     if not runs:
         print(f"❌ No runs found matching '{run_name_filter}' in '{project}'")
+        return
+
+    if list_metrics:
+        for run in runs:
+            r_name = run.name or run.id
+            print(f"\n--- Metrics for Run: {r_name} ---")
+            metrics = _list_all_metrics(run, debug)
+            for m in metrics:
+                print(m)
         return
 
     print(f"Found {len(runs)} runs. Processing metrics: {metric_keys}...")
@@ -131,15 +180,14 @@ def download_wandb_history(
             if debug:
                 print(f"Scanning run: {r_name}...")
             
-            stats_df = get_system_event_series(run, metric, interval)
+            stats_df = get_event_series(run, metric, debug)
             
             if stats_df is not None:
                 # Use the original requested name for columns to keep CSV pretty
-                # e.g., "RunName - system/gpu.0.powerWatts"
                 base_col = f"{r_name} - {metric}"
-                stats_df.columns = [base_col, f"{base_col}__MIN", f"{base_col}__MAX"]
+                stats_df.columns = [base_col]
                 all_run_dfs.append(stats_df)
-                print(f"  ✔️  Captured {len(stats_df)} intervals")
+                print(f"  ✔️  Captured {len(stats_df)} samples")
             else:
                 if debug:
                     print(f"  -> No data.")
@@ -157,7 +205,6 @@ def download_wandb_history(
         merged_df = merged_df.sort_index()
 
         safe_name = metric.replace("/", "_") + ".csv"
-        safe_name = "gpu_power.csv"
         out_path = out_dir / safe_name
         merged_df.to_csv(out_path)
         print(f"✔️  Saved {safe_name} | Shape: {merged_df.shape}")
@@ -176,8 +223,8 @@ def main() -> None:
         metric_keys=metric_keys,
         out_dir=args.out_dir,
         run_name_filter=args.run_name,
-        interval=args.interval,
         debug=args.debug,
+        list_metrics=args.list_metrics,
     )
 
 
