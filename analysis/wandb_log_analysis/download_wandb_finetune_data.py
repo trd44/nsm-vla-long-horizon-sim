@@ -1,6 +1,16 @@
 #!/usr/bin/env python3
 """
 Download W&B metrics (system events or custom history) into CSVs.
+
+Usage:
+python analysis/wandb_log_analysis/download_wandb_finetune_data.py --help
+python analysis/wandb_log_analysis/download_wandb_finetune_data.py \
+  --args.project openpi \
+  --args.run-name hanoi_50_ja_no_mask_50ah \
+  --args.metrics system/gpu.0.powerWatts,cpu_power_watts \
+  --args.out-dir analysis/wandb_log_analysis/data/finetuning_exports/hanoi_3x3 \
+  --args.debug true
+
 """
 
 from __future__ import annotations
@@ -23,10 +33,13 @@ except ImportError:
 class Args:
     project: str = "openpi"
     run_name: str = "hanoi_50_ja_no_mask_50ah"
-    metrics: str = "system/gpu.0.powerWatts,cpu_power_watts"
-    out_dir: Path = Path(f"data/finetuning_exports/{run_name}/")
+    metrics: str = (
+        "system/gpu.0.powerWatts,cpu_power_watts,"
+        "system/gpu.0.gpu,system/cpu"
+    )
+    out_dir: Path | None = None
     list_metrics: bool = False
-    debug: bool = True
+    debug: bool = False
 
 
 def _fetch_history(run, stream: str, samples: int) -> pd.DataFrame | None:
@@ -215,11 +228,12 @@ args = None
 
 def main(args: Args) -> None:
     metric_keys = [m.strip() for m in args.metrics.split(",")]
+    out_dir = args.out_dir or Path(f"data/finetuning_exports/{args.run_name}/")
     
     download_wandb_history(
         project=args.project,
         metric_keys=metric_keys,
-        out_dir=args.out_dir,
+        out_dir=out_dir,
         run_name_filter=args.run_name,
         debug=args.debug,
         list_metrics=args.list_metrics,
