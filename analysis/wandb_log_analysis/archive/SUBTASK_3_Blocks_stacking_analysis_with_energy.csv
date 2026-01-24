@@ -1,0 +1,7 @@
+Metric,Value,Unit
+Total Attempted Stackings,350,count
+Total Successful Stackings,62,count
+Stacking Success Rate,17.7,%
+Mean Stacking Duration,20.15,seconds
+Mean Stacking Length Steps,396,steps
+Mean Energy per Successful Stacking,0.4005,Wh

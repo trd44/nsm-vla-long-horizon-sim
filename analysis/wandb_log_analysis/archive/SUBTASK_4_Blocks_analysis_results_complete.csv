@@ -1,0 +1,18 @@
+Metric,Value,Unit
+Total Runs,50,count
+Successful Runs,0,count
+Success Rate,0.0,%
+Advancement Rate,3.6,%
+Task Completion Rate,3.6,%
+Mean Duration (All),43.54,seconds
+Mean Duration (Successful),0.00,seconds
+Mean Steps (All),832,steps
+Mean Steps (Successful),0,steps
+Mean GPU Power,63.7,W
+Mean CPU Power,4.7,W
+Total Energy per Episode,0.866,Wh
+Energy per Successful Stacking,0.000,Wh
+Successful Episodes Count,0,count
+Total Tasks Available,1500,count
+Total Tasks Completed,54,count
+Total Subtasks Completed,54,count

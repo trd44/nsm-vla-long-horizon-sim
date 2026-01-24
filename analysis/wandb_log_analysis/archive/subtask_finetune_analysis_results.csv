@@ -1,0 +1,16 @@
+Metric,Value,Unit
+Average Power,409.04,W
+Effective Average Power,409.05,W
+Max Power,442.35,W
+Min Power,24.11,W
+Median Power (P50),430.35,W
+P90 Power,433.30,W
+P95 Power,435.05,W
+P99 Power,438.48,W
+Total Energy,16.239,kWh
+Active Time,142920.0,seconds
+Number of Measurements,9529,count
+High Power Count,954,count
+Low Power Count,953,count
+High Power Percentage,10.0,%
+Low Power Percentage,10.0,%

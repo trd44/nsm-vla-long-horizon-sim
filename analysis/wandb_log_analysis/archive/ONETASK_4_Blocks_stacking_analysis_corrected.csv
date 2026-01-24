@@ -1,0 +1,6 @@
+Metric,Value,Unit
+Total Attempted Stackings,350,count
+Total Successful Stackings,1,count
+Stacking Success Rate,0.3,%
+Mean Stacking Duration,23.09,seconds
+Mean Stacking Length Steps,242,steps
