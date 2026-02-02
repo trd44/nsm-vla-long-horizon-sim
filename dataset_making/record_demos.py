@@ -301,7 +301,7 @@ class RecordDemos(gym.Wrapper):
         natural_commands = []
         print("Natural language plan:")
         for i, op_str in enumerate(plan):
-            nl_instruction = symbolic_to_natural_instruction(op_str, self.env)
+            nl_instruction = symbolic_to_natural_instruction(op_str, self.env, self.args.env)
             natural_commands.append(nl_instruction)
             print(f"  {i+1}. {nl_instruction}")
         print()
@@ -573,7 +573,7 @@ def _generate_env_specific_goal(env_name: str, state: dict, detector, pddl_path:
     return goal_predicates
 
 
-def symbolic_to_natural_instruction(op_str, env=None):
+def symbolic_to_natural_instruction(op_str, env=None, env_name=None):
     """Convert a symbolic PDDL operator string to a natural language 
     instruction.
     """
@@ -590,7 +590,19 @@ def symbolic_to_natural_instruction(op_str, env=None):
     cube_sizes = hasattr(env, 'cube_sizes')
     rgba_semantic_colors = hasattr(env, 'rgba_semantic_colors')
     
-    if env is not None and cube_colors and color_cats:  # AssemblyLine env  
+    if env is not None and env_name == "HeightStacking" and cube_colors:        
+        rgba_to_name = {
+            (0, 0, 1): "blue",
+            (1, 0, 0): "red",
+            (0, 1, 0): "green",
+            (1, 1, 0): "yellow",
+            (1, 0, 1): "magenta",
+        }
+        for i in range(len(env.cube_colors)):
+            rgba = tuple(env.cube_colors[i][:3])
+            color_name = rgba_to_name.get(rgba, "unknown")
+            colors[f"cube{i}"] = f"{color_name} block"
+    elif env is not None and cube_colors and color_cats:  # AssemblyLine env  
         for i in range(len(env.cube_colors)):
             color_idx = env.cube_colors[i]
             color_name = env.color_categories[color_idx][0]
