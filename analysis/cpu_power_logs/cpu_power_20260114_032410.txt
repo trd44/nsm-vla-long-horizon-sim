@@ -1,0 +1,5 @@
+timestamp: 20260114_032410
+start_energy_j: 115383.135648
+end_energy_j: 126913.394766
+duration_sec: 300
+avg_power_w: 38.43419706
