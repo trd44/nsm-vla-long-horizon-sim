@@ -26,10 +26,10 @@
   )
   (:goal 
     (and
-      (on cube1 bin1)
-      (on cube3 bin0)
-      (on cube0 bin0)
       (on cube2 bin2)
+      (on cube1 bin1)
+      (on cube0 bin0)
+      (on cube3 bin0)
     )
   )
 )
