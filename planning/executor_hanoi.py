@@ -224,12 +224,12 @@ class Executor_Diffusion(Executor):
         self.next_object_id = {}
         
         # Particle filters for 2D bbox tracking
-        #self.particle_filters_2d = {}  # {object_id: ParticleFilter2D}
-        #self.particle_filter_particles_2d = particle_filter_particles_2d
+        self.particle_filters_2d = {}  # {object_id: ParticleFilter2D}
+        self.particle_filter_particles_2d = particle_filter_particles_2d
 
         # Particle filters for 3D position tracking
-        #self.particle_filters_3d = {}
-        #self.particle_filter_particles_3d = particle_filter_particles_3d
+        self.particle_filters_3d = {}
+        self.particle_filter_particles_3d = particle_filter_particles_3d
         
         # Noise removal parameters
         self.max_position_jump = max_position_jump  # meters
@@ -259,7 +259,7 @@ class Executor_Diffusion(Executor):
         payload = torch.load(open(path, 'rb'), pickle_module=dill)
         cfg = payload['cfg']
         cls = TrainDiffusionTransformerLowdimWorkspace
-        cfg.policy.num_inference_steps = 7
+        cfg.policy.num_inference_steps = 10
         workspace = cls(cfg)
         workspace: BaseWorkspace
         workspace.load_payload(payload, exclude_keys=None, include_keys=None)
@@ -409,18 +409,18 @@ class Executor_Diffusion(Executor):
             bbox_center: Current bbox center [x, y]
             velocity: Optional velocity [vx, vy]
         """
-        # if track_id not in self.particle_filters_2d:
-        #     # Initialize new particle filter
-        #     self.particle_filters_2d[track_id] = ParticleFilter2D(
-        #         n_particles=self.particle_filter_particles_2d,
-        #         process_noise=5.0,
-        #         measurement_noise=5.0
-        #     )
-        #     self.particle_filters_2d[track_id].initialize(bbox_center)
-        # else:
-        #     # Predict and update
-        #     self.particle_filters_2d[track_id].predict(velocity)
-        #     self.particle_filters_2d[track_id].update(bbox_center)
+        if track_id not in self.particle_filters_2d:
+            # Initialize new particle filter
+            self.particle_filters_2d[track_id] = ParticleFilter2D(
+                n_particles=self.particle_filter_particles_2d,
+                process_noise=5.0,
+                measurement_noise=5.0
+            )
+            self.particle_filters_2d[track_id].initialize(bbox_center)
+        else:
+            # Predict and update
+            self.particle_filters_2d[track_id].predict(velocity)
+            self.particle_filters_2d[track_id].update(bbox_center)
 
     def get_particle_filter_estimate_2d(self, track_id):
         """
@@ -445,18 +445,18 @@ class Executor_Diffusion(Executor):
             position_3d: Current 3D position [x, y, z]
             velocity: Optional velocity [vx, vy, vz]
         """
-        # if track_id not in self.particle_filters_3d:
-        #     # Initialize new particle filter
-        #     self.particle_filters_3d[track_id] = ParticleFilter3D(
-        #         n_particles=self.particle_filter_particles_3d,
-        #         process_noise=0.01,
-        #         measurement_noise=0.05
-        #     )
-        #     self.particle_filters_3d[track_id].initialize(position_3d)
-        # else:
-        #     # Predict and update
-        #     self.particle_filters_3d[track_id].predict(velocity)
-        #     self.particle_filters_3d[track_id].update(position_3d)
+        if track_id not in self.particle_filters_3d:
+            # Initialize new particle filter
+            self.particle_filters_3d[track_id] = ParticleFilter3D(
+                n_particles=self.particle_filter_particles_3d,
+                process_noise=0.01,
+                measurement_noise=0.05
+            )
+            self.particle_filters_3d[track_id].initialize(position_3d)
+        else:
+            # Predict and update
+            self.particle_filters_3d[track_id].predict(velocity)
+            self.particle_filters_3d[track_id].update(position_3d)
 
     def get_particle_filter_estimate_3d(self, track_id):
         """
@@ -633,10 +633,10 @@ class Executor_Diffusion(Executor):
                 del self.tracked_objects[track_id]
                 del self.tracking_metadata[track_id]
                 
-                # if track_id in self.particle_filters_2d:
-                #     del self.particle_filters_2d[track_id]
-                # if track_id in self.particle_filters_3d:
-                #     del self.particle_filters_3d[track_id]
+                if track_id in self.particle_filters_2d:
+                    del self.particle_filters_2d[track_id]
+                if track_id in self.particle_filters_3d:
+                    del self.particle_filters_3d[track_id]
                 if track_id in self.detection_outlier_count:
                     del self.detection_outlier_count[track_id]
                 
@@ -678,17 +678,17 @@ class Executor_Diffusion(Executor):
                 iou = self.compute_iou(det['bbox'], self.tracked_objects[tid]['bbox'])
                 
                 # Get particle filter estimate if available
-                # pf_estimate = self.get_particle_filter_estimate_2d(tid)
-                # if pf_estimate is not None:
-                #     det_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #     pf_distance = np.linalg.norm(det_center - pf_estimate)
-                #     # Normalize distance (closer = better)
-                #     pf_score = np.exp(-pf_distance / 50.0)  # Decay with distance
+                pf_estimate = self.get_particle_filter_estimate_2d(tid)
+                if pf_estimate is not None:
+                    det_center = np.array([det['bbox'][0], det['bbox'][1]])
+                    pf_distance = np.linalg.norm(det_center - pf_estimate)
+                    # Normalize distance (closer = better)
+                    pf_score = np.exp(-pf_distance / 50.0)  # Decay with distance
                     
-                #     # Combined score (60% IoU, 40% particle filter)
-                #     combined_score = 0.6 * iou + 0.4 * pf_score
-                # else:
-                combined_score = iou
+                    # Combined score (60% IoU, 40% particle filter)
+                    combined_score = 0.6 * iou + 0.4 * pf_score
+                else:
+                    combined_score = iou
                 
                 cost_matrix[i, j] = -combined_score  # Negative because we minimize
         
@@ -763,12 +763,12 @@ class Executor_Diffusion(Executor):
             
             # Update particle filter with projected position
             bbox_2d = self.project_3d_to_2d_approximate(ee_pos, image_shape)
-            # if track_id in self.particle_filters_2d:
-            #     self.particle_filters_2d[track_id].predict()
-            #     self.particle_filters_2d[track_id].update(bbox_2d)
-            # if track_id in self.particle_filters_3d:
-            #     self.particle_filters_3d[track_id].predict()
-            #     self.particle_filters_3d[track_id].update(ee_pos)
+            if track_id in self.particle_filters_2d:
+                self.particle_filters_2d[track_id].predict()
+                self.particle_filters_2d[track_id].update(bbox_2d)
+            if track_id in self.particle_filters_3d:
+                self.particle_filters_3d[track_id].predict()
+                self.particle_filters_3d[track_id].update(ee_pos)
 
             return {
                 'position_3d': ee_pos,
@@ -847,11 +847,11 @@ class Executor_Diffusion(Executor):
         image1 = cv2.flip(image1, 0)
         image1 = cv2.cvtColor(image1, cv2.COLOR_RGB2BGR)
         ogi_image = image1.copy()
-        predictions1 = self.yolo_model.predict(image1, verbose=False, device=self.device)[0]
+        predictions1 = self.yolo_model.predict(image1, verbose=False)[0]
         
         image2 = cv2.flip(image2, 0)
         image2 = cv2.cvtColor(image2, cv2.COLOR_RGB2BGR)
-        predictions2 = self.yolo_model.predict(image2, verbose=False, device=self.device)[0]
+        predictions2 = self.yolo_model.predict(image2, verbose=False)[0]
 
         if not isinstance(image1, np.ndarray):
             image1 = np.array(image1)
@@ -985,8 +985,8 @@ class Executor_Diffusion(Executor):
                 
                 # Update particle filter
                 bbox_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #self.update_particle_filter_2d(track_id, bbox_center, velocity_2d)
-                #self.update_particle_filter_3d(track_id, det['position'], velocity_3d)
+                self.update_particle_filter_2d(track_id, bbox_center, velocity_2d)
+                self.update_particle_filter_3d(track_id, det['position'], velocity_3d)
                 
                 # Update tracking metadata
                 if track_id not in self.tracking_metadata:
@@ -1046,9 +1046,9 @@ class Executor_Diffusion(Executor):
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
                     # Draw particle filter estimate (small cyan circle)
-                    # pf_est = self.get_particle_filter_estimate_2d(track_id)
-                    # if pf_est is not None:
-                    #     cv2.circle(image1, (int(pf_est[0]), int(pf_est[1])), 3, (255, 255, 0), -1)
+                    pf_est = self.get_particle_filter_estimate_2d(track_id)
+                    if pf_est is not None:
+                        cv2.circle(image1, (int(pf_est[0]), int(pf_est[1])), 3, (255, 255, 0), -1)
                     if render:
                         cv2.imshow("Tracking", image1)
                         cv2.waitKey(1)
@@ -1073,8 +1073,8 @@ class Executor_Diffusion(Executor):
                 
                 # Initialize particle filter
                 bbox_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #self.update_particle_filter_2d(object_id, bbox_center)
-                #self.update_particle_filter_3d(object_id, det['position'])
+                self.update_particle_filter_2d(object_id, bbox_center)
+                self.update_particle_filter_3d(object_id, det['position'])
                 
                 # Initialize tracking metadata
                 self.tracking_metadata[object_id] = {
@@ -1182,16 +1182,16 @@ class Executor_Diffusion(Executor):
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                             
                             # Draw particle cloud (for debugging)
-                            # if track_id in self.particle_filters_2d:
-                            #     pf = self.particle_filters_2d[track_id]
-                            #     if pf.initialized:
-                            #         # Draw a few particles
-                            #         sample_indices = np.random.choice(len(pf.particles), 
-                            #                                          min(20, len(pf.particles)), 
-                            #                                          replace=False)
-                            #         for idx in sample_indices:
-                            #             px, py = pf.particles[idx]
-                            #             cv2.circle(image1, (int(px), int(py)), 1, (100, 100, 100), -1)
+                            if track_id in self.particle_filters_2d:
+                                pf = self.particle_filters_2d[track_id]
+                                if pf.initialized:
+                                    # Draw a few particles
+                                    sample_indices = np.random.choice(len(pf.particles), 
+                                                                     min(20, len(pf.particles)), 
+                                                                     replace=False)
+                                    for idx in sample_indices:
+                                        px, py = pf.particles[idx]
+                                        cv2.circle(image1, (int(px), int(py)), 1, (100, 100, 100), -1)
                             if render:
                                 cv2.imshow("Tracking", image1)
                                 cv2.waitKey(1)
@@ -1251,8 +1251,8 @@ class Executor_Diffusion(Executor):
         self.tracking_metadata = {}
         self.next_object_id = {}
         self.instances_per_label = {}
-        #self.particle_filters_2d = {}
-        #self.particle_filters_3d = {}
+        self.particle_filters_2d = {}
+        self.particle_filters_3d = {}
         self.detection_outlier_count = {}
         self.debug_message("Tracking data reset")
     
@@ -1261,8 +1261,8 @@ class Executor_Diffusion(Executor):
         self.tracked_objects = tracking_data_dict.get('tracked_objects', {})
         self.tracking_metadata = tracking_data_dict.get('tracking_metadata', {})
         self.instances_per_label = tracking_data_dict.get('instances_per_label', {})
-        #self.particle_filters_2d = tracking_data_dict.get('particle_filters_2d', {})
-        #self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
+        self.particle_filters_2d = tracking_data_dict.get('particle_filters_2d', {})
+        self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
         self.detection_outlier_count = tracking_data_dict.get('detection_outlier_count', {})
         self.next_object_id = tracking_data_dict.get('next_object_id', {})
 
@@ -1274,8 +1274,8 @@ class Executor_Diffusion(Executor):
             'tracked_objects': self.tracked_objects,
             'tracking_metadata': self.tracking_metadata,
             'instances_per_label': self.instances_per_label,
-            #'particle_filters_2d': self.particle_filters_2d,
-            #'particle_filters_3d': self.particle_filters_3d,
+            'particle_filters_2d': self.particle_filters_2d,
+            'particle_filters_3d': self.particle_filters_3d,
             'detection_outlier_count': self.detection_outlier_count,
             'next_object_id': self.next_object_id,
             'instances_per_label': self.instances_per_label
@@ -1292,14 +1292,14 @@ class Executor_Diffusion(Executor):
                 oracle = np.concatenate([obs[index_obs["obj_to_pick_pos"][0]:index_obs["obj_to_pick_pos"][1]], obs[index_obs["aperture"][0]:index_obs["aperture"][1]], obs[index_obs["place_to_drop_pos"][0]:index_obs["place_to_drop_pos"][1]]])
         elif action_step == "ReachPick":
             if relative:
-                oracle = np.concatenate([obs[index_obs["obj_to_pick_pos"][0]:index_obs["obj_to_pick_pos"][1]] - obs[index_obs["gripper_pos"][0]:index_obs["gripper_pos"][1]]])# + [0,0.006,0]])
+                oracle = np.concatenate([obs[index_obs["obj_to_pick_pos"][0]:index_obs["obj_to_pick_pos"][1]] - obs[index_obs["gripper_pos"][0]:index_obs["gripper_pos"][1]]])
             else:
                 oracle = obs[index_obs["obj_to_pick_pos"][0]:index_obs["obj_to_pick_pos"][1]]
         elif action_step == "Grasp" or action_step == "Pick":
             if relative:
                 oracle = np.concatenate([obs[index_obs["obj_to_pick_z"][0]:index_obs["obj_to_pick_z"][1]] - obs[index_obs["gripper_z"][0]:index_obs["gripper_z"][1]], obs[index_obs["aperture"][0]:index_obs["aperture"][1]]])
             else:
-                oracle = np.concatenate([obs[index_obs["obj_to_pick_z"][0]:index_obs["obj_to_pick_z"][1]] + 0.01, obs[index_obs["aperture"][0]:index_obs["aperture"][1]]])
+                oracle = np.concatenate([obs[index_obs["obj_to_pick_z"][0]:index_obs["obj_to_pick_z"][1]], obs[index_obs["aperture"][0]:index_obs["aperture"][1]]])
         elif action_step == "ReachDrop":
             if relative:
                 oracle = np.concatenate([obs[index_obs["place_to_drop_pos"][0]:index_obs["place_to_drop_pos"][1]] - obs[index_obs["gripper_pos"][0]:index_obs["gripper_pos"][1]]])
@@ -1324,11 +1324,11 @@ class Executor_Diffusion(Executor):
             returned_obs[j] = obs_policy
         return returned_obs
 
-    def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=False):
+    def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=True):
         gripper_pos = objects_pos["gripper"]
         left_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")])
         right_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")])
-        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)#*1000.
+        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)*1000.
 
         # self.debug_message keys
         # self.debug_message("objects_pos keys: ", objects_pos.keys())
@@ -1396,8 +1396,7 @@ class Executor_Diffusion(Executor):
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
             rel_place_to_drop_pos = gripper_pos - place_to_drop_pos
-            #obs = np.concatenate([gripper_pos, [aperture], -rel_obj_to_pick_pos*1000, -rel_place_to_drop_pos*1000])
-            obs = np.concatenate([gripper_pos, [aperture], rel_obj_to_pick_pos, rel_place_to_drop_pos])
+            obs = np.concatenate([gripper_pos, [aperture], -rel_obj_to_pick_pos*1000, -rel_place_to_drop_pos*1000])
         else:
             obs = np.concatenate([gripper_pos, [aperture], obj_to_pick_pos, place_to_drop_pos])
         return obs
@@ -1407,9 +1406,9 @@ class Executor_Diffusion(Executor):
         if -0.5 < action_gripper < 0.5:
             action_gripper = np.array([0])
         if action_gripper <= -0.5:
-            action_gripper = np.array([-0.1])
-        elif action_gripper >= 0.5:
             action_gripper = np.array([0.1])
+        elif action_gripper >= 0.5:
+            action_gripper = np.array([-0.1])
         action = np.concatenate([action[:3], action_gripper])
         return action
     
@@ -1577,19 +1576,19 @@ class Executor_Diffusion(Executor):
                 
                 # Update particle filters
                 bbox_center = np.array([bbox_2d[0], bbox_2d[1]])
-                # if yolo_id in self.particle_filters_2d:
-                #     self.particle_filters_2d[yolo_id].predict()
-                #     self.particle_filters_2d[yolo_id].update(bbox_center)
-                #else:
+                if yolo_id in self.particle_filters_2d:
+                    self.particle_filters_2d[yolo_id].predict()
+                    self.particle_filters_2d[yolo_id].update(bbox_center)
+                else:
                     # Initialize particle filter
-                #    self.update_particle_filter_2d(yolo_id, bbox_center)
+                    self.update_particle_filter_2d(yolo_id, bbox_center)
                 
-                #if yolo_id in self.particle_filters_3d:
-                #    self.particle_filters_3d[yolo_id].predict()
-                #    self.particle_filters_3d[yolo_id].update(ee_pos)
-                #else:
+                if yolo_id in self.particle_filters_3d:
+                    self.particle_filters_3d[yolo_id].predict()
+                    self.particle_filters_3d[yolo_id].update(ee_pos)
+                else:
                     # Initialize particle filter
-                #    self.update_particle_filter_3d(yolo_id, ee_pos)
+                    self.update_particle_filter_3d(yolo_id, ee_pos)
         
         return predicted_pos
 
@@ -1598,7 +1597,7 @@ class Executor_Diffusion(Executor):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
         self.image_buffer = []
         self.detected_positions = {}
-        self.yolo_frequency = 15
+        self.yolo_frequency = 2
         horizon = self.horizon if self.horizon is not None else 50
         self.debug_message("\tTask goal: ", symgoal)
 
@@ -1609,7 +1608,7 @@ class Executor_Diffusion(Executor):
 
         while not done:
             anomaly_safe = False
-            max_shift_threshold = 0.1#100.0  # in mm
+            max_shift_threshold = 100.0  # in mm
             while not anomaly_safe:
                 processed_obs = []
                 
@@ -1679,7 +1678,7 @@ class Executor_Diffusion(Executor):
                     if max_diff > max_shift_threshold:
                         anomaly_detected = True
                         anomaly_indices.append(i)
-                        #print(f"[ANOMALY] Large shift detected between observations {i} and {i+1}, reating as YOLO failure. Patching observations.")
+                        print(f"[ANOMALY] Large shift detected between observations {i} and {i+1}, reating as YOLO failure. Patching observations.")
                         self.debug_message(f"  Max shift: {max_diff:.2f} mm (threshold: {max_shift_threshold:.2f})")
                         self.debug_message(f"  Obs {i}: {obs_current}")
                         self.debug_message(f"  Obs {i+1}: {obs_next}")
@@ -1699,7 +1698,7 @@ class Executor_Diffusion(Executor):
                         observations.pop(0)
                 else:
                     anomaly_safe = True
-            #print(processed_obs)
+            
             processed_obs = np.array([processed_obs])
             np_obs_dict = {'obs': processed_obs.astype(np.float32)}
             obs_dict = dict_apply(np_obs_dict, 
@@ -1710,8 +1709,7 @@ class Executor_Diffusion(Executor):
             
             np_action_dict = dict_apply(action_dict,
                 lambda x: x.detach().to('cpu').numpy())
-            actions = np_action_dict['action']#/1000.0
-            #print("Actions: ", actions)
+            actions = np_action_dict['action']/1000.0
             
             if len(actions[0][0]) < 4:
                 for index in self.nulified_action_indexes:

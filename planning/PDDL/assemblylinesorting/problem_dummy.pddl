@@ -26,9 +26,15 @@
   )
   (:goal 
     (and
+<<<<<<< HEAD
       (on cube2 bin2)
       (on cube1 bin1)
       (on cube0 bin0)
+=======
+      (on cube0 bin0)
+      (on cube1 bin1)
+      (on cube2 bin2)
+>>>>>>> c503f953ba62426498fd13771ab07cfcfc10c381
       (on cube3 bin0)
     )
   )

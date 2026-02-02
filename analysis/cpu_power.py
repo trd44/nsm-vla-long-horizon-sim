@@ -64,4 +64,4 @@ def average_cpu_power(duration_sec=60, sample_interval=1.0, output_dir=None):
     print(f"Saved results to {output_path}")
 
 if __name__ == "__main__":
-    average_cpu_power(600)  # 10-minute test
+    average_cpu_power(300)  # 5-minute test
