@@ -8,6 +8,7 @@
     (grasped ?disk - disk)     ; robot is grasped a disk
     (free-gripper) ; the gripper is free
     (small ?disk - disk)
+    (type_match ?location - location ?location - location)
   )
 
   (:action pick
