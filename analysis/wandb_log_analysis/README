@@ -1,0 +1,1 @@
+Workflow is download logs with download_wandb_finetune_data.py or download_wandb_experiment_data.py the analyze with analyze_wandb_finetune_data.py or analyze_wandb_experiment_data.py.
