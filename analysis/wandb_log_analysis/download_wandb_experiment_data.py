@@ -69,12 +69,14 @@ def download_wandb_csvs(project: str,
 
     # initialise one empty wide DF per metric
     dfs: Dict[str, pd.DataFrame] = {m: pd.DataFrame() for m in metric_keys}
+    runtime_rows: list[dict[str, object]] = []
 
     print(f"Downloading {len(runs)} runs × {len(metric_keys)} metrics …")
     for run in tqdm(runs, desc="Runs", unit="run"):
         run_name = run.name or run.id
         series_by_metric: Dict[str, List[tuple[float, float]]] = {m: [] for m in metric_keys}
         start_ts = None
+        max_runtime_seen = None
         for row in run.scan_history(keys=metric_keys + ["_runtime", "_timestamp"]):
             time_s = row.get("_runtime")
             if time_s is None:
@@ -85,9 +87,22 @@ def download_wandb_csvs(project: str,
                     time_s = ts - start_ts
             if time_s is None:
                 continue
+            if max_runtime_seen is None or time_s > max_runtime_seen:
+                max_runtime_seen = float(time_s)
             for m in metric_keys:
                 if m in row:
                     series_by_metric[m].append((float(time_s), row[m]))
+
+        runtime_s = run.summary.get("_runtime")
+        if runtime_s is None:
+            runtime_s = max_runtime_seen
+        runtime_rows.append(
+            {
+                "run": run_name,
+                "run_id": run.id,
+                "runtime_s": runtime_s,
+            }
+        )
 
         for m, points in series_by_metric.items():
             if not points:
@@ -113,6 +128,10 @@ def download_wandb_csvs(project: str,
         fn = out_dir / (m.replace("/", "_") + ".csv")
         df.to_csv(fn, index=True)
         print(f"✔️  Saved {fn}  (rows={df.shape[0]}, runs={df.shape[1]})")
+
+    runtime_df = pd.DataFrame(runtime_rows)
+    runtime_df.to_csv(out_dir / "run_runtime_seconds.csv", index=False)
+    print(f"✔️  Saved {out_dir / 'run_runtime_seconds.csv'} (runs={len(runtime_rows)})")
 
 
 # ----------------------------------------------------------------------------- #
