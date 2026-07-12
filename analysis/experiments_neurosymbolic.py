@@ -183,6 +183,7 @@ if __name__ == "__main__":
     parser.add_argument('--rnd_reset', action='store_true', help='Randomize the object positions at reset')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
     parser.add_argument('--n_act', type=int, default=4, help='Number of actions to execute per policy call')
+    parser.add_argument('--episodes', type=int, default=100, help='Number of episodes to run')
     args = parser.parse_args()
     np.random.seed(args.seed)
 
@@ -377,7 +378,7 @@ if __name__ == "__main__":
             delta = reset_gripper_pos - gripper_pos
             #print(f"Delta: {delta}, Current pos: {gripper_pos}, Reset pos: {reset_gripper_pos}, Action: {action}")
     retry_reset = False
-    for i in range(100):
+    for i in range(args.episodes):
         if retry_reset:
             i -= 1
         print("Episode: ", i)
@@ -494,8 +495,11 @@ if __name__ == "__main__":
         # Write the results to a file results_seed_{args.seed}.txt
         os.makedirs("results", exist_ok=True)
         with open(f"results/results_neurosym_seed_{args.seed}.txt", 'w') as file:
-            file.write("Success rate: {}\n".format(episode_successes/(100)))
+            file.write("Success rate: {}\n".format(episode_successes/(args.episodes)))
             file.write("Mean Successful pick_place: {}\n".format(mean(pick_place_successes)))
             file.write("Mean Percentage advancement: {}\n".format(mean(percentage_advancement)))
             file.write("Pick placce success rate: {}\n".format(valid_pick_place_success/num_valid_pick_place_queries))
+
+        # GT-fallback instrumentation: running summary after each episode
+        Executor_Diffusion.gt_fallback_summary()
 

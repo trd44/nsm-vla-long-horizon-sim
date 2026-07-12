@@ -1324,6 +1324,28 @@ class Executor_Diffusion(Executor):
             returned_obs[j] = obs_policy
         return returned_obs
 
+    # --- Ground-truth fallback instrumentation (verification only) ----------
+    # Records every time a policy observation position is taken from simulator
+    # ground truth (objects_pos) instead of the vision pipeline. Fallbacks for
+    # static areas (pegs/zones/bins) are by design and only counted; any
+    # fallback for a manipulable object ('cube' in the name) is printed loudly.
+    gt_fallback_counts = {}
+
+    def gt_fallback(self, obj_name, reason):
+        key = (str(obj_name), reason)
+        Executor_Diffusion.gt_fallback_counts[key] = Executor_Diffusion.gt_fallback_counts.get(key, 0) + 1
+        if 'cube' in str(obj_name).lower():
+            print(f"[GT-FALLBACK] object={obj_name} reason={reason} total={Executor_Diffusion.gt_fallback_counts[key]} skill={getattr(self, 'id', '?')}", flush=True)
+
+    @staticmethod
+    def gt_fallback_summary():
+        counts = Executor_Diffusion.gt_fallback_counts
+        cubes = {k: v for k, v in counts.items() if 'cube' in k[0].lower()}
+        areas = {k: v for k, v in counts.items() if 'cube' not in k[0].lower()}
+        print("\n[GT-FALLBACK] ===== summary =====", flush=True)
+        print(f"[GT-FALLBACK] manipulable objects (should be empty): {cubes if cubes else 'NONE - vision was used throughout'}", flush=True)
+        print(f"[GT-FALLBACK] static areas (expected by design): {areas if areas else 'none'}", flush=True)
+
     def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=False):
         gripper_pos = objects_pos["gripper"]
         left_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")])
@@ -1380,18 +1402,38 @@ class Executor_Diffusion(Executor):
 
             if obj_to_pick_yolo_id is not None and obj_to_pick_yolo_id not in predicted_pos:
                 self.debug_message(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
-                obj_to_pick_pos = self.tracking_metadata.get(obj_to_pick_yolo_id, {}).get('last_position', objects_pos[obj_to_pick])
+                _track = self.tracking_metadata.get(obj_to_pick_yolo_id, {})
+                if 'last_position' in _track:
+                    obj_to_pick_pos = _track['last_position']
+                else:
+                    obj_to_pick_pos = objects_pos[obj_to_pick]
+                    self.gt_fallback(obj_to_pick, 'track-missing-last-position')
             else:
-                obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id] if obj_to_pick_yolo_id is not None else objects_pos[obj_to_pick]
+                if obj_to_pick_yolo_id is not None:
+                    obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id]
+                else:
+                    obj_to_pick_pos = objects_pos[obj_to_pick]
+                    self.gt_fallback(obj_to_pick, 'no-relation-match')
             
             if place_to_drop_yolo_id is not None and place_to_drop_yolo_id not in predicted_pos:
                 self.debug_message(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
-                place_to_drop_pos = self.tracking_metadata.get(place_to_drop_yolo_id, {}).get('last_position', objects_pos[place_to_drop])
+                _track = self.tracking_metadata.get(place_to_drop_yolo_id, {})
+                if 'last_position' in _track:
+                    place_to_drop_pos = _track['last_position']
+                else:
+                    place_to_drop_pos = objects_pos[place_to_drop]
+                    self.gt_fallback(place_to_drop, 'track-missing-last-position')
             else:
-                place_to_drop_pos = predicted_pos[place_to_drop_yolo_id] if place_to_drop_yolo_id is not None else objects_pos[place_to_drop]
+                if place_to_drop_yolo_id is not None:
+                    place_to_drop_pos = predicted_pos[place_to_drop_yolo_id]
+                else:
+                    place_to_drop_pos = objects_pos[place_to_drop]
+                    self.gt_fallback(place_to_drop, 'no-relation-match')
         else:
             obj_to_pick_pos = objects_pos[obj_to_pick]
             place_to_drop_pos = objects_pos[place_to_drop]
+            self.gt_fallback(obj_to_pick, 'too-few-detections')
+            self.gt_fallback(place_to_drop, 'too-few-detections')
 
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
