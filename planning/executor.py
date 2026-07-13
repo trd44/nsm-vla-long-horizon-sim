@@ -176,17 +176,25 @@ class ParticleFilter3D:
         return cov
 
 
+class VisionLostError(Exception):
+    """Raised in strict_vision mode when a manipulable object has had no
+    vision-derived position for more than vision_timeout_steps steps."""
+    pass
+
+
 class Executor_Diffusion(Executor):
-    def __init__(self, 
-                 id, 
-                 policy, 
-                 Beta, 
+    def __init__(self,
+                 id,
+                 policy,
+                 Beta,
                  count=0,
-                 nulified_action_indexes=[], 
-                 oracle=False, 
-                 horizon=None, 
-                 use_yolo=True, 
+                 nulified_action_indexes=[],
+                 oracle=False,
+                 horizon=None,
+                 use_yolo=True,
                  save_data=False,
+                 strict_vision=True,
+                 vision_timeout_steps=45,
                  instances_per_label=None,
                  particle_filter_particles_2d=100,
                  particle_filter_particles_3d=100,
@@ -204,6 +212,12 @@ class Executor_Diffusion(Executor):
         self.oracle = oracle
         self.use_yolo = use_yolo
         self.save_data = save_data
+        # Strict vision: manipulable objects (cubes) never read simulator
+        # ground truth; see _resolve_position.
+        self.strict_vision = strict_vision
+        self.vision_timeout_steps = vision_timeout_steps
+        self.last_vision_pos = {}       # PDDL id -> last vision-derived position
+        self.vision_missing_steps = {}  # PDDL id -> consecutive steps without vision
         self.image_buffer = []
         # self.map_id_semantic = {
         #         "blue cube": "cube1",
@@ -832,6 +846,7 @@ class Executor_Diffusion(Executor):
         """
         Enhanced YOLO estimation with particle filter tracking and noise removal.
         """
+        self.count += 1
         cubes_predicted_xyz = {}
 
         try:
@@ -1346,7 +1361,53 @@ class Executor_Diffusion(Executor):
         print(f"[GT-FALLBACK] manipulable objects (should be empty): {cubes if cubes else 'NONE - vision was used throughout'}", flush=True)
         print(f"[GT-FALLBACK] static areas (expected by design): {areas if areas else 'none'}", flush=True)
 
-    def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=False):
+    def _resolve_position(self, name, predicted_pos, objects_pos, fallback_reason, count_step=True):
+        """Resolve one object's position for the policy observation.
+
+        Preference order: fresh/tracked vision position, then tracker memory.
+        Static areas (no 'cube' in the name, e.g. pegs/bins) may fall back to
+        simulator ground truth — they are not YOLO classes. In strict_vision
+        mode manipulable objects (cubes) NEVER read ground truth: while vision
+        is lost the last vision-derived position is reused (recoverable when a
+        later frame re-detects the object), and VisionLostError is raised after
+        vision_timeout_steps consecutive steps without any vision update.
+        """
+        name = str(name)
+        is_cube = 'cube' in name.lower()
+        yolo_id = self.relations.get(name, None)
+
+        if yolo_id is not None and yolo_id in predicted_pos:
+            pos = predicted_pos[yolo_id]
+            if is_cube:
+                self.last_vision_pos[name] = pos
+                self.vision_missing_steps[name] = 0
+            return pos
+
+        track = getattr(self, 'tracking_metadata', {}).get(yolo_id, {}) if yolo_id is not None else {}
+        if 'last_position' in track:
+            pos = track['last_position']
+            if is_cube:
+                self.last_vision_pos[name] = pos
+                self.vision_missing_steps[name] = 0
+            return pos
+
+        if not (self.strict_vision and self.use_yolo and is_cube):
+            self.gt_fallback(name, fallback_reason)
+            return objects_pos[name]
+
+        # Strict mode, cube, no vision this step
+        if count_step:
+            self.vision_missing_steps[name] = self.vision_missing_steps.get(name, 0) + 1
+        missed = self.vision_missing_steps.get(name, 1)
+        if name not in self.last_vision_pos:
+            raise VisionLostError(f"{name} has never been detected by the vision pipeline")
+        if missed > self.vision_timeout_steps:
+            raise VisionLostError(f"no vision update for {name} in {missed} consecutive steps (timeout {self.vision_timeout_steps})")
+        if count_step and missed % 15 == 1:
+            print(f"[VISION-LOST] {name}: reusing last vision position ({missed}/{self.vision_timeout_steps} steps without vision)", flush=True)
+        return self.last_vision_pos[name]
+
+    def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=False, first_obs=True):
         gripper_pos = objects_pos["gripper"]
         left_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")])
         right_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")])
@@ -1389,51 +1450,19 @@ class Executor_Diffusion(Executor):
             # obj_to_pick_pos = predicted_pos[obj_to_pick] if obj_to_pick in predicted_pos else objects_pos[obj_to_pick]
             # place_to_drop_pos = predicted_pos[place_to_drop] if place_to_drop in predicted_pos else objects_pos[place_to_drop]
 
-            obj_to_pick_yolo_id = self.relations.get(obj_to_pick, None)
-            place_to_drop_yolo_id = self.relations.get(place_to_drop, None)
-
             # if None, self.debug_message warning
-            if obj_to_pick_yolo_id is None and self.warnings["obj_to_pick"]:
+            if self.relations.get(obj_to_pick, None) is None and self.warnings["obj_to_pick"]:
                 self.debug_message(f"Warning: No YOLO prediction matched for object to pick: {obj_to_pick}")
                 self.warnings["obj_to_pick"] = False  # Only warn once per episode
-            if place_to_drop_yolo_id is None and self.warnings["place_to_drop"]:
+            if self.relations.get(place_to_drop, None) is None and self.warnings["place_to_drop"]:
                 self.debug_message(f"Warning: No YOLO prediction matched for place to drop: {place_to_drop}")
                 self.warnings["place_to_drop"] = False  # Only warn once per episode
 
-            if obj_to_pick_yolo_id is not None and obj_to_pick_yolo_id not in predicted_pos:
-                self.debug_message(f"Warning: Mapped YOLO ID {obj_to_pick_yolo_id} for object to pick not in predicted positions. Using tracked positions if available.")
-                _track = self.tracking_metadata.get(obj_to_pick_yolo_id, {})
-                if 'last_position' in _track:
-                    obj_to_pick_pos = _track['last_position']
-                else:
-                    obj_to_pick_pos = objects_pos[obj_to_pick]
-                    self.gt_fallback(obj_to_pick, 'track-missing-last-position')
-            else:
-                if obj_to_pick_yolo_id is not None:
-                    obj_to_pick_pos = predicted_pos[obj_to_pick_yolo_id]
-                else:
-                    obj_to_pick_pos = objects_pos[obj_to_pick]
-                    self.gt_fallback(obj_to_pick, 'no-relation-match')
-            
-            if place_to_drop_yolo_id is not None and place_to_drop_yolo_id not in predicted_pos:
-                self.debug_message(f"Warning: Mapped YOLO ID {place_to_drop_yolo_id} for place to drop not in predicted positions. Using tracked positions if available.")
-                _track = self.tracking_metadata.get(place_to_drop_yolo_id, {})
-                if 'last_position' in _track:
-                    place_to_drop_pos = _track['last_position']
-                else:
-                    place_to_drop_pos = objects_pos[place_to_drop]
-                    self.gt_fallback(place_to_drop, 'track-missing-last-position')
-            else:
-                if place_to_drop_yolo_id is not None:
-                    place_to_drop_pos = predicted_pos[place_to_drop_yolo_id]
-                else:
-                    place_to_drop_pos = objects_pos[place_to_drop]
-                    self.gt_fallback(place_to_drop, 'no-relation-match')
+            obj_to_pick_pos = self._resolve_position(obj_to_pick, predicted_pos, objects_pos, 'no-relation-match', count_step=first_obs)
+            place_to_drop_pos = self._resolve_position(place_to_drop, predicted_pos, objects_pos, 'no-relation-match', count_step=first_obs)
         else:
-            obj_to_pick_pos = objects_pos[obj_to_pick]
-            place_to_drop_pos = objects_pos[place_to_drop]
-            self.gt_fallback(obj_to_pick, 'too-few-detections')
-            self.gt_fallback(place_to_drop, 'too-few-detections')
+            obj_to_pick_pos = self._resolve_position(obj_to_pick, predicted_pos, objects_pos, 'too-few-detections', count_step=first_obs)
+            place_to_drop_pos = self._resolve_position(place_to_drop, predicted_pos, objects_pos, 'too-few-detections', count_step=first_obs)
 
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
@@ -1638,6 +1667,7 @@ class Executor_Diffusion(Executor):
 
     def execute(self, env, observations, n_act, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
+        self.vision_missing_steps = {}  # fresh vision-timeout budget per skill
         self.image_buffer = []
         self.detected_positions = {}
         self.yolo_frequency = 15
@@ -1693,12 +1723,20 @@ class Executor_Diffusion(Executor):
                         )
                         
                         # STEP 4: Build observation for policy
-                        obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz, 
-                                                symgoal[0], symgoal[1], relative_obs=self.oracle)
+                        try:
+                            obs = self.get_object_obs(env, objects_pos, predicted_cubes_xyz,
+                                                    symgoal[0], symgoal[1], relative_obs=self.oracle, first_obs=(obs_num == 0))
+                        except VisionLostError as e:
+                            print(f"[VISION-LOST] Aborting skill {self.id}: {e}", flush=True)
+                            return observations, False, False
                     else:
                         objects_pos = observation["objects_pos"]
-                        obs = self.get_object_obs(env, objects_pos, {}, 
-                                                symgoal[0], symgoal[1], relative_obs=self.oracle)
+                        try:
+                            obs = self.get_object_obs(env, objects_pos, {},
+                                                    symgoal[0], symgoal[1], relative_obs=self.oracle, first_obs=(obs_num == 0))
+                        except VisionLostError as e:
+                            print(f"[VISION-LOST] Aborting skill {self.id}: {e}", flush=True)
+                            return observations, False, False
                         
                     processed_obs.append(obs)
                 

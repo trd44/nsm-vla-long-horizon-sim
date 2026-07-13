@@ -125,9 +125,11 @@ def get_plan(state, pddl_path, mode):
             init_predicates.pop(predicate)
     add_predicates_to_pddl(pddl_path, init_predicates)
     # Get goal from initial state
-    # For Hanoi, KitchenEnv and NutAssembly, do nothing
+    # For Hanoi, KitchenEnv and NutAssembly, use the fixed goal from the PDDL problem file
     # For CubeSorting, find all small cubes and write the goal as on(cube, target_zone)
-    if args.env == "CubeSorting":
+    if args.env == "Hanoi":
+        goal_predicates = ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+    elif args.env == "CubeSorting":
         goal_predicates = []
         for predicate in state.keys():
             if "small" in predicate and state[predicate]:
@@ -200,7 +202,11 @@ if __name__ == "__main__":
             # print("Checking condition: ", f"grasped({symgoal[0]})", state[f"grasped({symgoal[0]})"])
             # print("Condition value: ", state[f"on({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"])
             # print("-----------------------------------")
-                condition = state[f"in({symgoal[0]},{symgoal[1]})"] and not state[f"grasped({symgoal[0]})"]
+                key = f"in({symgoal[0]},{symgoal[1]})"
+                if key not in state:
+                    # Hanoi-style detectors only report on(x,y), not in(x,y)
+                    key = f"on({symgoal[0]},{symgoal[1]})"
+                condition = state[key] and not state[f"grasped({symgoal[0]})"]
                 return condition
         elif operator == 'reach_pick':
             def Beta(state, symgoal):
