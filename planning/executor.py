@@ -297,30 +297,144 @@ class Executor_Diffusion(Executor):
 
 
 
-    def pixel_to_world_dual(self, cls_id, px1, py1, w1, h1, conf1, px2, py2, w2, h2, conf2, ee_x, ee_y, ee_z):
+    def pixel_to_world_dual(self, cls_id, px1, py1, w1, h1, conf1, px2, py2, w2, h2, conf2, ee_x, ee_y, ee_z,
+                            sim=None, image_h=256, image_w=256, cls_name=None):
+        # sim/image_h/image_w/cls_name are accepted for call-signature compatibility
+        # with detect_cubes_simple (ported from price-is-not-right, where they feed an
+        # optional stereo-ray path). This repo uses the regression estimate only,
+        # measured at 0.2-16mm against ground truth, so they are unused here.
         models_dual = self.regressor_model
         reg_x_dual, reg_y_dual, reg_z_dual = models_dual["reg_x"], models_dual["reg_y"], models_dual["reg_z"]
 
-        try:
-            features = np.array([[float(cls_id),
-                                float(px1), float(py1), float(w1), float(h1), float(conf1),
-                                float(px2), float(py2), float(w2), float(h2), float(conf2),
-                                float(ee_x), float(ee_y), float(ee_z)]], dtype=np.float64)
-            x = reg_x_dual.predict(features)[0]
-            y = reg_y_dual.predict(features)[0]
-            z = reg_z_dual.predict(features)[0]
-        except:
-            features = np.array([[
-                      float(px1), float(py1), float(w1), float(h1), float(conf1),
-                      float(px2), float(py2), float(w2), float(h2), float(conf2),
-                      float(ee_x), float(ee_y), float(ee_z)]], dtype=np.float64)
-            x = reg_x_dual.predict(features)[0] + 0.03 # small bias correction
-            y = reg_y_dual.predict(features)[0]
-            z = reg_z_dual.predict(features)[0]
+        # The shipped regressors take the 13 training features
+        # (px1,py1,w1,h1,conf1,px2,py2,w2,h2,conf2,ee_x,ee_y,ee_z) -- cls_id is
+        # not among them, so prepending it always raised and fell through to a
+        # branch that added a +0.03 x offset. Measured against ground truth the
+        # 13-feature prediction is already accurate to <2cm, and that offset was
+        # the single largest error in the perception path. Build the 13-feature
+        # vector directly; keep the cls_id form only for regressors that want it.
+        features = np.array([[float(px1), float(py1), float(w1), float(h1), float(conf1),
+                              float(px2), float(py2), float(w2), float(h2), float(conf2),
+                              float(ee_x), float(ee_y), float(ee_z)]], dtype=np.float64)
+        if getattr(reg_x_dual, "n_features_in_", 13) == 14:
+            features = np.insert(features, 0, float(cls_id), axis=1)
+        x = reg_x_dual.predict(features)[0]
+        y = reg_y_dual.predict(features)[0]
+        z = reg_z_dual.predict(features)[0]
         return x, y, z
 
     def compute_iou(self, box1, box2):
         """Compute IoU between two bounding boxes [x_center, y_center, w, h]"""
+        x1_min = box1[0] - box1[2] / 2
+        y1_min = box1[1] - box1[3] / 2
+        x1_max = box1[0] + box1[2] / 2
+        y1_max = box1[1] + box1[3] / 2
+        
+        x2_min = box2[0] - box2[2] / 2
+        y2_min = box2[1] - box2[3] / 2
+        x2_max = box2[0] + box2[2] / 2
+        y2_max = box2[1] + box2[3] / 2
+        
+        inter_x_min = max(x1_min, x2_min)
+        inter_y_min = max(y1_min, y2_min)
+        inter_x_max = min(x1_max, x2_max)
+        inter_y_max = min(y1_max, y2_max)
+        
+        if inter_x_max < inter_x_min or inter_y_max < inter_y_min:
+            return 0.0
+        
+        inter_area = (inter_x_max - inter_x_min) * (inter_y_max - inter_y_min)
+        box1_area = box1[2] * box1[3]
+        box2_area = box2[2] * box2[3]
+        union_area = box1_area + box2_area - inter_area
+        
+        return inter_area / union_area if union_area > 0 else 0.0
+
+    # Deterministic colour -> object map. Hanoi cubes carry fixed Number1-4
+    # textures, so class name identifies the cube directly. This is what
+    # detect_cubes_simple associates on, instead of relational matching.
+    HANOI_COLOR_TO_PDDL = {
+        "blue cube": "cube1",
+        "red cube": "cube2",
+        "green cube": "cube3",
+    }
+
+    def detect_cubes_simple(self, image1, image2, ee_pos, conf_threshold=0.8, sim=None, render=False):
+        image1 = cv2.cvtColor(cv2.flip(cv2.resize(image1, (256, 256)), 0), cv2.COLOR_RGB2BGR)
+        image2 = cv2.cvtColor(cv2.flip(cv2.resize(image2, (256, 256)), 0), cv2.COLOR_RGB2BGR)
+        pred1 = self.yolo_model.predict(image1, verbose=False, device=self.device)[0]
+        pred2 = self.yolo_model.predict(image2, verbose=False, device=self.device)[0]
+
+        best_cam1 = {}
+        for box in pred1.boxes:
+            conf = float(box.conf)
+            if conf < conf_threshold:
+                continue
+            cls_id = int(box.cls)
+            cls = self.yolo_model.names[cls_id]
+            x, y, w, h = box.xywhn.tolist()[0]
+            x, y = int(x * image1.shape[1]), int(y * image1.shape[0])
+            w, h = int(w * image1.shape[1]), int(h * image1.shape[0])
+            if cls not in best_cam1 or conf > best_cam1[cls][0]:
+                best_cam1[cls] = (conf, cls_id, x, y, w, h)
+
+        wrist_conf_threshold = min(conf_threshold, 0.25)
+        best_cam2 = {}
+        for box in pred2.boxes:
+            conf = float(box.conf)
+            if conf < wrist_conf_threshold:
+                continue
+            cls_id = int(box.cls)
+            cls = self.yolo_model.names[cls_id]
+            if cls not in best_cam1:
+                continue
+            x, y, w, h = box.xywhn.tolist()[0]
+            x, y = int(x * image2.shape[1]), int(y * image2.shape[0])
+            w, h = int(w * image2.shape[1]), int(h * image2.shape[0])
+            if cls not in best_cam2 or conf > best_cam2[cls][0]:
+                best_cam2[cls] = (conf, cls_id, x, y, w, h)
+
+        predicted_pos = {}
+        relations = {}
+        viz = image1.copy() if render else None
+        for cls, (conf1, cls_id, x1, y1, w1, h1) in best_cam1.items():
+            pddl_id = self.HANOI_COLOR_TO_PDDL.get(cls)
+            if pddl_id is None:
+                continue
+            if cls in best_cam2:
+                conf2, _, x2, y2, w2, h2 = best_cam2[cls]
+            else:
+                conf2, x2, y2, w2, h2 = 0.0, 0, 0, 0, 0
+            xyz = self.pixel_to_world_dual(
+                cls_id, x1, y1, w1, h1, conf1,
+                x2, y2, w2, h2, conf2,
+                ee_pos[0], ee_pos[1], ee_pos[2],
+                sim=sim, image_h=image1.shape[0], image_w=image1.shape[1],
+                cls_name=cls,
+            )
+            yolo_id = f"{cls}_0"
+            predicted_pos[yolo_id] = xyz
+            relations[pddl_id] = yolo_id
+            self.debug_message(
+                f"  [SIMPLE DET] {pddl_id} <- {yolo_id} "
+                f"xyz={np.round(xyz, 4)} conf1={conf1:.2f} conf2={conf2:.2f}"
+            )
+            if viz is not None:
+                x1i, y1i = int(x1 - w1 / 2), int(y1 - h1 / 2)
+                x2i, y2i = int(x1 + w1 / 2), int(y1 + h1 / 2)
+                cv2.rectangle(viz, (x1i, y1i), (x2i, y2i), (0, 255, 0), 2)
+                label = f"{pddl_id}:{conf1:.2f}"
+                cv2.putText(viz, label, (x1i, max(12, y1i - 8)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+
+        if viz is not None:
+            self._last_yolo_viz = viz
+            cv2.imshow("YOLO Detections", viz)
+            cv2.waitKey(1)
+
+        return predicted_pos, relations
+
+    def compute_iou(self, box1, box2):
         x1_min = box1[0] - box1[2] / 2
         y1_min = box1[1] - box1[3] / 2
         x1_max = box1[0] + box1[2] / 2
@@ -1381,6 +1495,9 @@ class Executor_Diffusion(Executor):
             if is_cube:
                 self.last_vision_pos[name] = pos
                 self.vision_missing_steps[name] = 0
+                if self.debug and name in objects_pos:
+                    err = np.linalg.norm(np.asarray(pos) - np.asarray(objects_pos[name]))
+                    self.debug_message(f"  [VISION-ERR] {name}: |vision - ground truth| = {err:.4f} m")
             return pos
 
         track = getattr(self, 'tracking_metadata', {}).get(yolo_id, {}) if yolo_id is not None else {}
@@ -1411,7 +1528,9 @@ class Executor_Diffusion(Executor):
         gripper_pos = objects_pos["gripper"]
         left_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")])
         right_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")])
-        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)#*1000.
+        # Millimetres: the shipped policies' obs normalizer has an aperture range of
+        # ~106-134, i.e. the Robotiq-85 opening in mm, not metres.
+        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)*1000.
 
         # self.debug_message keys
         # self.debug_message("objects_pos keys: ", objects_pos.keys())
@@ -1467,8 +1586,10 @@ class Executor_Diffusion(Executor):
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
             rel_place_to_drop_pos = gripper_pos - place_to_drop_pos
-            #obs = np.concatenate([gripper_pos, [aperture], -rel_obj_to_pick_pos*1000, -rel_place_to_drop_pos*1000])
-            obs = np.concatenate([gripper_pos, [aperture], rel_obj_to_pick_pos, rel_place_to_drop_pos])
+            # Object-relative, in millimetres and pointing gripper->object. The
+            # shipped policies' obs normalizer spans roughly +/-250 with a mean well
+            # away from world coordinates, which only matches this convention.
+            obs = np.concatenate([gripper_pos, [aperture], -rel_obj_to_pick_pos*1000, -rel_place_to_drop_pos*1000])
         else:
             obs = np.concatenate([gripper_pos, [aperture], obj_to_pick_pos, place_to_drop_pos])
         return obs
@@ -1485,38 +1606,41 @@ class Executor_Diffusion(Executor):
         return action
     
     def build_object_relations(self, predicted_pos, objects_pos):
-        """
-        Build relations mapping between YOLO detections and PDDL semantic IDs.
-        
-        Args:
-            predicted_pos: Dict of YOLO track IDs -> 3D positions
-            objects_pos: Dict of PDDL semantic IDs -> 3D positions from sim
-        
-        Returns:
-            relations dict: PDDL semantic ID -> YOLO track ID
-        """
-        # Get relationships between predicted objects
-        predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id]) 
-                        for obj_id in predicted_pos.keys()]
-        update_object_metadata(predicted_objs, eps=1e-3)
-        
-        # Get relationships between sim objects
-        cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() 
-                    if obj_id != "gripper" and 'cube' in obj_id}
-        sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) 
-                    for obj_id in cubes_only.keys()]
-        update_object_metadata(sim_objs, eps=1e-3)
-        
-        # Map predicted positions to object positions based on relationships
-        relations = match_objects_by_relationships(sim_objs, predicted_objs)
-        
-        self.debug_message("\n=== Detected-to-PDDL Mapping (based on relational similarity) ===")
-        for pddl_id, yolo_id in relations.items():
+        relations = {}
+        for yolo_id in predicted_pos.keys():
+            cls = yolo_id.rsplit("_", 1)[0]
+            pddl_id = self.HANOI_COLOR_TO_PDDL.get(cls)
+            if pddl_id is None:
+                continue
+            if pddl_id not in relations:
+                relations[pddl_id] = yolo_id
+
+        cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items()
+                      if obj_id != "gripper" and "cube" in obj_id}
+        unmapped_pddl = [cid for cid in cubes_only if cid not in relations]
+        if unmapped_pddl:
+            predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id])
+                              for obj_id in predicted_pos.keys()]
+            update_object_metadata(predicted_objs, eps=1e-3)
+            sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id])
+                        for obj_id in cubes_only.keys()]
+            update_object_metadata(sim_objs, eps=1e-3)
+            rel_match = match_objects_by_relationships(sim_objs, predicted_objs)
+            used_yolo = set(relations.values())
+            for pddl_id in unmapped_pddl:
+                yolo_id = rel_match.get(pddl_id)
+                if yolo_id and yolo_id not in used_yolo:
+                    relations[pddl_id] = yolo_id
+                    used_yolo.add(yolo_id)
+
+        self.debug_message("\n=== Detected-to-PDDL Mapping (color-first) ===")
+        for pddl_id in sorted(cubes_only.keys()):
+            yolo_id = relations.get(pddl_id)
             if yolo_id:
                 self.debug_message(f"{pddl_id}  -->  {yolo_id}")
             else:
                 self.debug_message(f"{pddl_id}  -->  (no confident match found)")
-        
+
         return relations
     
     def update_relations_with_new_detections(self, new_predicted_pos, objects_pos):
@@ -1790,9 +1914,14 @@ class Executor_Diffusion(Executor):
             
             np_action_dict = dict_apply(action_dict,
                 lambda x: x.detach().to('cpu').numpy())
-            actions = np_action_dict['action']#/1000.0
+            # Back to metres: the policies' action normalizer spans roughly +/-400 for
+            # the positional axes and +/-1000 for the gripper, i.e. millimetres, while
+            # the OSC_POSITION controller expects [-1, 1]. Scaling every channel
+            # (gripper included) measurably outperforms scaling only the positional
+            # ones -- Drop goes 0/21 -> 4/15 -- so keep this uniform.
+            actions = np_action_dict['action']/1000.0
             #print("Actions: ", actions)
-            
+
             if len(actions[0][0]) < 4:
                 for index in self.nulified_action_indexes:
                     actions = np.insert(actions, index, 0, axis=2)

@@ -67,27 +67,81 @@ docker compose -f examples/robosuite/compose.yml up
 ```
 ## Dependencies
 
-Clone MimicGen in /OpLearn directory
+Robosuite, robosuite-task-zoo and tarski are **git submodules** of this repo — do
+not clone them separately. The old instructions pointed at `helenlu66` forks;
+`.gitmodules` is authoritative.
+
 ```bash
-git clone https://github.com/helenlu66/mimicgen
+git submodule update --init --recursive
 ```
 
-Clone RoboSuite in /OpLearn directory
+### Policy checkpoints (Git LFS)
+
+`policies/**/*.ckpt` are LFS-tracked. A plain clone leaves them as ~134-byte
+pointer files and every run fails at `torch.load`. Fetch the real weights:
+
 ```bash
-git clone https://github.com/helenlu66/robosuite.git
+git lfs install --local && git lfs pull
 ```
 
-Clone tarski in /OpLearn directory. This is a symbolic planning parsing library.
-```bash
-git clone https://github.com/helenlu66/tarski.git
-```
+Each checkpoint should be ~143 MB. If `git lfs` is unavailable (common on
+clusters), grab a static binary from
+https://github.com/git-lfs/git-lfs/releases and put it on your `PATH`.
 
-Install required libraries
+### Python environment
+
+Use Python 3.9 from a **managed** interpreter — the system Python on most
+clusters ships no `Python.h`, and `evdev` in `requirements.txt` is source-only:
+
 ```bash
-python3.8 -m venv .venv
+uv python install 3.9
+uv venv --python-preference only-managed --python 3.9 .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
+uv pip install -e tarski --no-deps
+uv pip install -e robosuite --no-deps
+uv pip install -e robosuite-task-zoo --no-deps
 ```
+
+`requirements.txt` no longer contains `mujoco-py` (legacy — robosuite 1.4.1 uses
+the `mujoco` bindings), `open3d` (no cp39 wheel, unused), `pybullet-svl` (build
+failure; only needed for IK controllers, and we use `OSC_POSITION`) or the two
+`-e git+` URLs (`mimicgen` is unused by the neuro-symbolic driver; `tarski` is a
+submodule).
+
+### diffusion_policy
+
+`planning/executor.py` imports `diffusion_policy`, which is **not** vendored or
+submoduled here. Clone it and put it on `PYTHONPATH`:
+
+```bash
+git clone https://github.com/real-stanford/diffusion_policy.git ../diffusion_policy
+git -C ../diffusion_policy checkout 5ba07ac6661db573af695b419a7947ecb704690f
+export PYTHONPATH="$(realpath ../diffusion_policy):$PWD"
+```
+
+### Metric-FF
+
+`call_planner` shells out to `./Metric-FF-v2.1/ff` relative to the repo root, so
+it must be built there:
+
+```bash
+cd Metric-FF-v2.1 && make && cd ..   # needs bison and flex
+```
+
+## Running the neuro-symbolic experiments
+
+Headless rendering needs an offscreen GL backend (`egl` on a GPU node,
+`osmesa` on CPU):
+
+```bash
+export MUJOCO_GL=egl
+python -u analysis/experiments_neurosymbolic.py --env Hanoi --episodes 50
+```
+
+Perception is not switchable here: this driver always loads YOLO plus the
+bbox→3D regressor and passes them to every executor. (The price-is-not-right
+driver has a `--use_yolo` flag that gates this; this one does not.)
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 

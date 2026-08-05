@@ -5,6 +5,7 @@ warnings.filterwarnings("ignore")
 import argparse
 import gym
 import joblib
+import json
 import robosuite as suite
 import numpy as np
 from statistics import mean 
@@ -55,7 +56,7 @@ pddl_paths = {
     "NutAssembly": "planning/PDDL/nut_assembly.pddl",
     "CubeSorting": "planning/PDDL/cubesorting/",
     "HeightStacking": "planning/PDDL/heightstacking/",
-    "AssemblyLineSorting": "planning/PDDL/assemblyline/",
+    "AssemblyLineSorting": "planning/PDDL/assemblylinesorting/",
     "PatternReplication": "planning/PDDL/patternreplication/"
 }
 yolo_model_paths = {
@@ -184,9 +185,18 @@ if __name__ == "__main__":
     parser.add_argument('--size', type=int, default=256, help='Size of the rendered images')
     parser.add_argument('--rnd_reset', action='store_true', help='Randomize the object positions at reset')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--gt_perception', action='store_true',
+                        help='Bypass YOLO and read object positions from the simulator. '
+                             'Isolates policy behaviour from perception error.')
     parser.add_argument('--n_act', type=int, default=4, help='Number of actions to execute per policy call')
     parser.add_argument('--episodes', type=int, default=100, help='Number of episodes to run')
+    parser.add_argument('--env_kwargs', type=str, default='{}',
+                        help='JSON dict of extra kwargs forwarded to suite.make, used to select '
+                             'the task variants from the paper. Examples: '
+                             '\'{"num_bins": 2, "bin_colors": ["blue", "red"]}\' for 2-Color Block '
+                             'Sorting; \'{"min_cubes": 3, "max_cubes": 3}\' for 3-Block Tower Stacking.')
     args = parser.parse_args()
+    env_kwargs = json.loads(args.env_kwargs)
     np.random.seed(args.seed)
 
     def termination_indicator(operator):
@@ -262,6 +272,7 @@ if __name__ == "__main__":
                        nulified_action_indexes=[0, 1],
                        oracle=True,
                        horizon=8/args.n_act*25,
+                       use_yolo=not args.gt_perception,
                        debug=args.debug)
     reach_pick = Executor_Diffusion(id='ReachPick', 
                             policy=policies_paths[args.env]['reach_pick'],
@@ -269,6 +280,7 @@ if __name__ == "__main__":
                             nulified_action_indexes=[3],
                             oracle=True,
                             horizon=8/args.n_act*25,
+                            use_yolo=not args.gt_perception,
                             debug=args.debug)
     reach_place = Executor_Diffusion(id='ReachDrop', 
                             policy=policies_paths[args.env]['reach_place'],
@@ -276,6 +288,7 @@ if __name__ == "__main__":
                             nulified_action_indexes=[3],
                             oracle=True,
                             horizon=8/args.n_act*35,
+                            use_yolo=not args.gt_perception,
                             debug=args.debug)
     drop = Executor_Diffusion(id='Drop', 
                     policy=policies_paths[args.env]['drop'],
@@ -283,6 +296,7 @@ if __name__ == "__main__":
                     nulified_action_indexes=[0, 1],
                     oracle=True,
                     horizon=8/args.n_act*25,
+                    use_yolo=not args.gt_perception,
                     debug=args.debug)
 
     Move_action = [reach_pick, pick, reach_place, drop]
@@ -306,6 +320,7 @@ if __name__ == "__main__":
         camera_heights=args.size,
         camera_widths=args.size,
         #random_block_placement=args.rnd_reset
+        **env_kwargs
     )
     detector = env_detectors[args.env](env)
     # Wrap the environment with the GymWrapper
@@ -352,17 +367,28 @@ if __name__ == "__main__":
     percentage_advancement = []
     valid_pick_place_success = 0
 
-    def reset_gripper(env):
+    def gripper_aperture():
+        # HanoiDetector/NutAssembly/Kitchen expose open(gripper, ...); the
+        # sorting/stacking detectors expose open_gripper(...) instead.
+        if hasattr(detector, "open_gripper"):
+            return detector.open_gripper(return_distance=True)
+        return detector.open("gripper", return_distance=True)
+
+    def reset_gripper(env, max_open_steps=80, max_home_steps=200):
         print("Resetting gripper")
         # First open the gripper
         state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
-        while not(state["open_gripper(gripper)"]):
-            #print(state["open_gripper(gripper)"])
+        for _ in range(max_open_steps):
+            if state["open_gripper(gripper)"]:
+                break
             action = np.array([0, 0, 0, -1])
             env.step(action)
             state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
             if args.render:
                 env.render()
+        else:
+            print(f"[reset_gripper] open timeout after {max_open_steps} steps "
+                  f"(aperture={gripper_aperture()}); continuing")
         # Then move the gripper to the initial position
         for _ in range(50):
             action = np.array([0, 0, 0.5, 0])
@@ -371,8 +397,9 @@ if __name__ == "__main__":
                 env.render()
         gripper_pos = env._get_observations()["robot0_eef_pos"]
         delta = reset_gripper_pos - gripper_pos
-        action = 5*np.array([delta[0], delta[1], delta[2], 0])
-        while np.linalg.norm(delta) > 0.01:
+        for _ in range(max_home_steps):
+            if np.linalg.norm(delta) <= 0.01:
+                break
             #print("Curent pos: ", gripper_pos)
             #print("Reset pos: ", reset_gripper_pos)
             action = 5*np.array([delta[0], delta[1], delta[2], 0])
@@ -383,6 +410,9 @@ if __name__ == "__main__":
             gripper_pos = env._get_observations()["robot0_eef_pos"]
             delta = reset_gripper_pos - gripper_pos
             #print(f"Delta: {delta}, Current pos: {gripper_pos}, Reset pos: {reset_gripper_pos}, Action: {action}")
+        else:
+            print(f"[reset_gripper] home timeout after {max_home_steps} steps "
+                  f"(dist={np.linalg.norm(delta):.4f}); continuing")
     retry_reset = False
     for i in range(args.episodes):
         if retry_reset:
@@ -457,6 +487,14 @@ if __name__ == "__main__":
                 tracking_data = action_step.get_tracking_data()
 
                 state = detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+                if args.debug:
+                    # Which executor stalled, and by how far it missed its gate.
+                    print(f"\t  {action_step.id}: {'ok' if success else 'FAILED'}"
+                          f" | over(gripper,{obj_to_pick})={detector.over('gripper', obj_to_pick, return_distance=True):.4f}"
+                          f" over(gripper,{obj_to_drop})={detector.over('gripper', obj_to_drop, return_distance=True):.4f}"
+                          f" | grasped({obj_to_pick})={state.get(f'grasped({obj_to_pick})')}"
+                          f" on({obj_to_pick},{obj_to_drop})={state.get(f'on({obj_to_pick},{obj_to_drop})')}"
+                          f" open_gripper={state.get('open_gripper(gripper)')}")
             if success:
                 pick_place_success += 1
                 valid_pick_place_success += 1

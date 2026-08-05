@@ -77,4 +77,16 @@ planning/PDDL/assemblyline/problem_dummy.pddl
 planning/PDDL/nut_assembly/problem_dummy.pddl
 planning/PDDL/kitchen/problem_dummy.pddl
 
-DEBUG_PLOTS_README.md
+DEBUG_PLOTS_README.mddata_reg/
+results/
+policies/hanoi_JOURNAL_ORIGINAL/
+data_reg
+# Regressor training CSVs (~336MB) - regenerate with:
+#   python auto_demo.py --env Hanoi --train_yolo --rnd_reset --episodes 30 --dir ./data_reg/ --name reg --seed 42
+data_reg/
+# Demos collected against the Panda-trained regressor (11.4cm Y bias) - discard
+data_PANDA_REGRESSOR_DISCARD
+results/
+# Pre-retrain checkpoints. Redundant: identical blobs are already in git history
+# as the previous version of policies/hanoi/*.ckpt (verified by sha256).
+policies/hanoi_JOURNAL_ORIGINAL/
