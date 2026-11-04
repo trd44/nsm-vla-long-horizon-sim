@@ -200,10 +200,23 @@ class Executor_Diffusion(Executor):
                  particle_filter_particles_3d=100,
                  max_position_jump=0.10,  # 10cm max jump in 3D world coords
                  max_bbox_jump=20,  # 20 pixels max jump in image space
-                 debug=False
+                 debug=False,
+                 num_inference_steps=8,  # paper section 6.1
+                 yolo_frequency=2,
+                 gripper_close_sign=1,
+                 color_to_pddl=None,
                  ):
         super().__init__(id, "RL", Beta)
         self.debug = debug
+        self.num_inference_steps = num_inference_steps
+        self.yolo_frequency = yolo_frequency
+        # Sign of the policy's gripper output that means "close". The policy sets
+        # disagree: policies/hanoi_original closes on -1000 and
+        # policies/hanoi on +1000, while the environment always closes on +1.
+        self.gripper_close_sign = gripper_close_sign
+        # YOLO class -> PDDL cube, for tasks where colour identifies the cube.
+        # None means identities come from relational matching (paper section 3.4.3).
+        self.color_to_pddl = color_to_pddl or {}
         self.policy = policy
         self.model = None
         self.nulified_action_indexes = nulified_action_indexes
@@ -238,12 +251,12 @@ class Executor_Diffusion(Executor):
         self.next_object_id = {}
         
         # Particle filters for 2D bbox tracking
-        #self.particle_filters_2d = {}  # {object_id: ParticleFilter2D}
-        #self.particle_filter_particles_2d = particle_filter_particles_2d
+        self.particle_filters_2d = {}  # {object_id: ParticleFilter2D}
+        self.particle_filter_particles_2d = particle_filter_particles_2d
 
         # Particle filters for 3D position tracking
-        #self.particle_filters_3d = {}
-        #self.particle_filter_particles_3d = particle_filter_particles_3d
+        self.particle_filters_3d = {}
+        self.particle_filter_particles_3d = particle_filter_particles_3d
         
         # Noise removal parameters
         self.max_position_jump = max_position_jump  # meters
@@ -273,7 +286,7 @@ class Executor_Diffusion(Executor):
         payload = torch.load(open(path, 'rb'), pickle_module=dill)
         cfg = payload['cfg']
         cls = TrainDiffusionTransformerLowdimWorkspace
-        cfg.policy.num_inference_steps = 7
+        cfg.policy.num_inference_steps = self.num_inference_steps
         workspace = cls(cfg)
         workspace: BaseWorkspace
         workspace.load_payload(payload, exclude_keys=None, include_keys=None)
@@ -299,20 +312,10 @@ class Executor_Diffusion(Executor):
 
     def pixel_to_world_dual(self, cls_id, px1, py1, w1, h1, conf1, px2, py2, w2, h2, conf2, ee_x, ee_y, ee_z,
                             sim=None, image_h=256, image_w=256, cls_name=None):
-        # sim/image_h/image_w/cls_name are accepted for call-signature compatibility
-        # with detect_cubes_simple (ported from price-is-not-right, where they feed an
-        # optional stereo-ray path). This repo uses the regression estimate only,
-        # measured at 0.2-16mm against ground truth, so they are unused here.
+        # Regressors take 13 features, or 14 with cls_id first. No offset is added:
+        # the old +0.03 x "bias correction" was itself a constant 3cm error.
         models_dual = self.regressor_model
         reg_x_dual, reg_y_dual, reg_z_dual = models_dual["reg_x"], models_dual["reg_y"], models_dual["reg_z"]
-
-        # The shipped regressors take the 13 training features
-        # (px1,py1,w1,h1,conf1,px2,py2,w2,h2,conf2,ee_x,ee_y,ee_z) -- cls_id is
-        # not among them, so prepending it always raised and fell through to a
-        # branch that added a +0.03 x offset. Measured against ground truth the
-        # 13-feature prediction is already accurate to <2cm, and that offset was
-        # the single largest error in the perception path. Build the 13-feature
-        # vector directly; keep the cls_id form only for regressors that want it.
         features = np.array([[float(px1), float(py1), float(w1), float(h1), float(conf1),
                               float(px2), float(py2), float(w2), float(h2), float(conf2),
                               float(ee_x), float(ee_y), float(ee_z)]], dtype=np.float64)
@@ -325,116 +328,6 @@ class Executor_Diffusion(Executor):
 
     def compute_iou(self, box1, box2):
         """Compute IoU between two bounding boxes [x_center, y_center, w, h]"""
-        x1_min = box1[0] - box1[2] / 2
-        y1_min = box1[1] - box1[3] / 2
-        x1_max = box1[0] + box1[2] / 2
-        y1_max = box1[1] + box1[3] / 2
-        
-        x2_min = box2[0] - box2[2] / 2
-        y2_min = box2[1] - box2[3] / 2
-        x2_max = box2[0] + box2[2] / 2
-        y2_max = box2[1] + box2[3] / 2
-        
-        inter_x_min = max(x1_min, x2_min)
-        inter_y_min = max(y1_min, y2_min)
-        inter_x_max = min(x1_max, x2_max)
-        inter_y_max = min(y1_max, y2_max)
-        
-        if inter_x_max < inter_x_min or inter_y_max < inter_y_min:
-            return 0.0
-        
-        inter_area = (inter_x_max - inter_x_min) * (inter_y_max - inter_y_min)
-        box1_area = box1[2] * box1[3]
-        box2_area = box2[2] * box2[3]
-        union_area = box1_area + box2_area - inter_area
-        
-        return inter_area / union_area if union_area > 0 else 0.0
-
-    # Deterministic colour -> object map. Hanoi cubes carry fixed Number1-4
-    # textures, so class name identifies the cube directly. This is what
-    # detect_cubes_simple associates on, instead of relational matching.
-    HANOI_COLOR_TO_PDDL = {
-        "blue cube": "cube1",
-        "red cube": "cube2",
-        "green cube": "cube3",
-    }
-
-    def detect_cubes_simple(self, image1, image2, ee_pos, conf_threshold=0.8, sim=None, render=False):
-        image1 = cv2.cvtColor(cv2.flip(cv2.resize(image1, (256, 256)), 0), cv2.COLOR_RGB2BGR)
-        image2 = cv2.cvtColor(cv2.flip(cv2.resize(image2, (256, 256)), 0), cv2.COLOR_RGB2BGR)
-        pred1 = self.yolo_model.predict(image1, verbose=False, device=self.device)[0]
-        pred2 = self.yolo_model.predict(image2, verbose=False, device=self.device)[0]
-
-        best_cam1 = {}
-        for box in pred1.boxes:
-            conf = float(box.conf)
-            if conf < conf_threshold:
-                continue
-            cls_id = int(box.cls)
-            cls = self.yolo_model.names[cls_id]
-            x, y, w, h = box.xywhn.tolist()[0]
-            x, y = int(x * image1.shape[1]), int(y * image1.shape[0])
-            w, h = int(w * image1.shape[1]), int(h * image1.shape[0])
-            if cls not in best_cam1 or conf > best_cam1[cls][0]:
-                best_cam1[cls] = (conf, cls_id, x, y, w, h)
-
-        wrist_conf_threshold = min(conf_threshold, 0.25)
-        best_cam2 = {}
-        for box in pred2.boxes:
-            conf = float(box.conf)
-            if conf < wrist_conf_threshold:
-                continue
-            cls_id = int(box.cls)
-            cls = self.yolo_model.names[cls_id]
-            if cls not in best_cam1:
-                continue
-            x, y, w, h = box.xywhn.tolist()[0]
-            x, y = int(x * image2.shape[1]), int(y * image2.shape[0])
-            w, h = int(w * image2.shape[1]), int(h * image2.shape[0])
-            if cls not in best_cam2 or conf > best_cam2[cls][0]:
-                best_cam2[cls] = (conf, cls_id, x, y, w, h)
-
-        predicted_pos = {}
-        relations = {}
-        viz = image1.copy() if render else None
-        for cls, (conf1, cls_id, x1, y1, w1, h1) in best_cam1.items():
-            pddl_id = self.HANOI_COLOR_TO_PDDL.get(cls)
-            if pddl_id is None:
-                continue
-            if cls in best_cam2:
-                conf2, _, x2, y2, w2, h2 = best_cam2[cls]
-            else:
-                conf2, x2, y2, w2, h2 = 0.0, 0, 0, 0, 0
-            xyz = self.pixel_to_world_dual(
-                cls_id, x1, y1, w1, h1, conf1,
-                x2, y2, w2, h2, conf2,
-                ee_pos[0], ee_pos[1], ee_pos[2],
-                sim=sim, image_h=image1.shape[0], image_w=image1.shape[1],
-                cls_name=cls,
-            )
-            yolo_id = f"{cls}_0"
-            predicted_pos[yolo_id] = xyz
-            relations[pddl_id] = yolo_id
-            self.debug_message(
-                f"  [SIMPLE DET] {pddl_id} <- {yolo_id} "
-                f"xyz={np.round(xyz, 4)} conf1={conf1:.2f} conf2={conf2:.2f}"
-            )
-            if viz is not None:
-                x1i, y1i = int(x1 - w1 / 2), int(y1 - h1 / 2)
-                x2i, y2i = int(x1 + w1 / 2), int(y1 + h1 / 2)
-                cv2.rectangle(viz, (x1i, y1i), (x2i, y2i), (0, 255, 0), 2)
-                label = f"{pddl_id}:{conf1:.2f}"
-                cv2.putText(viz, label, (x1i, max(12, y1i - 8)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-
-        if viz is not None:
-            self._last_yolo_viz = viz
-            cv2.imshow("YOLO Detections", viz)
-            cv2.waitKey(1)
-
-        return predicted_pos, relations
-
-    def compute_iou(self, box1, box2):
         x1_min = box1[0] - box1[2] / 2
         y1_min = box1[1] - box1[3] / 2
         x1_max = box1[0] + box1[2] / 2
@@ -537,18 +430,18 @@ class Executor_Diffusion(Executor):
             bbox_center: Current bbox center [x, y]
             velocity: Optional velocity [vx, vy]
         """
-        # if track_id not in self.particle_filters_2d:
-        #     # Initialize new particle filter
-        #     self.particle_filters_2d[track_id] = ParticleFilter2D(
-        #         n_particles=self.particle_filter_particles_2d,
-        #         process_noise=5.0,
-        #         measurement_noise=5.0
-        #     )
-        #     self.particle_filters_2d[track_id].initialize(bbox_center)
-        # else:
-        #     # Predict and update
-        #     self.particle_filters_2d[track_id].predict(velocity)
-        #     self.particle_filters_2d[track_id].update(bbox_center)
+        if track_id not in self.particle_filters_2d:
+            # Initialize new particle filter
+            self.particle_filters_2d[track_id] = ParticleFilter2D(
+                n_particles=self.particle_filter_particles_2d,
+                process_noise=5.0,
+                measurement_noise=5.0
+            )
+            self.particle_filters_2d[track_id].initialize(bbox_center)
+        else:
+            # Predict and update
+            self.particle_filters_2d[track_id].predict(velocity)
+            self.particle_filters_2d[track_id].update(bbox_center)
 
     def get_particle_filter_estimate_2d(self, track_id):
         """
@@ -573,18 +466,18 @@ class Executor_Diffusion(Executor):
             position_3d: Current 3D position [x, y, z]
             velocity: Optional velocity [vx, vy, vz]
         """
-        # if track_id not in self.particle_filters_3d:
-        #     # Initialize new particle filter
-        #     self.particle_filters_3d[track_id] = ParticleFilter3D(
-        #         n_particles=self.particle_filter_particles_3d,
-        #         process_noise=0.01,
-        #         measurement_noise=0.05
-        #     )
-        #     self.particle_filters_3d[track_id].initialize(position_3d)
-        # else:
-        #     # Predict and update
-        #     self.particle_filters_3d[track_id].predict(velocity)
-        #     self.particle_filters_3d[track_id].update(position_3d)
+        if track_id not in self.particle_filters_3d:
+            # Initialize new particle filter
+            self.particle_filters_3d[track_id] = ParticleFilter3D(
+                n_particles=self.particle_filter_particles_3d,
+                process_noise=0.01,
+                measurement_noise=0.05
+            )
+            self.particle_filters_3d[track_id].initialize(position_3d)
+        else:
+            # Predict and update
+            self.particle_filters_3d[track_id].predict(velocity)
+            self.particle_filters_3d[track_id].update(position_3d)
 
     def get_particle_filter_estimate_3d(self, track_id):
         """
@@ -761,10 +654,10 @@ class Executor_Diffusion(Executor):
                 del self.tracked_objects[track_id]
                 del self.tracking_metadata[track_id]
                 
-                # if track_id in self.particle_filters_2d:
-                #     del self.particle_filters_2d[track_id]
-                # if track_id in self.particle_filters_3d:
-                #     del self.particle_filters_3d[track_id]
+                if track_id in self.particle_filters_2d:
+                    del self.particle_filters_2d[track_id]
+                if track_id in self.particle_filters_3d:
+                    del self.particle_filters_3d[track_id]
                 if track_id in self.detection_outlier_count:
                     del self.detection_outlier_count[track_id]
                 
@@ -806,17 +699,17 @@ class Executor_Diffusion(Executor):
                 iou = self.compute_iou(det['bbox'], self.tracked_objects[tid]['bbox'])
                 
                 # Get particle filter estimate if available
-                # pf_estimate = self.get_particle_filter_estimate_2d(tid)
-                # if pf_estimate is not None:
-                #     det_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #     pf_distance = np.linalg.norm(det_center - pf_estimate)
-                #     # Normalize distance (closer = better)
-                #     pf_score = np.exp(-pf_distance / 50.0)  # Decay with distance
+                pf_estimate = self.get_particle_filter_estimate_2d(tid)
+                if pf_estimate is not None:
+                    det_center = np.array([det['bbox'][0], det['bbox'][1]])
+                    pf_distance = np.linalg.norm(det_center - pf_estimate)
+                    # Normalize distance (closer = better)
+                    pf_score = np.exp(-pf_distance / 50.0)  # Decay with distance
                     
-                #     # Combined score (60% IoU, 40% particle filter)
-                #     combined_score = 0.6 * iou + 0.4 * pf_score
-                # else:
-                combined_score = iou
+                    # Combined score (60% IoU, 40% particle filter)
+                    combined_score = 0.6 * iou + 0.4 * pf_score
+                else:
+                    combined_score = iou
                 
                 cost_matrix[i, j] = -combined_score  # Negative because we minimize
         
@@ -891,12 +784,12 @@ class Executor_Diffusion(Executor):
             
             # Update particle filter with projected position
             bbox_2d = self.project_3d_to_2d_approximate(ee_pos, image_shape)
-            # if track_id in self.particle_filters_2d:
-            #     self.particle_filters_2d[track_id].predict()
-            #     self.particle_filters_2d[track_id].update(bbox_2d)
-            # if track_id in self.particle_filters_3d:
-            #     self.particle_filters_3d[track_id].predict()
-            #     self.particle_filters_3d[track_id].update(ee_pos)
+            if track_id in self.particle_filters_2d:
+                self.particle_filters_2d[track_id].predict()
+                self.particle_filters_2d[track_id].update(bbox_2d)
+            if track_id in self.particle_filters_3d:
+                self.particle_filters_3d[track_id].predict()
+                self.particle_filters_3d[track_id].update(ee_pos)
 
             return {
                 'position_3d': ee_pos,
@@ -1114,8 +1007,8 @@ class Executor_Diffusion(Executor):
                 
                 # Update particle filter
                 bbox_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #self.update_particle_filter_2d(track_id, bbox_center, velocity_2d)
-                #self.update_particle_filter_3d(track_id, det['position'], velocity_3d)
+                self.update_particle_filter_2d(track_id, bbox_center, velocity_2d)
+                self.update_particle_filter_3d(track_id, det['position'], velocity_3d)
                 
                 # Update tracking metadata
                 if track_id not in self.tracking_metadata:
@@ -1175,9 +1068,9 @@ class Executor_Diffusion(Executor):
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
                     # Draw particle filter estimate (small cyan circle)
-                    # pf_est = self.get_particle_filter_estimate_2d(track_id)
-                    # if pf_est is not None:
-                    #     cv2.circle(image1, (int(pf_est[0]), int(pf_est[1])), 3, (255, 255, 0), -1)
+                    pf_est = self.get_particle_filter_estimate_2d(track_id)
+                    if pf_est is not None:
+                        cv2.circle(image1, (int(pf_est[0]), int(pf_est[1])), 3, (255, 255, 0), -1)
                     if render:
                         cv2.imshow("Tracking", image1)
                         cv2.waitKey(1)
@@ -1202,8 +1095,8 @@ class Executor_Diffusion(Executor):
                 
                 # Initialize particle filter
                 bbox_center = np.array([det['bbox'][0], det['bbox'][1]])
-                #self.update_particle_filter_2d(object_id, bbox_center)
-                #self.update_particle_filter_3d(object_id, det['position'])
+                self.update_particle_filter_2d(object_id, bbox_center)
+                self.update_particle_filter_3d(object_id, det['position'])
                 
                 # Initialize tracking metadata
                 self.tracking_metadata[object_id] = {
@@ -1311,16 +1204,16 @@ class Executor_Diffusion(Executor):
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
                             
                             # Draw particle cloud (for debugging)
-                            # if track_id in self.particle_filters_2d:
-                            #     pf = self.particle_filters_2d[track_id]
-                            #     if pf.initialized:
-                            #         # Draw a few particles
-                            #         sample_indices = np.random.choice(len(pf.particles), 
-                            #                                          min(20, len(pf.particles)), 
-                            #                                          replace=False)
-                            #         for idx in sample_indices:
-                            #             px, py = pf.particles[idx]
-                            #             cv2.circle(image1, (int(px), int(py)), 1, (100, 100, 100), -1)
+                            if track_id in self.particle_filters_2d:
+                                pf = self.particle_filters_2d[track_id]
+                                if pf.initialized:
+                                    # Draw a few particles
+                                    sample_indices = np.random.choice(len(pf.particles), 
+                                                                     min(20, len(pf.particles)), 
+                                                                     replace=False)
+                                    for idx in sample_indices:
+                                        px, py = pf.particles[idx]
+                                        cv2.circle(image1, (int(px), int(py)), 1, (100, 100, 100), -1)
                             if render:
                                 cv2.imshow("Tracking", image1)
                                 cv2.waitKey(1)
@@ -1380,9 +1273,13 @@ class Executor_Diffusion(Executor):
         self.tracking_metadata = {}
         self.next_object_id = {}
         self.instances_per_label = {}
-        #self.particle_filters_2d = {}
-        #self.particle_filters_3d = {}
+        self.particle_filters_2d = {}
+        self.particle_filters_3d = {}
         self.detection_outlier_count = {}
+        self.relations = {}
+        self.map_id_semantic = {}
+        self.last_vision_pos = {}
+        self.vision_missing_steps = {}
         self.debug_message("Tracking data reset")
     
     def set_tracking_data(self, tracking_data_dict):
@@ -1390,8 +1287,8 @@ class Executor_Diffusion(Executor):
         self.tracked_objects = tracking_data_dict.get('tracked_objects', {})
         self.tracking_metadata = tracking_data_dict.get('tracking_metadata', {})
         self.instances_per_label = tracking_data_dict.get('instances_per_label', {})
-        #self.particle_filters_2d = tracking_data_dict.get('particle_filters_2d', {})
-        #self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
+        self.particle_filters_2d = tracking_data_dict.get('particle_filters_2d', {})
+        self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
         self.detection_outlier_count = tracking_data_dict.get('detection_outlier_count', {})
         self.next_object_id = tracking_data_dict.get('next_object_id', {})
 
@@ -1403,8 +1300,8 @@ class Executor_Diffusion(Executor):
             'tracked_objects': self.tracked_objects,
             'tracking_metadata': self.tracking_metadata,
             'instances_per_label': self.instances_per_label,
-            #'particle_filters_2d': self.particle_filters_2d,
-            #'particle_filters_3d': self.particle_filters_3d,
+            'particle_filters_2d': self.particle_filters_2d,
+            'particle_filters_3d': self.particle_filters_3d,
             'detection_outlier_count': self.detection_outlier_count,
             'next_object_id': self.next_object_id,
             'instances_per_label': self.instances_per_label
@@ -1526,11 +1423,7 @@ class Executor_Diffusion(Executor):
 
     def get_object_obs(self, env, objects_pos, predicted_pos, obj_to_pick, place_to_drop, relative_obs=False, first_obs=True):
         gripper_pos = objects_pos["gripper"]
-        left_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")])
-        right_finger_pos = np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")])
-        # Millimetres: the shipped policies' obs normalizer has an aperture range of
-        # ~106-134, i.e. the Robotiq-85 opening in mm, not metres.
-        aperture = np.linalg.norm(left_finger_pos - right_finger_pos)*1000.
+        aperture = objects_pos.get("aperture", self._aperture_mm(env))
 
         # self.debug_message keys
         # self.debug_message("objects_pos keys: ", objects_pos.keys())
@@ -1599,9 +1492,9 @@ class Executor_Diffusion(Executor):
         if -0.5 < action_gripper < 0.5:
             action_gripper = np.array([0])
         if action_gripper <= -0.5:
-            action_gripper = np.array([-0.1])
+            action_gripper = np.array([-0.1 * self.gripper_close_sign])
         elif action_gripper >= 0.5:
-            action_gripper = np.array([0.1])
+            action_gripper = np.array([0.1 * self.gripper_close_sign])
         action = np.concatenate([action[:3], action_gripper])
         return action
     
@@ -1609,7 +1502,7 @@ class Executor_Diffusion(Executor):
         relations = {}
         for yolo_id in predicted_pos.keys():
             cls = yolo_id.rsplit("_", 1)[0]
-            pddl_id = self.HANOI_COLOR_TO_PDDL.get(cls)
+            pddl_id = self.color_to_pddl.get(cls)
             if pddl_id is None:
                 continue
             if pddl_id not in relations:
@@ -1772,29 +1665,41 @@ class Executor_Diffusion(Executor):
                 
                 # Update particle filters
                 bbox_center = np.array([bbox_2d[0], bbox_2d[1]])
-                # if yolo_id in self.particle_filters_2d:
-                #     self.particle_filters_2d[yolo_id].predict()
-                #     self.particle_filters_2d[yolo_id].update(bbox_center)
-                #else:
+                if yolo_id in self.particle_filters_2d:
+                    self.particle_filters_2d[yolo_id].predict()
+                    self.particle_filters_2d[yolo_id].update(bbox_center)
+                else:
                     # Initialize particle filter
-                #    self.update_particle_filter_2d(yolo_id, bbox_center)
+                    self.update_particle_filter_2d(yolo_id, bbox_center)
                 
-                #if yolo_id in self.particle_filters_3d:
-                #    self.particle_filters_3d[yolo_id].predict()
-                #    self.particle_filters_3d[yolo_id].update(ee_pos)
-                #else:
+                if yolo_id in self.particle_filters_3d:
+                    self.particle_filters_3d[yolo_id].predict()
+                    self.particle_filters_3d[yolo_id].update(ee_pos)
+                else:
                     # Initialize particle filter
-                #    self.update_particle_filter_3d(yolo_id, ee_pos)
+                    self.update_particle_filter_3d(yolo_id, ee_pos)
         
         return predicted_pos
 
+
+    def _objects_pos_snapshot(self, env):
+        # get_all_objects_pos returns live views of sim.data, and the aperture was
+        # read live too, so all frames of the observation history collapsed to the
+        # current one. Copy them so the policy sees real history, as in training.
+        snapshot = {k: np.array(v, copy=True) for k, v in self.detector.get_all_objects_pos().items()}
+        snapshot["aperture"] = self._aperture_mm(env)
+        return snapshot
+
+    def _aperture_mm(self, env):
+        left = env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_left_inner_finger")]
+        right = env.sim.data.body_xpos[env.sim.model.body_name2id("gripper0_right_inner_finger")]
+        return float(np.linalg.norm(left - right)) * 1000.
 
     def execute(self, env, observations, n_act, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
         self.vision_missing_steps = {}  # fresh vision-timeout budget per skill
         self.image_buffer = []
         self.detected_positions = {}
-        self.yolo_frequency = 15
         horizon = self.horizon if self.horizon is not None else 50
         self.debug_message("\tTask goal: ", symgoal)
 
@@ -1805,7 +1710,7 @@ class Executor_Diffusion(Executor):
 
         while not done:
             anomaly_safe = False
-            max_shift_threshold = 0.1#100.0  # in mm
+            max_shift_threshold = 100.0  # in mm
             while not anomaly_safe:
                 processed_obs = []
                 
@@ -1897,7 +1802,7 @@ class Executor_Diffusion(Executor):
                     for _ in range(len(observations)):
                         # Get current observation
                         obs = env._get_observations()
-                        objects_pos = self.detector.get_all_objects_pos()
+                        objects_pos = self._objects_pos_snapshot(env)
                         obs['objects_pos'] = objects_pos
                         observations.append(obs)
                         observations.pop(0)
@@ -1914,11 +1819,7 @@ class Executor_Diffusion(Executor):
             
             np_action_dict = dict_apply(action_dict,
                 lambda x: x.detach().to('cpu').numpy())
-            # Back to metres: the policies' action normalizer spans roughly +/-400 for
-            # the positional axes and +/-1000 for the gripper, i.e. millimetres, while
-            # the OSC_POSITION controller expects [-1, 1]. Scaling every channel
-            # (gripper included) measurably outperforms scaling only the positional
-            # ones -- Drop goes 0/21 -> 4/15 -- so keep this uniform.
+            # Policies output millimetres; OSC_POSITION expects [-1, 1].
             actions = np_action_dict['action']/1000.0
             #print("Actions: ", actions)
 
@@ -1934,7 +1835,7 @@ class Executor_Diffusion(Executor):
                 if render:
                     env.render()
                 obs = env._get_observations()
-                objects_pos = self.detector.get_all_objects_pos()
+                objects_pos = self._objects_pos_snapshot(env)
                 obs['objects_pos'] = objects_pos
                 # Append last obs and pop first obs to keep the buffer size
                 observations.append(obs)
