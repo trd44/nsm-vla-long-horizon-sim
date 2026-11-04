@@ -130,6 +130,26 @@ def legacy_task(env_name: str) -> TaskConfig:
     return _task(f"legacy_{env_name}", env_name, {}, pddl, predicates, goal, None, None, colors, None, detector)
 
 
+# A cube with this many others below it sits above the default home height (z=0.958).
+# The policies only ever saw the target below the gripper, so they would drive into the
+# tower from there, and the regressor was fit at default home, so only those picks lift.
+TALL_PICK_LEVEL = 3
+TALL_PICK_HOME_Z = 1.03
+
+
+def cubes_below(state: Dict[str, bool], cube: str) -> int:
+    """Number of cubes stacked under `cube` in the symbolic state."""
+    count = 0
+    current = cube
+    while True:
+        support = next((key[key.index(",") + 1:-1] for key, value in state.items()
+                        if value and key.startswith(f"on({current},")), None)
+        if support is None or "cube" not in support:
+            return count
+        count += 1
+        current = support
+
+
 LEGACY_ENVS = ("Hanoi", "Hanoi4x3", "CubeSorting", "HeightStacking", "AssemblyLineSorting")
 
 

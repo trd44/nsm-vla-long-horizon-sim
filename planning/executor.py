@@ -205,6 +205,10 @@ class Executor_Diffusion(Executor):
                  yolo_frequency=2,
                  gripper_close_sign=1,
                  color_to_pddl=None,
+                 xy_hold_gain=5.0,
+                 max_agentview_box_px=40,
+                 stable_estimate_radius=0.08,
+                 stable_estimate_window=40,
                  ):
         super().__init__(id, "RL", Beta)
         self.debug = debug
@@ -217,6 +221,28 @@ class Executor_Diffusion(Executor):
         # YOLO class -> PDDL cube, for tasks where colour identifies the cube.
         # None means identities come from relational matching (paper section 3.4.3).
         self.color_to_pddl = color_to_pddl or {}
+        # Skills with nullified XY (Pick, Drop) send zero XY. Delta OSC treats that as
+        # "stay where you are now", so the arm drifts 10-14mm in x while descending,
+        # enough to topple a stack. Hold the XY from skill start instead. Proprioception
+        # only, and not part of the paper's description. 0 disables it.
+        self.xy_hold_gain = xy_hold_gain
+        self._xy_anchor = None
+        # The coloured bins are detected as cubes of the same class, and usually with
+        # higher confidence. Cubes span well under this many pixels in the agent view.
+        self.max_agentview_box_px = max_agentview_box_px
+        # An ungrasped cube does not move, but vision gets worse as the gripper closes
+        # in (occlusion, wrist camera too close): the z estimate reaches 8-10mm low
+        # during Pick, against 3-5mm at hover. Use the median of readings taken with the
+        # arm clear of the cube, and freeze it inside this radius. 0 disables it.
+        self.stable_estimate_radius = stable_estimate_radius
+        self.stable_estimate_window = stable_estimate_window
+        self.stable_estimates = {}
+        self.release_xy = {}
+        self.release_trust_radius = 0.03
+        self.occlusion_radius = 0.06
+        self.pick_xy = {}
+        self._grasped_now = set()
+        self._was_grasped = set()
         self.policy = policy
         self.model = None
         self.nulified_action_indexes = nulified_action_indexes
@@ -898,7 +924,10 @@ class Executor_Diffusion(Executor):
             y = int(y * image1.shape[0])
             w = int(w * image1.shape[1])
             h = int(h * image1.shape[0])
-            
+
+            if max(w, h) > self.max_agentview_box_px:
+                continue
+
             if cls not in detections_by_class:
                 detections_by_class[cls] = []
                 high_conf_count[cls] = 0
@@ -1280,6 +1309,11 @@ class Executor_Diffusion(Executor):
         self.map_id_semantic = {}
         self.last_vision_pos = {}
         self.vision_missing_steps = {}
+        self.stable_estimates = {}
+        self.release_xy = {}
+        self._grasped_now = set()
+        self._was_grasped = set()
+        self.pick_xy = {}
         self.debug_message("Tracking data reset")
     
     def set_tracking_data(self, tracking_data_dict):
@@ -1291,6 +1325,10 @@ class Executor_Diffusion(Executor):
         self.particle_filters_3d = tracking_data_dict.get('particle_filters_3d', {})
         self.detection_outlier_count = tracking_data_dict.get('detection_outlier_count', {})
         self.next_object_id = tracking_data_dict.get('next_object_id', {})
+        self.stable_estimates = tracking_data_dict.get('stable_estimates', {})
+        self.release_xy = tracking_data_dict.get('release_xy', {})
+        self._was_grasped = tracking_data_dict.get('was_grasped', set())
+        self.pick_xy = tracking_data_dict.get('pick_xy', {})
 
     def get_tracking_data(self):
         """Returns all the variables related to tracking for external use."""
@@ -1304,7 +1342,11 @@ class Executor_Diffusion(Executor):
             'particle_filters_3d': self.particle_filters_3d,
             'detection_outlier_count': self.detection_outlier_count,
             'next_object_id': self.next_object_id,
-            'instances_per_label': self.instances_per_label
+            'instances_per_label': self.instances_per_label,
+            'stable_estimates': self.stable_estimates,
+            'release_xy': self.release_xy,
+            'was_grasped': self._was_grasped,
+            'pick_xy': self.pick_xy,
         }
 
     def action_obs_mapping(self, obs, action_step="PickPlace", relative=False):
@@ -1371,6 +1413,54 @@ class Executor_Diffusion(Executor):
         print("\n[GT-FALLBACK] ===== summary =====", flush=True)
         print(f"[GT-FALLBACK] manipulable objects (should be empty): {cubes if cubes else 'NONE - vision was used throughout'}", flush=True)
         print(f"[GT-FALLBACK] static areas (expected by design): {areas if areas else 'none'}", flush=True)
+
+    def _stabilize_estimate(self, name, position, gripper_pos, update=True):
+        """Median of the cube's vision readings taken with the arm clear of it."""
+        if self.stable_estimate_radius <= 0 or not self.use_yolo:
+            return position
+        if name in self._grasped_now:
+            self.stable_estimates.pop(name, None)
+            self.release_xy[name] = np.array(gripper_pos[:2], dtype=float)
+            return position
+        readings = self.stable_estimates.setdefault(name, [])
+        position = np.asarray(position, dtype=float)
+        # Horizontal distance: an arm hovering above a cube still occludes it.
+        if update and np.linalg.norm(position[:2] - np.asarray(gripper_pos)[:2]) > self.stable_estimate_radius:
+            readings.append(position.copy())
+            del readings[:-self.stable_estimate_window]
+        estimate = np.median(readings, axis=0) if readings else position
+        # The robot placed this cube, so its XY is where the gripper let go. That beats
+        # vision on tall stacks (p90 27mm at level 3) unless vision says it has moved.
+        release = self.release_xy.get(name)
+        if release is not None:
+            if np.linalg.norm(np.asarray(estimate[:2]) - release) < self.release_trust_radius:
+                estimate = np.array([release[0], release[1], estimate[2]])
+            else:
+                self.release_xy.pop(name, None)
+        return estimate
+
+    def _observe_all_cubes(self, predicted_pos, gripper_pos):
+        # A cube is otherwise only read while it is a skill's goal, which for a place
+        # target means only with the arm overhead. Read every cube on every frame.
+        self._grasped_now = self.get_grasped_objects()
+        # Moving a cube changes what occludes what where it was lifted from and where it
+        # was put down: a lower cube read with another on top of it stays biased by
+        # 6-8mm otherwise. Readings elsewhere are still good, and clearing those too
+        # leaves cubes on tall stacks short of them (z 14-32mm low).
+        for name in self._grasped_now - self._was_grasped:
+            self.pick_xy[name] = np.array(gripper_pos[:2], dtype=float)
+        for name in self._was_grasped - self._grasped_now:
+            changed = [self.pick_xy.pop(name, None), self.release_xy.get(name)]
+            changed = [xy for xy in changed if xy is not None]
+            for other in list(self.stable_estimates):
+                readings = self.stable_estimates[other]
+                if readings and any(np.linalg.norm(np.median(readings, axis=0)[:2] - xy) < self.occlusion_radius
+                                    for xy in changed):
+                    del self.stable_estimates[other]
+        self._was_grasped = set(self._grasped_now)
+        for pddl_id, yolo_id in self.relations.items():
+            if 'cube' in str(pddl_id).lower() and yolo_id in predicted_pos:
+                self._stabilize_estimate(str(pddl_id), predicted_pos[yolo_id], gripper_pos)
 
     def _resolve_position(self, name, predicted_pos, objects_pos, fallback_reason, count_step=True):
         """Resolve one object's position for the policy observation.
@@ -1476,6 +1566,11 @@ class Executor_Diffusion(Executor):
             obj_to_pick_pos = self._resolve_position(obj_to_pick, predicted_pos, objects_pos, 'too-few-detections', count_step=first_obs)
             place_to_drop_pos = self._resolve_position(place_to_drop, predicted_pos, objects_pos, 'too-few-detections', count_step=first_obs)
 
+        if 'cube' in str(obj_to_pick).lower():
+            obj_to_pick_pos = self._stabilize_estimate(str(obj_to_pick), obj_to_pick_pos, gripper_pos, update=False)
+        if 'cube' in str(place_to_drop).lower():
+            place_to_drop_pos = self._stabilize_estimate(str(place_to_drop), place_to_drop_pos, gripper_pos, update=False)
+
         if relative_obs:
             rel_obj_to_pick_pos = gripper_pos - obj_to_pick_pos
             rel_place_to_drop_pos = gripper_pos - place_to_drop_pos
@@ -1496,6 +1591,9 @@ class Executor_Diffusion(Executor):
         elif action_gripper >= 0.5:
             action_gripper = np.array([0.1 * self.gripper_close_sign])
         action = np.concatenate([action[:3], action_gripper])
+        if self.xy_hold_gain > 0 and self._xy_anchor is not None and 0 in self.nulified_action_indexes:
+            ee_xy = self.detector.env.sim.data.body_xpos[self.detector.env.gripper_body][:2]
+            action[:2] = np.clip(self.xy_hold_gain * (self._xy_anchor - ee_xy), -0.3, 0.3)
         return action
     
     def build_object_relations(self, predicted_pos, objects_pos):
@@ -1697,6 +1795,7 @@ class Executor_Diffusion(Executor):
 
     def execute(self, env, observations, n_act, symgoal, task_goals=None, render=False):
         self.warnings = {"obj_to_pick": True, "place_to_drop": True}
+        self._xy_anchor = np.array(self.detector.env.sim.data.body_xpos[self.detector.env.gripper_body][:2], copy=True)
         self.vision_missing_steps = {}  # fresh vision-timeout budget per skill
         self.image_buffer = []
         self.detected_positions = {}
@@ -1744,6 +1843,9 @@ class Executor_Diffusion(Executor):
                         if predicted_cubes_xyz:
                             self.update_relations_with_new_detections(predicted_cubes_xyz, objects_pos)
                         
+                        if obs_num == 0:
+                            self._observe_all_cubes(predicted_cubes_xyz, ee_pos)
+
                         # STEP 3: Correct positions of grasped objects (for both detected and undetected)
                         predicted_cubes_xyz = self.correct_grasped_object_positions(
                             predicted_cubes_xyz, 

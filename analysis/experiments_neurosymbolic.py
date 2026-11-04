@@ -37,6 +37,9 @@ from planning.executor import Executor_Diffusion
 from planning.task_configs import (
     LEGACY_ENVS,
     NO_PROGRESS_LIMIT,
+    TALL_PICK_HOME_Z,
+    TALL_PICK_LEVEL,
+    cubes_below,
     PAPER_TASKS,
     REPO_ROOT,
     EpisodeTimeout,
@@ -158,6 +161,17 @@ def reset_gripper(env, detector, render=False, max_open_steps=80, max_home_steps
               f"(dist={np.linalg.norm(delta):.4f}); continuing")
 
 
+def lift_to_home_z(env, z, render=False, max_steps=80):
+    """Raise the arm straight up to height z."""
+    for _ in range(max_steps):
+        error = z - env._get_observations()["robot0_eef_pos"][2]
+        if abs(error) <= 0.01:
+            return
+        env.step(np.array([0, 0, 4.5 * error, 0]))
+        if render:
+            env.render()
+
+
 def reset_until_planned(env, detector, task, n_act, render=False):
     """Reset until the planner finds a plan; unsolvable resets are logged and counted."""
     unsolvable = 0
@@ -240,6 +254,9 @@ def run_episode(env, detector, monitor, task, skills, episode, args):
                 terminal_reason = f"preconditions_unmet:{move}:{missing}"
                 break
             print(f"Move {index + 1}/{len(moves)}: {cube} -> {destination}", flush=True)
+            if cubes_below(state, cube) >= TALL_PICK_LEVEL:
+                lift_to_home_z(env, TALL_PICK_HOME_Z, args.render)
+                observations = collect_observations(env, detector, args.n_act, open_action)
             monitor.set_move(cube, destination)
             observations, tracking_data, failed_skill = execute_move(
                 env, detector, skills, move, goals, observations, tracking_data, args)
