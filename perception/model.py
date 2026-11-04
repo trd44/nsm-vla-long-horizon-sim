@@ -47,20 +47,21 @@ class RayHead(BaseEstimator, RegressorMixin):
         return ray_xy(slope, z)[:, self.axis] + self.gb.predict(np.column_stack([f, z]))
 
 
-def fit_ray_cascade(X, Y, groups, params=None, n_folds=3, seed=0, agent_only=False):
+def fit_ray_cascade(X, Y, groups, params=None, n_folds=3, seed=0, agent_only=False, sample_weight=None):
     """Fit {reg_x, reg_y, reg_z}. X/Y head residuals train on out-of-fold z predictions."""
     params = {**DEFAULT_PARAMS, **(params or {})}
     z_geo, slope, f = engineer(X)
+    w = np.ones(len(X)) if sample_weight is None else np.asarray(sample_weight, dtype=float)
     z_oof = np.zeros(len(X))
     for tr, te in GroupKFold(n_folds).split(X, groups=groups):
-        gb = make_gb(params, seed).fit(f[tr], Y[tr, 2] - z_geo[tr])
+        gb = make_gb(params, seed).fit(f[tr], Y[tr, 2] - z_geo[tr], sample_weight=w[tr])
         z_oof[te] = z_geo[te] + gb.predict(f[te])
-    z_head = ZHead(make_gb(params, seed).fit(f, Y[:, 2] - z_geo))
+    z_head = ZHead(make_gb(params, seed).fit(f, Y[:, 2] - z_geo, sample_weight=w))
     base = ray_xy(slope, z_oof)
     f2 = np.column_stack([f[:, AGENT_COLS] if agent_only else f, z_oof])
     out = {"reg_z": z_head}
     for axis, name in enumerate(("reg_x", "reg_y")):
-        gb = make_gb(params, seed).fit(f2, Y[:, axis] - base[:, axis])
+        gb = make_gb(params, seed).fit(f2, Y[:, axis] - base[:, axis], sample_weight=w)
         out[name] = RayHead(axis, z_head, gb, agent_only)
     return out
 

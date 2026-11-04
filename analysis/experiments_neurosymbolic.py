@@ -367,7 +367,7 @@ def parse_args():
     parser.add_argument('--policy_set', type=str, default='original', choices=list(POLICY_SETS),
                         help='original: policies/hanoi_original with gripper_close_sign=-1. '
                              'retrained: policies/hanoi with gripper_close_sign=+1.')
-    parser.add_argument('--regressor', type=str, default='models/regressors/nsm_regressor.pkl', help='Regressor path')
+    parser.add_argument('--regressor', type=str, default='models/regressors/nsm_regressor_rollout.pkl', help='Regressor path')
     parser.add_argument('--yolo', type=str, default='models/yolo/hanoi_yolo.pt', help='YOLO weights path')
     parser.add_argument('--n_inference_steps', type=int, default=8, help='Diffusion denoising steps (paper section 6.1)')
     parser.add_argument('--episodes', type=int, default=50, help='Number of episodes to run')
