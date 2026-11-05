@@ -1,0 +1,32 @@
+{
+  "task": "sort_2color",
+  "episodes": 50,
+  "successes": 43,
+  "success_pct": 86.0,
+  "success_wilson95_pct": [
+    73.81380617631021,
+    93.04916661082956
+  ],
+  "advancement_pct": 95.0,
+  "advancement_ci95_pct": [
+    90.57281127576427,
+    99.42718872423572
+  ],
+  "paper_success_pct": 100.0,
+  "paper_advancement_pct": 100.0,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 2321.36,
+  "mean_wall_s": 355.39628177165986,
+  "paper_success_in_ci": false,
+  "perception": "vision",
+  "perception_label": "VISION PERCEPTION (YOLO + regressor)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 1000,
+  "regressor": "models/regressors/nsm_regressor_rollout.pkl",
+  "yolo": "models/yolo/hanoi_yolo.pt",
+  "env_kwargs": {
+    "cube_placement_noise": 0.025
+  }
+}

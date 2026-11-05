@@ -1,0 +1,35 @@
+{
+  "task": "tower_3_random",
+  "episodes": 50,
+  "successes": 46,
+  "success_pct": 92.0,
+  "success_wilson95_pct": [
+    81.16175297192756,
+    96.84504861306887
+  ],
+  "advancement_pct": 97.33333333333334,
+  "advancement_ci95_pct": [
+    94.80126347296657,
+    99.8654031937001
+  ],
+  "paper_success_pct": 100.0,
+  "paper_advancement_pct": 100.0,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 1663.82,
+  "mean_wall_s": 274.56705798625944,
+  "paper_success_in_ci": false,
+  "perception": "vision",
+  "perception_label": "VISION PERCEPTION (YOLO + regressor)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 1000,
+  "regressor": "models/regressors/nsm_regressor_rollout.pkl",
+  "yolo": "models/yolo/hanoi_yolo.pt",
+  "env_kwargs": {
+    "min_cubes": 3,
+    "max_cubes": 3,
+    "cube_placement_noise": 0.025,
+    "deterministic_reset": false
+  }
+}

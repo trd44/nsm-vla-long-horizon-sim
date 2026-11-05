@@ -1,0 +1,33 @@
+{
+  "task": "sort_2color_swapped",
+  "episodes": 50,
+  "successes": 49,
+  "success_pct": 98.0,
+  "success_wilson95_pct": [
+    89.5045563061035,
+    99.64607407674954
+  ],
+  "advancement_pct": 100.0,
+  "advancement_ci95_pct": [
+    100.0,
+    100.0
+  ],
+  "paper_success_pct": 100.0,
+  "paper_advancement_pct": 100.0,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 2385.38,
+  "mean_wall_s": 77.343654961586,
+  "paper_success_in_ci": false,
+  "perception": "gt",
+  "perception_label": "GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 1000,
+  "regressor": null,
+  "yolo": null,
+  "env_kwargs": {
+    "cube_placement_noise": 0.025,
+    "swap_bins": true
+  }
+}

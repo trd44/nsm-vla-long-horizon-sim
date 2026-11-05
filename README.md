@@ -131,17 +131,40 @@ cd Metric-FF-v2.1 && make && cd ..   # needs bison and flex
 
 ## Running the neuro-symbolic experiments
 
-Headless rendering needs an offscreen GL backend (`egl` on a GPU node,
-`osmesa` on CPU):
+Set `MUJOCO_GL` to the offscreen GL backend for your machine: `egl` on a GPU node,
+`osmesa` on CPU, `cgl` on macOS. On a machine that can't run the tracked
+`Metric-FF-v2.1/ff` binary, point `NSM_FF_BIN` at a native build.
 
 ```bash
-export MUJOCO_GL=egl
-python -u analysis/experiments_neurosymbolic.py --env Hanoi --episodes 50
+export PYTHONPATH="$PWD/robosuite/src:$PWD:$(realpath ../diffusion_policy)"
+export MUJOCO_GL=egl OMP_NUM_THREADS=1
+python -u analysis/experiments_neurosymbolic.py --task hanoi_4 --perception vision \
+    --episodes 50 --seed 1000 --results_dir results/nsm
 ```
 
-Perception is not switchable here: this driver always loads YOLO plus the
-bbox→3D regressor and passes them to every executor. (The price-is-not-right
-driver has a `--use_yolo` flag that gates this; this one does not.)
+- `--task`: `sort_2color`, `tower_3_set`, `hanoi_3`, `sort_2color_swapped`,
+  `sort_3color`, `tower_3_random`, `tower_4_set` or `hanoi_4`.
+- `--perception vision` uses YOLO and `models/regressors/nsm_regressor_rollout.pkl`.
+  `--perception gt` feeds simulator poses to the policies, and only isolates policy
+  behaviour. Do not report it as the vision result.
+- `--policy_set original` (default) uses the checkpoints in `policies/hanoi_original/`.
+- Each run writes per-episode JSONL and a summary with Wilson intervals against the
+  paper's number. Vision logs print a `[GT-FALLBACK]` summary, whose "manipulable
+  objects" line must read `NONE`.
+
+Seed ranges: 0-9 were used for development, 1000+ are held out for evaluation, and
+2000+ are for regressor training. `perception/collect_rollouts.py` refuses seeds below 2000.
+
+In vision mode, simulator state still supplies destination positions (pegs, bins and
+the platform have no YOLO class), the planner's initial state, skill termination and
+goal checks, the grasp override, and object identity when colours repeat. OWLv2
+distillation is not implemented in this repo.
+
+Rebuild the perception model with `perception/collect_data.py`,
+`perception/train_regressor.py`, `perception/collect_rollouts.py` and
+`perception/refit_rollouts.py`. Run the wiring tests with
+`pytest tests/test_task_configs.py`.
+
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 

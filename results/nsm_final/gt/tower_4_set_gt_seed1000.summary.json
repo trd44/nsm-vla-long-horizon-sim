@@ -1,0 +1,35 @@
+{
+  "task": "tower_4_set",
+  "episodes": 50,
+  "successes": 39,
+  "success_pct": 78.0,
+  "success_wilson95_pct": [
+    64.7584503045172,
+    87.24608408548042
+  ],
+  "advancement_pct": 80.5,
+  "advancement_ci95_pct": [
+    69.81129568188923,
+    91.18870431811078
+  ],
+  "paper_success_pct": 97.0,
+  "paper_advancement_pct": 99.5,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 1894.36,
+  "mean_wall_s": 61.527188878059384,
+  "paper_success_in_ci": false,
+  "perception": "gt",
+  "perception_label": "GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 1000,
+  "regressor": null,
+  "yolo": null,
+  "env_kwargs": {
+    "min_cubes": 4,
+    "max_cubes": 4,
+    "cube_placement_noise": 0.025,
+    "deterministic_reset": true
+  }
+}
