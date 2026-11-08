@@ -1459,6 +1459,17 @@ class Executor_Diffusion(Executor):
         for name in self._grasped_now - self._was_grasped:
             self.pick_xy[name] = np.array(gripper_pos[:2], dtype=float)
         for name in self._was_grasped - self._grasped_now:
+            # While held, the cube's track was overwritten with the gripper position, which
+            # is ~40mm above the cube once it is set down. With relations shared across skills
+            # that stale track would outlive the release and bias the next skill's target
+            # (it is the place target of the next tower move). Drop it and remap from fresh
+            # detections.
+            yolo_id = self.relations.pop(name, None)
+            if yolo_id is not None:
+                for attr in ('tracked_objects', 'tracking_metadata', 'particle_filters_2d',
+                             'particle_filters_3d', 'detection_outlier_count', 'map_id_semantic'):
+                    getattr(self, attr, {}).pop(yolo_id, None)
+                predicted_pos.pop(yolo_id, None)
             changed = [self.pick_xy.pop(name, None), self.release_xy.get(name)]
             changed = [xy for xy in changed if xy is not None]
             for other in list(self.stable_estimates):
