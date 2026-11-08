@@ -1,0 +1,54 @@
+{
+ "model": "/private/tmp/claude-501/-Users-timothyduggan-GitHub-nsm-vla-long-horizon-sim/e8f407aa-5c53-480b-bbe8-e6ebef675f1d/scratchpad/owl/yolov8n.pt",
+ "imgsz": 416,
+ "epochs": 6,
+ "batch": 16,
+ "device": "cpu",
+ "train_seconds": 4827,
+ "dataset": "/private/tmp/claude-501/-Users-timothyduggan-GitHub-nsm-vla-long-horizon-sim/e8f407aa-5c53-480b-bbe8-e6ebef675f1d/scratchpad/owl/dataset",
+ "owl_label_build": {
+  "label_cfg": {
+   "score_thr": 0.1,
+   "margin": -1.0,
+   "nms_iou": 0.3,
+   "max_side_a": 40,
+   "min_side": 3,
+   "max_aspect": 2.5,
+   "color": "recolor_any",
+   "min_frac": 0.1
+  },
+  "counts": {
+   "val/a": [
+    626,
+    2153
+   ],
+   "val/w": [
+    626,
+    1290
+   ],
+   "train/a": [
+    3211,
+    11552
+   ],
+   "train/w": [
+    3211,
+    6502
+   ],
+   "test/a": [
+    1415,
+    5257
+   ],
+   "test/w": [
+    1415,
+    2745
+   ]
+  }
+ },
+ "val_metrics_vs_owl_labels": {
+  "metrics/precision(B)": 0.8992170404558911,
+  "metrics/recall(B)": 0.9147700129097882,
+  "metrics/mAP50(B)": 0.9553156280777408,
+  "metrics/mAP50-95(B)": 0.8985432154273635,
+  "fitness": 0.8985432154273635
+ }
+}

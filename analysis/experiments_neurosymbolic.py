@@ -226,6 +226,12 @@ def run_episode(env, detector, monitor, task, skills, episode, args):
     monitor.start_episode()
     plan, goals, observations, unsolvable_resets = reset_until_planned(env, detector, task, args.n_act, args.render)
     print(f"Plan ({len(plan)} ops): {plan}\nGoal predicates: {goals}", flush=True)
+    owl_fallback = getattr(args, "owl_fallback_model", None)
+    if owl_fallback is not None:
+        # Colour names the cube in these tasks; otherwise the fallback watches every class it has seen.
+        inverse = {cube: color for color, cube in (task.color_to_pddl or {}).items()}
+        needed = {inverse[cube] for cube, _, _ in parse_moves(plan)} if task.color_to_pddl else None
+        owl_fallback.start_episode(needed)
     original_plan = list(plan)
     moves = parse_moves(plan)
     total_moves = len(moves)
@@ -316,7 +322,7 @@ def run_episode(env, detector, monitor, task, skills, episode, args):
         failure_reason = terminal_reason or ("skill_failed" if failure_move else "goal_not_held_at_end")
     print(("Episode SUCCEEDED" if success else f"Episode FAILED ({failure_reason}); unmet goals: {unmet}"), flush=True)
 
-    return {
+    record = {
         "episode": episode,
         "seed": seed,
         "base_seed": args.seed,
@@ -341,6 +347,10 @@ def run_episode(env, detector, monitor, task, skills, episode, args):
         "goals": goals,
         "unsolvable_resets": unsolvable_resets,
     }
+    if owl_fallback is not None:
+        record.update(owl_fallback.episode_stats())
+        print(f"[OWL-FALLBACK] {owl_fallback.episode_stats()}", flush=True)
+    return record
 
 
 def print_summary(summary, label):
@@ -382,6 +392,12 @@ def parse_args():
     parser.add_argument('--n_act', type=int, default=4, help='Number of actions to execute per policy call')
     parser.add_argument('--env_kwargs', type=str, default='{}',
                         help='JSON dict overriding the task env kwargs; the run no longer matches the paper setup')
+    parser.add_argument('--owl_fallback', action='store_true',
+                        help='Query OWLv2 (CPU) for a needed cube YOLO has missed for --owl_fallback_frames '
+                             'agentview frames; rate limited. Off by default. See perception/owl_fallback.py')
+    parser.add_argument('--owl_fallback_frames', type=int, default=10)
+    parser.add_argument('--owl_fallback_gap', type=int, default=10, help='min agentview frames between queries')
+    parser.add_argument('--owl_fallback_max', type=int, default=40, help='max queries per episode')
     args = parser.parse_args()
     if bool(args.task) == bool(args.env):
         parser.error("Pass exactly one of --task and --env")
@@ -457,6 +473,14 @@ def main():
     env = DictObs(GymWrapper(raw_env), monitor)
 
     yolo_model = YOLO(args.yolo) if use_vision else None
+    args.owl_fallback_model = None
+    if use_vision and args.owl_fallback:
+        from perception.owl_fallback import OwlFallbackModel
+        yolo_model = args.owl_fallback_model = OwlFallbackModel(
+            yolo_model, n_missing=args.owl_fallback_frames, min_gap=args.owl_fallback_gap,
+            max_queries=args.owl_fallback_max)
+        print(f"# OWLv2 runtime fallback ON: {args.owl_fallback_frames} missed frames, gap {args.owl_fallback_gap}, "
+              f"max {args.owl_fallback_max}/episode", flush=True)
     regressor_model = joblib.load(args.regressor) if use_vision else None
     for skill in skills:
         skill.load_policy(detector=detector, yolo_model=yolo_model, regressor_model=regressor_model, image_size=args.size)
@@ -476,6 +500,7 @@ def main():
             summary.update(perception=args.perception, perception_label=label, policy_set=args.policy_set,
                            replan=args.replan, n_inference_steps=args.n_inference_steps, seed=args.seed,
                            regressor=args.regressor if use_vision else None, yolo=args.yolo if use_vision else None,
+                           owl_fallback=bool(args.owl_fallback_model),
                            env_kwargs={**task.env_kwargs, **env_kwargs_override})
             with open(summary_path, 'w') as summary_file:
                 json.dump(summary, summary_file, indent=2)

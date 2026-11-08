@@ -1,0 +1,470 @@
+{
+ "note": "Regressor refit on nsm_yolo_owl.pt boxes (train/val frames of perception/owl_label.py data, seeds 2100-2499 scenes and 2600-2899 rollouts). 3D error on held-out test frames (scene groups 2500-2599, rollout episodes 2900-2999). 'common' = cubes every detector found.",
+ "regressor_error_mm": {
+  "nsm_regressor_rollout.pkl (default)": {
+   "owlv2": {
+    "own": {
+     "n": 4061,
+     "median_mm": 4.12,
+     "mean_mm": 13.15,
+     "p90_mm": 33.85,
+     "frac_under_15mm": 0.7951
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 3.27,
+     "mean_mm": 10.81,
+     "p90_mm": 27.05,
+     "frac_under_15mm": 0.8552
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 2.78,
+     "mean_mm": 3.45,
+     "p90_mm": 5.99,
+     "frac_under_15mm": 0.9923
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 3.82,
+     "mean_mm": 4.35,
+     "p90_mm": 6.97,
+     "frac_under_15mm": 1.0
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 27.33,
+     "mean_mm": 41.22,
+     "p90_mm": 111.6,
+     "frac_under_15mm": 0.2889
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 3.45,
+     "mean_mm": 10.84,
+     "p90_mm": 25.27,
+     "frac_under_15mm": 0.8568
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 3.16,
+     "mean_mm": 10.8,
+     "p90_mm": 27.43,
+     "frac_under_15mm": 0.8543
+    }
+   },
+   "distilled": {
+    "own": {
+     "n": 4121,
+     "median_mm": 3.24,
+     "mean_mm": 14.08,
+     "p90_mm": 39.7,
+     "frac_under_15mm": 0.7695
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 2.67,
+     "mean_mm": 7.66,
+     "p90_mm": 19.02,
+     "frac_under_15mm": 0.8797
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 2.29,
+     "mean_mm": 2.81,
+     "p90_mm": 4.75,
+     "frac_under_15mm": 0.9896
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 100.29,
+     "mean_mm": 79.6,
+     "p90_mm": 107.02,
+     "frac_under_15mm": 0.2308
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 18.19,
+     "mean_mm": 26.1,
+     "p90_mm": 53.65,
+     "frac_under_15mm": 0.4413
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 2.84,
+     "mean_mm": 9.0,
+     "p90_mm": 22.19,
+     "frac_under_15mm": 0.861
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 2.54,
+     "mean_mm": 6.87,
+     "p90_mm": 18.03,
+     "frac_under_15mm": 0.8906
+    }
+   },
+   "hanoi_yolo": {
+    "own": {
+     "n": 3726,
+     "median_mm": 1.53,
+     "mean_mm": 2.75,
+     "p90_mm": 4.53,
+     "frac_under_15mm": 0.9742
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 1.49,
+     "mean_mm": 2.59,
+     "p90_mm": 4.11,
+     "frac_under_15mm": 0.9762
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 1.38,
+     "mean_mm": 1.8,
+     "p90_mm": 2.97,
+     "frac_under_15mm": 0.9934
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 3.54,
+     "mean_mm": 4.02,
+     "p90_mm": 6.72,
+     "frac_under_15mm": 1.0
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 2.27,
+     "mean_mm": 5.83,
+     "p90_mm": 14.57,
+     "frac_under_15mm": 0.9048
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 1.84,
+     "mean_mm": 3.9,
+     "p90_mm": 8.09,
+     "frac_under_15mm": 0.9439
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 1.3,
+     "mean_mm": 1.82,
+     "p90_mm": 2.92,
+     "frac_under_15mm": 0.9951
+    }
+   }
+  },
+  "nsm_regressor_owl.pkl (this file)": {
+   "owlv2": {
+    "own": {
+     "n": 4061,
+     "median_mm": 5.73,
+     "mean_mm": 8.68,
+     "p90_mm": 18.41,
+     "frac_under_15mm": 0.8754
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 5.52,
+     "mean_mm": 8.2,
+     "p90_mm": 17.0,
+     "frac_under_15mm": 0.8859
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 5.12,
+     "mean_mm": 7.1,
+     "p90_mm": 13.06,
+     "frac_under_15mm": 0.917
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 24.08,
+     "mean_mm": 21.2,
+     "p90_mm": 34.06,
+     "frac_under_15mm": 0.3846
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 8.36,
+     "mean_mm": 12.46,
+     "p90_mm": 28.42,
+     "frac_under_15mm": 0.7683
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 5.89,
+     "mean_mm": 10.8,
+     "p90_mm": 28.41,
+     "frac_under_15mm": 0.7822
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 5.43,
+     "mean_mm": 6.68,
+     "p90_mm": 11.54,
+     "frac_under_15mm": 0.9465
+    }
+   },
+   "distilled": {
+    "own": {
+     "n": 4121,
+     "median_mm": 1.77,
+     "mean_mm": 3.82,
+     "p90_mm": 8.74,
+     "frac_under_15mm": 0.9478
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 1.58,
+     "mean_mm": 3.21,
+     "p90_mm": 6.02,
+     "frac_under_15mm": 0.9604
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 1.41,
+     "mean_mm": 1.93,
+     "p90_mm": 3.27,
+     "frac_under_15mm": 0.9915
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 7.39,
+     "mean_mm": 8.07,
+     "p90_mm": 13.06,
+     "frac_under_15mm": 0.9231
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 4.53,
+     "mean_mm": 8.35,
+     "p90_mm": 19.98,
+     "frac_under_15mm": 0.8333
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 2.0,
+     "mean_mm": 4.89,
+     "p90_mm": 12.59,
+     "frac_under_15mm": 0.9255
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 1.43,
+     "mean_mm": 2.22,
+     "p90_mm": 3.79,
+     "frac_under_15mm": 0.9809
+    }
+   },
+   "hanoi_yolo": {
+    "own": {
+     "n": 3726,
+     "median_mm": 3.3,
+     "mean_mm": 6.39,
+     "p90_mm": 15.15,
+     "frac_under_15mm": 0.8983
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 3.09,
+     "mean_mm": 5.88,
+     "p90_mm": 13.52,
+     "frac_under_15mm": 0.9143
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 2.6,
+     "mean_mm": 4.17,
+     "p90_mm": 7.34,
+     "frac_under_15mm": 0.9552
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 9.88,
+     "mean_mm": 10.21,
+     "p90_mm": 14.87,
+     "frac_under_15mm": 0.8462
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 8.94,
+     "mean_mm": 12.81,
+     "p90_mm": 29.33,
+     "frac_under_15mm": 0.7476
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 3.94,
+     "mean_mm": 7.83,
+     "p90_mm": 19.28,
+     "frac_under_15mm": 0.861
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 2.74,
+     "mean_mm": 4.74,
+     "p90_mm": 10.67,
+     "frac_under_15mm": 0.9456
+    }
+   }
+  },
+  "control: same recipe refit on hanoi_yolo boxes (not saved in repo)": {
+   "owlv2": {
+    "own": {
+     "n": 4061,
+     "median_mm": 6.97,
+     "mean_mm": 11.23,
+     "p90_mm": 22.68,
+     "frac_under_15mm": 0.8202
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 5.98,
+     "mean_mm": 8.96,
+     "p90_mm": 17.05,
+     "frac_under_15mm": 0.8806
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 5.32,
+     "mean_mm": 6.38,
+     "p90_mm": 10.97,
+     "frac_under_15mm": 0.9687
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 5.9,
+     "mean_mm": 7.3,
+     "p90_mm": 13.27,
+     "frac_under_15mm": 0.9231
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 14.45,
+     "mean_mm": 19.6,
+     "p90_mm": 35.91,
+     "frac_under_15mm": 0.5175
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 5.9,
+     "mean_mm": 10.42,
+     "p90_mm": 21.65,
+     "frac_under_15mm": 0.8367
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 6.04,
+     "mean_mm": 8.11,
+     "p90_mm": 14.21,
+     "frac_under_15mm": 0.9063
+    }
+   },
+   "distilled": {
+    "own": {
+     "n": 4121,
+     "median_mm": 3.53,
+     "mean_mm": 8.76,
+     "p90_mm": 21.43,
+     "frac_under_15mm": 0.8246
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 2.64,
+     "mean_mm": 5.93,
+     "p90_mm": 15.52,
+     "frac_under_15mm": 0.8951
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 2.04,
+     "mean_mm": 3.03,
+     "p90_mm": 5.65,
+     "frac_under_15mm": 0.9861
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 10.78,
+     "mean_mm": 10.91,
+     "p90_mm": 17.98,
+     "frac_under_15mm": 0.6923
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 14.11,
+     "mean_mm": 17.74,
+     "p90_mm": 35.55,
+     "frac_under_15mm": 0.5254
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 3.06,
+     "mean_mm": 7.44,
+     "p90_mm": 19.12,
+     "frac_under_15mm": 0.8601
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 2.34,
+     "mean_mm": 5.04,
+     "p90_mm": 13.38,
+     "frac_under_15mm": 0.9156
+    }
+   },
+   "hanoi_yolo": {
+    "own": {
+     "n": 3726,
+     "median_mm": 1.62,
+     "mean_mm": 3.4,
+     "p90_mm": 6.21,
+     "frac_under_15mm": 0.9611
+    },
+    "common": {
+     "n": 3233,
+     "median_mm": 1.57,
+     "mean_mm": 3.11,
+     "p90_mm": 5.84,
+     "frac_under_15mm": 0.9663
+    },
+    "common/base": {
+     "n": 2590,
+     "median_mm": 1.44,
+     "mean_mm": 2.09,
+     "p90_mm": 3.3,
+     "frac_under_15mm": 0.9888
+    },
+    "common/in_bin": {
+     "n": 13,
+     "median_mm": 5.37,
+     "mean_mm": 6.17,
+     "p90_mm": 11.07,
+     "frac_under_15mm": 1.0
+    },
+    "common/stacked": {
+     "n": 630,
+     "median_mm": 3.7,
+     "mean_mm": 7.24,
+     "p90_mm": 18.16,
+     "frac_under_15mm": 0.873
+    },
+    "common/scene": {
+     "n": 1194,
+     "median_mm": 2.21,
+     "mean_mm": 5.28,
+     "p90_mm": 12.66,
+     "frac_under_15mm": 0.9121
+    },
+    "common/rollout": {
+     "n": 2039,
+     "median_mm": 1.4,
+     "mean_mm": 1.84,
+     "p90_mm": 3.32,
+     "frac_under_15mm": 0.998
+    }
+   }
+  }
+ }
+}

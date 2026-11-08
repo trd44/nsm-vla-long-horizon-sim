@@ -157,8 +157,22 @@ Seed ranges: 0-9 were used for development, 1000+ are held out for evaluation, a
 
 In vision mode, simulator state still supplies destination positions (pegs, bins and
 the platform have no YOLO class), the planner's initial state, skill termination and
-goal checks, the grasp override, and object identity when colours repeat. OWLv2
-distillation is not implemented in this repo.
+goal checks, the grasp override, and object identity when colours repeat.
+
+OWLv2 distillation (paper §3.4.2) is available but not the default.
+`perception/owl_label.py` labels frames with OWLv2 (boxes from OWLv2, class from an
+added HSV colour step, since OWLv2 prompts label the yellow cube "green"), and
+`perception/train_yolo_distill.py` trains and evaluates `models/yolo/nsm_yolo_owl.pt`
+(use with `--yolo models/yolo/nsm_yolo_owl.pt --regressor models/regressors/nsm_regressor_owl.pkl`).
+It is distilled offline, not during episodes as in the paper. It finds more cubes in
+bins, in the gripper and in the wrist view, but in 8-episode dev pilots it scored
+below `hanoi_yolo.pt` (hanoi_4 0/8 vs 3/8). `--owl_fallback` queries OWLv2 at runtime
+for a cube YOLO has lost; it is experimental and off by default.
+
+Object tracking: a cube is never mapped to a track of another colour, one track maps
+to at most one cube, the cube-to-track mapping and last vision positions are shared
+across the four skills, a held cube is placed at the gripper, and a cube that is not
+held keeps its last vision position instead of timing out.
 
 Rebuild the perception model with `perception/collect_data.py`,
 `perception/train_regressor.py`, `perception/collect_rollouts.py` and
