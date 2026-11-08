@@ -1329,6 +1329,10 @@ class Executor_Diffusion(Executor):
         self.release_xy = tracking_data_dict.get('release_xy', {})
         self._was_grasped = tracking_data_dict.get('was_grasped', set())
         self.pick_xy = tracking_data_dict.get('pick_xy', {})
+        if 'relations' in tracking_data_dict:
+            self.relations = tracking_data_dict['relations']
+            self.map_id_semantic = tracking_data_dict['map_id_semantic']
+            self.last_vision_pos = tracking_data_dict['last_vision_pos']
 
     def get_tracking_data(self):
         """Returns all the variables related to tracking for external use."""
@@ -1347,6 +1351,11 @@ class Executor_Diffusion(Executor):
             'release_xy': self.release_xy,
             'was_grasped': self._was_grasped,
             'pick_xy': self.pick_xy,
+            # Shared so all four skills agree on which track is which cube and where a
+            # cube was last seen; per-skill copies diverged and caused wrong-cube picks.
+            'relations': self.relations,
+            'map_id_semantic': self.map_id_semantic,
+            'last_vision_pos': self.last_vision_pos,
         }
 
     def action_obs_mapping(self, obs, action_step="PickPlace", relative=False):
@@ -1476,6 +1485,27 @@ class Executor_Diffusion(Executor):
         name = str(name)
         is_cube = 'cube' in name.lower()
         yolo_id = self.relations.get(name, None)
+
+        # A held cube is where the gripper is (proprioception, not simulator state).
+        vision_cube = is_cube and self.use_yolo
+        if vision_cube and name in self._grasped_now:
+            pos = np.array(objects_pos['gripper'], dtype=float)
+            self.last_vision_pos[name] = pos
+            self.vision_missing_steps[name] = 0
+            return pos
+
+        # An unmapped cube falls back to the median of its own earlier vision readings.
+        if vision_cube and name not in self.last_vision_pos:
+            tracked = yolo_id is not None and (
+                yolo_id in predicted_pos or 'last_position' in getattr(self, 'tracking_metadata', {}).get(yolo_id, {}))
+            readings = self.stable_estimates.get(name)
+            if not tracked and readings:
+                self.last_vision_pos[name] = np.median(readings, axis=0)
+
+        # A cube that is not held does not move, so its last vision position stays valid:
+        # it never times out (the timeout below only applies to cubes without one).
+        if vision_cube and name in self.last_vision_pos:
+            self.vision_missing_steps[name] = 0
 
         if yolo_id is not None and yolo_id in predicted_pos:
             pos = predicted_pos[yolo_id]
@@ -1680,6 +1710,43 @@ class Executor_Diffusion(Executor):
                                 new_relations[pddl_id] = yolo_id  # Keep stable mapping
             
             self.relations = new_relations
+            self.update_yolo_to_pddl_mapping()
+        self._enforce_relation_consistency(new_predicted_pos)
+
+    def _enforce_relation_consistency(self, new_predicted_pos):
+        """A cube is never mapped to a track of another colour, and a track is one cube.
+
+        When a mapped track is dropped (arm occlusion), the rebuild plus the merge above
+        could map a cube to a different-coloured track and put 2-4 cubes on one track.
+        """
+        changed = False
+        if self.color_to_pddl:
+            colour_of = {pddl: colour for colour, pddl in self.color_to_pddl.items()}
+            for pddl_id, yolo_id in list(self.relations.items()):
+                if pddl_id in colour_of and yolo_id is not None and yolo_id.rsplit('_', 1)[0] != colour_of[pddl_id]:
+                    del self.relations[pddl_id]
+                    changed = True
+        by_track = {}
+        for pddl_id, yolo_id in self.relations.items():
+            if yolo_id is not None:
+                by_track.setdefault(yolo_id, []).append(pddl_id)
+        for yolo_id, pddl_ids in by_track.items():
+            if len(pddl_ids) < 2:
+                continue
+            track_pos = new_predicted_pos.get(yolo_id)
+
+            def dist(pddl_id):
+                readings = self.stable_estimates.get(pddl_id)
+                if track_pos is None or not readings:
+                    return np.inf
+                return float(np.linalg.norm(np.median(readings, axis=0)[:2] - np.asarray(track_pos)[:2]))
+
+            keep = min(pddl_ids, key=dist)
+            for pddl_id in pddl_ids:
+                if pddl_id != keep:
+                    del self.relations[pddl_id]
+                    changed = True
+        if changed:
             self.update_yolo_to_pddl_mapping()
 
     def correct_grasped_object_positions(self, predicted_pos, ee_pos, image_shape):
