@@ -13,3 +13,6 @@
 [submodule "rlds_dataset_builder"]
 	path = rlds_dataset_builder
 	url = https://github.com/trd44/rlds_dataset_builder.git
+[submodule "diffusion_policy"]
+	path = diffusion_policy
+	url = https://github.com/real-stanford/diffusion_policy.git

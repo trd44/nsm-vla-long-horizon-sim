@@ -111,13 +111,13 @@ submodule).
 
 ### diffusion_policy
 
-`planning/executor.py` imports `diffusion_policy`, which is **not** vendored or
-submoduled here. Clone it and put it on `PYTHONPATH`:
+`planning/executor.py` imports `diffusion_policy`, a submodule pinned to
+upstream commit `5ba07ac`. Fetch it with the other submodules and put it on
+`PYTHONPATH`:
 
 ```bash
-git clone https://github.com/real-stanford/diffusion_policy.git ../diffusion_policy
-git -C ../diffusion_policy checkout 5ba07ac6661db573af695b419a7947ecb704690f
-export PYTHONPATH="$(realpath ../diffusion_policy):$PWD"
+git submodule update --init diffusion_policy
+export PYTHONPATH="$PWD/diffusion_policy:$PWD"
 ```
 
 ### Metric-FF
@@ -136,7 +136,7 @@ Set `MUJOCO_GL` to the offscreen GL backend for your machine: `egl` on a GPU nod
 `Metric-FF-v2.1/ff` binary, point `NSM_FF_BIN` at a native build.
 
 ```bash
-export PYTHONPATH="$PWD/robosuite/src:$PWD:$(realpath ../diffusion_policy)"
+export PYTHONPATH="$PWD/robosuite/src:$PWD:$PWD/diffusion_policy"
 export MUJOCO_GL=egl OMP_NUM_THREADS=1
 python -u analysis/experiments_neurosymbolic.py --task hanoi_4 --perception vision \
     --episodes 50 --seed 1000 --results_dir results/nsm
