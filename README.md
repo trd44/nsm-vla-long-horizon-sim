@@ -144,20 +144,32 @@ python -u analysis/experiments_neurosymbolic.py --task hanoi_4 --perception visi
 
 - `--task`: `sort_2color`, `tower_3_set`, `hanoi_3`, `sort_2color_swapped`,
   `sort_3color`, `tower_3_random`, `tower_4_set` or `hanoi_4`.
-- `--perception vision` uses YOLO and `models/regressors/nsm_regressor_rollout.pkl`.
-  `--perception gt` feeds simulator poses to the policies, and only isolates policy
-  behaviour. Do not report it as the vision result.
+- `--perception vision` uses YOLO and `models/regressors/nsm_regressor_rollout.pkl`, and
+  never reads an object position from the simulator (there is no fallback).
+  `--perception gt` is the only way to feed simulator poses to the policies; it isolates
+  policy behaviour and is not a vision result.
 - `--policy_set original` (default) uses the checkpoints in `policies/hanoi_original/`.
 - Each run writes per-episode JSONL and a summary with Wilson intervals against the
-  paper's number. Vision logs print a `[GT-FALLBACK]` summary, whose "manipulable
-  objects" line must read `NONE`.
+  paper's number. Logs print a `[PERCEPTION]` line saying which source was used.
 
 Seed ranges: 0-9 were used for development, 1000+ are held out for evaluation, and
 2000+ are for regressor training. `perception/collect_rollouts.py` refuses seeds below 2000.
 
-In vision mode, simulator state still supplies destination positions (pegs, bins and
-the platform have no YOLO class), the planner's initial state, skill termination and
-goal checks, the grasp override, and object identity when colours repeat.
+In vision mode, positions come only from vision:
+- Cubes come from YOLO plus the regressor; a held cube is at the gripper (proprioception).
+- Pegs, bins and the platform are fixed fixtures with no YOLO class. Their positions come
+  from each task's workcell map in `planning/task_configs.py`, which
+  `tests/test_task_configs.py` checks against the environments. `--env_kwargs` that move
+  the fixtures are refused in vision mode.
+- Which cube is which comes from colour, where vision last saw each cube, and the
+  symbolic state, never from simulator positions. When several cubes share a colour
+  (sorting), symbolically identical cubes are interchangeable: if the robot reaches one
+  other than the planned cube, the two names are swapped for the rest of the plan
+  (`[IDENTITY]` in the log), as the relational grounding in paper §3.4.3 allows.
+
+The symbolic state (`on`, `clear`, `grasped`, `type_match`) is given, as in the paper:
+the planner's state, skill termination, goal checks and "which cube is held" read the
+simulator's predicate detector, not vision.
 
 OWLv2 distillation (paper §3.4.2) is available but not the default.
 `perception/owl_label.py` labels frames with OWLv2 (boxes from OWLv2, class from an

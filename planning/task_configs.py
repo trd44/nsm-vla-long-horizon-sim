@@ -26,6 +26,19 @@ NO_PROGRESS_LIMIT = 600
 HANOI_COLORS = {"blue cube": "cube1", "red cube": "cube2", "green cube": "cube3", "yellow cube": "cube4"}
 TOWER_COLORS = {"blue cube": "cube0", "red cube": "cube1", "green cube": "cube2", "yellow cube": "cube3"}
 
+# Workcell map: the pegs, platforms and bins are fixed fixtures (no jitter in any paper
+# task), so vision mode takes their positions from this map and never from the
+# simulator. tests/test_task_configs.py checks it against the environments.
+_PEGS = {"peg1": (0.0, -0.18, 0.8), "peg2": (0.0, 0.02, 0.8), "peg3": (0.0, 0.22, 0.8)}
+_TOWER_PLATFORM = {"platform": (0.0, 0.24, 0.805)}
+_SORT_BINS = {"platform1": (-0.15, -0.2, 0.806), "platform2": (-0.15, 0.2, 0.806)}
+_SORT_BINS_SWAPPED = {"platform1": (-0.15, 0.2, 0.806), "platform2": (-0.15, -0.2, 0.806)}
+_SORT3_BINS = {"bin0": (-0.15, -0.2, 0.806), "bin1": (-0.15, 0.0, 0.806), "bin2": (-0.15, 0.2, 0.806)}
+# Sorting tasks: the colour (YOLO class) of the cubes each area takes. With type_match()
+# from the symbolic state this gives every PDDL cube its colour.
+_SORT_COLORS = {"platform1": "blue cube", "platform2": "red cube"}
+_SORT3_COLORS = {"bin0": "red cube", "bin1": "green cube", "bin2": "blue cube"}
+
 
 def _hanoi_goal(state, detector):
     cubes = list(detector.objects)
@@ -71,13 +84,18 @@ class TaskConfig:
     detector: str = ""
     planning_mode: int = 0
     notes: str = ""
+    # Fixed fixture positions used by vision mode (see the workcell map above).
+    static_positions: Optional[Dict[str, Tuple[float, float, float]]] = None
+    # Sorting tasks: area -> colour of the cubes that belong there.
+    area_colors: Optional[Dict[str, str]] = None
 
 
-def _task(name, env_name, env_kwargs, pddl, predicates, goal, success, advancement, colors, plan_len, detector, notes=""):
+def _task(name, env_name, env_kwargs, pddl, predicates, goal, success, advancement, colors, plan_len, detector, notes="",
+          static=None, area_colors=None):
     return TaskConfig(name=name, env_name=env_name, env_kwargs=env_kwargs, pddl_dir=f"planning/PDDL/{pddl}/",
                       predicates=predicates, goal_builder=goal, paper_success=success,
                       paper_advancement=advancement, color_to_pddl=colors, expected_plan_len=plan_len,
-                      detector=detector, notes=notes)
+                      detector=detector, notes=notes, static_positions=static, area_colors=area_colors)
 
 
 _HANOI_PRED = ("on", "clear", "grasped")
@@ -88,32 +106,40 @@ PAPER_TASKS: Dict[str, TaskConfig] = {
     "sort_2color": _task(
         "sort_2color", "CubeSorting", {"cube_placement_noise": SPAWN_NOISE}, "cubesorting", _SORT_PRED,
         _sorting_goal, 100.0, 100.0, None, 8, "CubeSortingDetector",
-        "Colours are i.i.d. fair draws per reset, so 1 episode in 8 is all one colour."),
+        "Colours are i.i.d. fair draws per reset, so 1 episode in 8 is all one colour.",
+        static=_SORT_BINS, area_colors=_SORT_COLORS),
     "tower_3_set": _task(
         "tower_3_set", "HeightStacking",
         {"min_cubes": 3, "max_cubes": 3, "cube_placement_noise": SPAWN_NOISE, "deterministic_reset": True},
-        "heightstacking", _TOWER_PRED, _tower_goal, 100.0, 100.0, TOWER_COLORS, 6, "HeightStackingDetector"),
+        "heightstacking", _TOWER_PRED, _tower_goal, 100.0, 100.0, TOWER_COLORS, 6, "HeightStackingDetector",
+        static=_TOWER_PLATFORM),
     "hanoi_3": _task(
         "hanoi_3", "Hanoi", {"cube_init_pos_noise_uniform": SPAWN_NOISE}, "hanoi", _HANOI_PRED,
-        _hanoi_goal, 100.0, 100.0, {k: v for k, v in HANOI_COLORS.items() if v != "cube4"}, 14, "HanoiDetector"),
+        _hanoi_goal, 100.0, 100.0, {k: v for k, v in HANOI_COLORS.items() if v != "cube4"}, 14, "HanoiDetector",
+        static=_PEGS),
     "sort_2color_swapped": _task(
         "sort_2color_swapped", "CubeSorting", {"cube_placement_noise": SPAWN_NOISE, "swap_bins": True},
-        "cubesorting", _SORT_PRED, _sorting_goal, 100.0, 100.0, None, 8, "CubeSortingDetector"),
+        "cubesorting", _SORT_PRED, _sorting_goal, 100.0, 100.0, None, 8, "CubeSortingDetector",
+        static=_SORT_BINS_SWAPPED, area_colors=_SORT_COLORS),
     "sort_3color": _task(
         "sort_3color", "AssemblyLineSorting", {"num_bins": 3, "cube_placement_noise": SPAWN_NOISE},
         "assemblylinesorting", _SORT_PRED, _sorting_goal, 86.0, 96.5, None, 8, "AssemblyLineSortingDetector",
-        "Colours are fixed (red, green, blue, red); only the spawn order is shuffled."),
+        "Colours are fixed (red, green, blue, red); only the spawn order is shuffled.",
+        static=_SORT3_BINS, area_colors=_SORT3_COLORS),
     "tower_3_random": _task(
         "tower_3_random", "HeightStacking",
         {"min_cubes": 3, "max_cubes": 3, "cube_placement_noise": SPAWN_NOISE, "deterministic_reset": False},
-        "heightstacking", _TOWER_PRED, _tower_goal, 100.0, 100.0, TOWER_COLORS, 6, "HeightStackingDetector"),
+        "heightstacking", _TOWER_PRED, _tower_goal, 100.0, 100.0, TOWER_COLORS, 6, "HeightStackingDetector",
+        static=_TOWER_PLATFORM),
     "tower_4_set": _task(
         "tower_4_set", "HeightStacking",
         {"min_cubes": 4, "max_cubes": 4, "cube_placement_noise": SPAWN_NOISE, "deterministic_reset": True},
-        "heightstacking", _TOWER_PRED, _tower_goal, 97.0, 99.5, TOWER_COLORS, 8, "HeightStackingDetector"),
+        "heightstacking", _TOWER_PRED, _tower_goal, 97.0, 99.5, TOWER_COLORS, 8, "HeightStackingDetector",
+        static=_TOWER_PLATFORM),
     "hanoi_4": _task(
         "hanoi_4", "Hanoi4x3", {"cube_init_pos_noise_uniform": SPAWN_NOISE}, "hanoi4x3", _HANOI_PRED,
-        _hanoi_goal, 78.0, 84.4, HANOI_COLORS, 30, "HanoiDetector"),
+        _hanoi_goal, 78.0, 84.4, HANOI_COLORS, 30, "HanoiDetector",
+        static=_PEGS),
 }
 
 

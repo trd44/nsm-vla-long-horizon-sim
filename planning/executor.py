@@ -177,7 +177,7 @@ class ParticleFilter3D:
 
 
 class VisionLostError(Exception):
-    """Raised in strict_vision mode when a manipulable object has had no
+    """Raised in vision mode when a manipulable object has had no
     vision-derived position for more than vision_timeout_steps steps."""
     pass
 
@@ -193,7 +193,6 @@ class Executor_Diffusion(Executor):
                  horizon=None,
                  use_yolo=True,
                  save_data=False,
-                 strict_vision=True,
                  vision_timeout_steps=45,
                  instances_per_label=None,
                  particle_filter_particles_2d=100,
@@ -205,6 +204,8 @@ class Executor_Diffusion(Executor):
                  yolo_frequency=2,
                  gripper_close_sign=1,
                  color_to_pddl=None,
+                 static_positions=None,
+                 area_colors=None,
                  xy_hold_gain=5.0,
                  max_agentview_box_px=40,
                  stable_estimate_radius=0.08,
@@ -221,6 +222,13 @@ class Executor_Diffusion(Executor):
         # YOLO class -> PDDL cube, for tasks where colour identifies the cube.
         # None means identities come from relational matching (paper section 3.4.3).
         self.color_to_pddl = color_to_pddl or {}
+        # Vision mode never reads object positions from the simulator. Pegs, platforms and
+        # bins are fixed fixtures, so their positions come from the task's workcell map.
+        self.static_positions = {k: np.array(v, dtype=float) for k, v in (static_positions or {}).items()}
+        # Sorting tasks: area -> colour of its cubes. With type_match() from the symbolic
+        # state this gives each PDDL cube its colour (see _cube_colours).
+        self.area_colors = area_colors or {}
+        self._colour_cache = None
         # Skills with nullified XY (Pick, Drop) send zero XY. Delta OSC treats that as
         # "stay where you are now", so the arm drifts 10-14mm in x while descending,
         # enough to topple a stack. Hold the XY from skill start instead. Proprioception
@@ -255,9 +263,6 @@ class Executor_Diffusion(Executor):
         self.oracle = oracle
         self.use_yolo = use_yolo
         self.save_data = save_data
-        # Strict vision: manipulable objects (cubes) never read simulator
-        # ground truth; see _resolve_position.
-        self.strict_vision = strict_vision
         self.vision_timeout_steps = vision_timeout_steps
         self.last_vision_pos = {}       # PDDL id -> last vision-derived position
         self.vision_missing_steps = {}  # PDDL id -> consecutive steps without vision
@@ -1313,6 +1318,7 @@ class Executor_Diffusion(Executor):
         self.map_id_semantic = {}
         self.last_vision_pos = {}
         self.vision_missing_steps = {}
+        self._colour_cache = None
         self.stable_estimates = {}
         self.release_xy = {}
         self._grasped_now = set()
@@ -1403,27 +1409,13 @@ class Executor_Diffusion(Executor):
             returned_obs[j] = obs_policy
         return returned_obs
 
-    # --- Ground-truth fallback instrumentation (verification only) ----------
-    # Records every time a policy observation position is taken from simulator
-    # ground truth (objects_pos) instead of the vision pipeline. Fallbacks for
-    # static areas (pegs/zones/bins) are by design and only counted; any
-    # fallback for a manipulable object ('cube' in the name) is printed loudly.
-    gt_fallback_counts = {}
-
-    def gt_fallback(self, obj_name, reason):
-        key = (str(obj_name), reason)
-        Executor_Diffusion.gt_fallback_counts[key] = Executor_Diffusion.gt_fallback_counts.get(key, 0) + 1
-        if 'cube' in str(obj_name).lower():
-            print(f"[GT-FALLBACK] object={obj_name} reason={reason} total={Executor_Diffusion.gt_fallback_counts[key]} skill={getattr(self, 'id', '?')}", flush=True)
-
     @staticmethod
-    def gt_fallback_summary():
-        counts = Executor_Diffusion.gt_fallback_counts
-        cubes = {k: v for k, v in counts.items() if 'cube' in k[0].lower()}
-        areas = {k: v for k, v in counts.items() if 'cube' not in k[0].lower()}
-        print("\n[GT-FALLBACK] ===== summary =====", flush=True)
-        print(f"[GT-FALLBACK] manipulable objects (should be empty): {cubes if cubes else 'NONE - vision was used throughout'}", flush=True)
-        print(f"[GT-FALLBACK] static areas (expected by design): {areas if areas else 'none'}", flush=True)
+    def perception_summary(use_yolo):
+        if use_yolo:
+            print("[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; "
+                  "no simulator positions are read (only gripper proprioception and the symbolic state)", flush=True)
+        else:
+            print("[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)", flush=True)
 
     def _stabilize_estimate(self, name, position, gripper_pos, update=True):
         """Median of the cube's vision readings taken with the arm clear of it."""
@@ -1476,20 +1468,25 @@ class Executor_Diffusion(Executor):
     def _resolve_position(self, name, predicted_pos, objects_pos, fallback_reason, count_step=True):
         """Resolve one object's position for the policy observation.
 
-        Preference order: fresh/tracked vision position, then tracker memory.
-        Static areas (no 'cube' in the name, e.g. pegs/bins) may fall back to
-        simulator ground truth — they are not YOLO classes. In strict_vision
-        mode manipulable objects (cubes) NEVER read ground truth: while vision
-        is lost the last vision-derived position is reused (recoverable when a
-        later frame re-detects the object), and VisionLostError is raised after
-        vision_timeout_steps consecutive steps without any vision update.
+        Ground-truth mode (use_yolo False, --perception gt) reads the simulator. Vision mode
+        never does: fixtures come from the workcell map, a held cube is at the gripper, and
+        any other cube uses its fresh/tracked vision position, then its last vision position.
+        VisionLostError is raised for a cube vision has never located, or one without a
+        vision update for vision_timeout_steps consecutive steps.
         """
         name = str(name)
+        if not self.use_yolo:
+            return objects_pos[name]
         is_cube = 'cube' in name.lower()
+        if not is_cube:
+            if name not in self.static_positions:
+                raise KeyError(f"{name} is not a cube and not in the task's workcell map; "
+                               "vision mode has no position for it")
+            return self.static_positions[name].copy()
         yolo_id = self.relations.get(name, None)
 
         # A held cube is where the gripper is (proprioception, not simulator state).
-        vision_cube = is_cube and self.use_yolo
+        vision_cube = True
         if vision_cube and name in self._grasped_now:
             pos = np.array(objects_pos['gripper'], dtype=float)
             self.last_vision_pos[name] = pos
@@ -1511,27 +1508,18 @@ class Executor_Diffusion(Executor):
 
         if yolo_id is not None and yolo_id in predicted_pos:
             pos = predicted_pos[yolo_id]
-            if is_cube:
-                self.last_vision_pos[name] = pos
-                self.vision_missing_steps[name] = 0
-                if self.debug and name in objects_pos:
-                    err = np.linalg.norm(np.asarray(pos) - np.asarray(objects_pos[name]))
-                    self.debug_message(f"  [VISION-ERR] {name}: |vision - ground truth| = {err:.4f} m")
+            self.last_vision_pos[name] = pos
+            self.vision_missing_steps[name] = 0
             return pos
 
         track = getattr(self, 'tracking_metadata', {}).get(yolo_id, {}) if yolo_id is not None else {}
         if 'last_position' in track:
             pos = track['last_position']
-            if is_cube:
-                self.last_vision_pos[name] = pos
-                self.vision_missing_steps[name] = 0
+            self.last_vision_pos[name] = pos
+            self.vision_missing_steps[name] = 0
             return pos
 
-        if not (self.strict_vision and self.use_yolo and is_cube):
-            self.gt_fallback(name, fallback_reason)
-            return objects_pos[name]
-
-        # Strict mode, cube, no vision this step
+        # No vision this step
         if count_step:
             self.vision_missing_steps[name] = self.vision_missing_steps.get(name, 0) + 1
         missed = self.vision_missing_steps.get(name, 1)
@@ -1562,11 +1550,6 @@ class Executor_Diffusion(Executor):
             # b = objs[1]
             # self.debug_message(f"{a.id} relations to {b.id}:", a.get_relations_to(b.id))
 
-            # Get relationships between sim objects
-            cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items() if obj_id != "gripper" and 'cube' in obj_id}
-            sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id]) for obj_id in cubes_only.keys()]
-            update_object_metadata(sim_objs, eps=1e-3)
-            # pretty_self.debug_message_scene(sim_objs)
 
             # if not self.relations:
             #     # Map predicted positions to object positions based on relationships
@@ -1628,44 +1611,128 @@ class Executor_Diffusion(Executor):
             action[:2] = np.clip(self.xy_hold_gain * (self._xy_anchor - ee_xy), -0.3, 0.3)
         return action
     
-    def build_object_relations(self, predicted_pos, objects_pos):
+    def _pddl_cubes(self):
+        """The task's PDDL cube names (symbolic, no positions)."""
+        return [o for o in getattr(self.detector, 'objects', []) if 'cube' in str(o).lower()]
+
+    def _symbolic_state(self):
+        return self.detector.get_groundings(as_dict=True, binary_to_float=False, return_distance=False)
+
+    def _cube_colours(self):
+        """PDDL cube -> YOLO colour class. Hanoi/tower name a cube by its colour; in the
+        sorting tasks the symbolic state's type_match(cube, area) and the task's area
+        colours give it. Fixed within an episode, so cached."""
+        if self.color_to_pddl:
+            return {pddl: colour for colour, pddl in self.color_to_pddl.items()}
+        if self._colour_cache is None:
+            state = self._symbolic_state()
+            colours = {}
+            for cube in self._pddl_cubes():
+                for area, colour in self.area_colors.items():
+                    if state.get(f"type_match({cube},{area})"):
+                        colours[cube] = colour
+            self._colour_cache = colours
+        return self._colour_cache
+
+    def _memory_xy(self, pddl_id):
+        """Where vision last put this cube (no simulator state)."""
+        if pddl_id in self.last_vision_pos:
+            return np.asarray(self.last_vision_pos[pddl_id], dtype=float)[:2]
+        readings = self.stable_estimates.get(pddl_id)
+        if readings:
+            return np.median(readings, axis=0)[:2]
+        return None
+
+    def build_object_relations(self, predicted_pos, objects_pos=None):
+        """PDDL cube -> YOLO track, from vision and the symbolic state only.
+
+        Where colour names the cube (hanoi, tower) the cube takes the first track of its
+        colour. Where several cubes share a colour (sorting), the cubes of each colour
+        are assigned to that colour's tracks by where vision last saw each cube; a cube
+        vision has not located yet is matched by its symbolic support (in an area or on
+        the table, compared with the workcell map), as in paper section 3.4.3. Cubes that
+        are symbolically identical are interchangeable; execute_move in the driver
+        reconciles the names from the symbolic state after the robot reaches one.
+        """
         relations = {}
-        for yolo_id in predicted_pos.keys():
-            cls = yolo_id.rsplit("_", 1)[0]
-            pddl_id = self.color_to_pddl.get(cls)
-            if pddl_id is None:
-                continue
-            if pddl_id not in relations:
-                relations[pddl_id] = yolo_id
-
-        cubes_only = {obj_id: pos for obj_id, pos in objects_pos.items()
-                      if obj_id != "gripper" and "cube" in obj_id}
-        unmapped_pddl = [cid for cid in cubes_only if cid not in relations]
-        if unmapped_pddl:
-            predicted_objs = [SceneObject(id=obj_id, position=predicted_pos[obj_id])
-                              for obj_id in predicted_pos.keys()]
-            update_object_metadata(predicted_objs, eps=1e-3)
-            sim_objs = [SceneObject(id=obj_id, position=cubes_only[obj_id])
-                        for obj_id in cubes_only.keys()]
-            update_object_metadata(sim_objs, eps=1e-3)
-            rel_match = match_objects_by_relationships(sim_objs, predicted_objs)
-            used_yolo = set(relations.values())
-            for pddl_id in unmapped_pddl:
-                yolo_id = rel_match.get(pddl_id)
-                if yolo_id and yolo_id not in used_yolo:
+        cubes = self._pddl_cubes()
+        if self.color_to_pddl:
+            for yolo_id in predicted_pos.keys():
+                pddl_id = self.color_to_pddl.get(yolo_id.rsplit("_", 1)[0])
+                if pddl_id is not None and pddl_id not in relations:
                     relations[pddl_id] = yolo_id
-                    used_yolo.add(yolo_id)
+        else:
+            from scipy.optimize import linear_sum_assignment
+            colours = self._cube_colours()
+            state = None
+            tracks_by_colour = {}
+            for yolo_id in sorted(predicted_pos.keys()):
+                tracks_by_colour.setdefault(yolo_id.rsplit("_", 1)[0], []).append(yolo_id)
+            for colour, tracks in tracks_by_colour.items():
+                group = sorted(c for c in cubes if colours.get(c) == colour)
+                if not group:
+                    continue
+                cost = np.zeros((len(group), len(tracks)))
+                for i, cube in enumerate(group):
+                    memory = self._memory_xy(cube)
+                    for j, yolo_id in enumerate(tracks):
+                        txy = np.asarray(predicted_pos[yolo_id], dtype=float)[:2]
+                        if memory is not None:
+                            cost[i, j] = np.linalg.norm(txy - memory)
+                            continue
+                        if state is None:
+                            state = self._symbolic_state()
+                        area = next((a for a in self.static_positions
+                                     if state.get(f"on({cube},{a})") or state.get(f"in({cube},{a})")), None)
+                        near = {a: np.linalg.norm(txy - p[:2]) for a, p in self.static_positions.items()}
+                        if area is not None:
+                            cost[i, j] = 1.0 + near[area]
+                        else:
+                            # On the table: avoid tracks inside an area; ties go to track order.
+                            cost[i, j] = 1.0 + (5.0 if near and min(near.values()) < 0.08 else 0.0) + 1e-3 * j
+                rows, cols = linear_sum_assignment(cost)
+                for i, j in zip(rows, cols):
+                    relations[group[i]] = tracks[j]
 
-        self.debug_message("\n=== Detected-to-PDDL Mapping (color-first) ===")
-        for pddl_id in sorted(cubes_only.keys()):
+        self.debug_message("\n=== Detected-to-PDDL Mapping (vision + symbolic state) ===")
+        for pddl_id in sorted(cubes):
             yolo_id = relations.get(pddl_id)
-            if yolo_id:
-                self.debug_message(f"{pddl_id}  -->  {yolo_id}")
-            else:
-                self.debug_message(f"{pddl_id}  -->  (no confident match found)")
-
+            self.debug_message(f"{pddl_id}  -->  {yolo_id}" if yolo_id else f"{pddl_id}  -->  (no confident match found)")
         return relations
-    
+
+    def swap_identity(self, a, b, done=None):
+        """Exchange everything this skill believes about PDDL cubes a and b. Shared
+        tracking dicts are swapped once (pass the same `done` set to every skill)."""
+        done = set() if done is None else done
+
+        def swap(mapping):
+            if mapping is None or id(mapping) in done:
+                return
+            done.add(id(mapping))
+            va, vb = mapping.pop(a, None), mapping.pop(b, None)
+            if va is not None:
+                mapping[b] = va
+            if vb is not None:
+                mapping[a] = vb
+
+        def swap_set(items):
+            if items is None or id(items) in done:
+                return
+            done.add(id(items))
+            has_a, has_b = a in items, b in items
+            items.discard(a); items.discard(b)
+            if has_a:
+                items.add(b)
+            if has_b:
+                items.add(a)
+
+        for name in ('relations', 'last_vision_pos', 'vision_missing_steps', 'stable_estimates',
+                     'release_xy', 'pick_xy'):
+            swap(getattr(self, name, None))
+        swap_set(getattr(self, '_was_grasped', None))
+        swap_set(getattr(self, '_grasped_now', None))
+        self.map_id_semantic = {y: p for p, y in self.relations.items() if y is not None}
+
     def update_relations_with_new_detections(self, new_predicted_pos, objects_pos):
         """
         Update relations when new objects are detected or tracking IDs change.
@@ -1673,7 +1740,7 @@ class Executor_Diffusion(Executor):
         
         Args:
             new_predicted_pos: Dict of current YOLO track IDs -> 3D positions
-            objects_pos: Dict of PDDL semantic IDs -> 3D positions from sim
+            objects_pos: unused (kept for the call signature); matching never reads the simulator
         """
         # Check if we need to rebuild relations
         needs_update = False
@@ -1722,8 +1789,8 @@ class Executor_Diffusion(Executor):
         could map a cube to a different-coloured track and put 2-4 cubes on one track.
         """
         changed = False
-        if self.color_to_pddl:
-            colour_of = {pddl: colour for colour, pddl in self.color_to_pddl.items()}
+        colour_of = self._cube_colours() if (self.color_to_pddl or self.area_colors) else {}
+        if colour_of:
             for pddl_id, yolo_id in list(self.relations.items()):
                 if pddl_id in colour_of and yolo_id is not None and yolo_id.rsplit('_', 1)[0] != colour_of[pddl_id]:
                     del self.relations[pddl_id]

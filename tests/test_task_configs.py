@@ -420,3 +420,32 @@ def test_wilson_and_summary():
     assert summary["advancement_pct"] == pytest.approx(89.0)
     assert summary["unsolvable_resets"] == 1
     assert summary["paper_success_in_ci"] is True
+
+
+@pytest.mark.parametrize("name", sorted(PAPER_TASKS))
+def test_workcell_map_matches_simulator(name):
+    """Vision mode takes fixture positions from the workcell map, never the simulator."""
+    static = PAPER_TASKS[name].static_positions
+    assert static
+    for seed in (0, 7, 5000):
+        _, detector = reset(name, seed, steps=1)
+        sim = {k: np.asarray(v) for k, v in detector.get_all_objects_pos().items()
+               if "cube" not in k and k not in ("gripper", "aperture")}
+        assert sorted(sim) == sorted(static)
+        for key, pos in static.items():
+            assert np.array_equal(np.asarray(pos, dtype=float), sim[key]), (key, pos, sim[key])
+
+
+@pytest.mark.parametrize("name", ["sort_2color", "sort_2color_swapped", "sort_3color"])
+def test_sort_area_colours_match_cube_colours(name):
+    """type_match() plus the task's area colours gives each cube the colour YOLO sees."""
+    task = PAPER_TASKS[name]
+    rgba_name = {(0, 0, 1): "blue cube", (1, 0, 0): "red cube", (0, 1, 0): "green cube"}
+    for seed in range(4):
+        env, detector = reset(name, seed, steps=1)
+        state = groundings(detector)
+        for index, cube in enumerate(detector.objects):
+            areas = [a for a in task.area_colors if state.get(f"type_match({cube},{a})")]
+            assert len(areas) == 1
+            rgba = tuple(int(round(x)) for x in list(env.cubes[index].rgba)[:3])
+            assert task.area_colors[areas[0]] == rgba_name[rgba], (cube, areas, rgba)

@@ -190,18 +190,63 @@ def reset_until_planned(env, detector, task, n_act, render=False):
                                "the detector state and spawn noise disagree")
 
 
+def _interchangeable(state, a, b):
+    """Cubes a and b are symbolically identical: swapping their names leaves every
+    on/in/clear/type_match/smaller fact unchanged (same colour, same support)."""
+    def swapped(key):
+        name, args = key[:-1].split("(", 1)
+        parts = [b if x == a else a if x == b else x for x in args.split(",")]
+        return f"{name}({','.join(parts)})"
+    for key, value in state.items():
+        if not key.startswith(("on(", "in(", "clear(", "type_match(", "smaller(")):
+            continue
+        if (a in key or b in key) and bool(state.get(swapped(key), False)) != bool(value):
+            return False
+    return True
+
+
 def execute_move(env, detector, skills, move, goals, observations, tracking_data, args):
-    """Run the move's skills. Returns (observations, tracking data, first failed skill)."""
+    """Run the move's skills. Returns (observations, tracking data, first failed skill, cube moved).
+
+    When several cubes look the same (sorting), vision may take the robot to a cube other
+    than the plan's. A skill therefore also succeeds on a cube that is symbolically
+    identical to the planned one (same colour and support); that cube is then the one
+    being moved, and the two names are swapped in the vision tracker.
+    """
     cube, _, destination = move
     failed_skill = None
+    pre_state = get_state(detector)
     for skill in skills:
         env.monitor.skill = skill.id
         skill.model.reset()
         if tracking_data:
             skill.set_tracking_data(tracking_data)
-        observations, success, _ = skill.execute(
-            env, observations, args.n_act, (cube, destination), list(goals), args.render)
+        alternates = []
+        if skill.use_yolo and getattr(skill, 'area_colors', None) and not getattr(skill, 'color_to_pddl', None):
+            alternates = [o for o in detector.objects if o != cube and _interchangeable(pre_state, cube, o)]
+        beta = skill.Beta
+        if alternates:
+            skill.Beta = lambda state, goal, beta=beta: beta(state, goal) or any(
+                beta(state, (o, goal[1])) for o in alternates)
+        try:
+            observations, success, _ = skill.execute(
+                env, observations, args.n_act, (cube, destination), list(goals), args.render)
+        finally:
+            skill.Beta = beta
         tracking_data = skill.get_tracking_data()
+        if success and alternates:
+            state = get_state(detector)
+            if not beta(state, (cube, destination)):
+                other = next((o for o in alternates if beta(state, (o, destination))), None)
+                if other is not None:
+                    done = set()
+                    for s in skills:
+                        s.swap_identity(cube, other, done)
+                    print(f"[IDENTITY] {skill.id}: robot is at {other}, symbolically identical to {cube}; "
+                          f"the move continues with {other}", flush=True)
+                    cube = other
+                    # Keep the no-progress monitor on the cube actually being moved.
+                    env.monitor.move = (cube, destination)
         if args.debug:
             print(f"\t  {skill.id}: {'ok' if success else 'FAILED'}")
         if not success and failed_skill is None:
@@ -210,7 +255,7 @@ def execute_move(env, detector, skills, move, goals, observations, tracking_data
         # Without the cube in hand the remaining skills cannot place it.
         if skill.id == 'Pick' and not detector.grasped(cube):
             break
-    return observations, tracking_data, failed_skill
+    return observations, tracking_data, failed_skill, cube
 
 
 def run_episode(env, detector, monitor, task, skills, episode, args):
@@ -264,8 +309,15 @@ def run_episode(env, detector, monitor, task, skills, episode, args):
                 lift_to_home_z(env, TALL_PICK_HOME_Z, args.render)
                 observations = collect_observations(env, detector, args.n_act, open_action)
             monitor.set_move(cube, destination)
-            observations, tracking_data, failed_skill = execute_move(
+            observations, tracking_data, failed_skill, moved = execute_move(
                 env, detector, skills, move, goals, observations, tracking_data, args)
+            if moved != cube:
+                # The two cubes were symbolically identical, so swapping their names in the
+                # rest of the plan keeps it valid (and the goals are unchanged).
+                rename = {cube: moved, moved: cube}
+                moves = moves[:index] + [(rename.get(c, c), rename.get(src, src), rename.get(dst, dst))
+                                         for c, src, dst in moves[index:]]
+                cube = moved
             # The effect only counts if it survives the gripper leaving.
             monitor.skill = "retreat"
             reset_gripper(env, detector, args.render)
@@ -412,6 +464,10 @@ def main():
     task = PAPER_TASKS[args.task] if args.task else legacy_task(args.env)
     env_kwargs_override = json.loads(args.env_kwargs)
     use_vision = args.perception == 'vision'
+    moved_fixtures = {"swap_bins", "peg_xy_jitter", "num_bins"} & set(env_kwargs_override)
+    if use_vision and moved_fixtures:
+        raise SystemExit(f"--env_kwargs {sorted(moved_fixtures)} moves the fixtures away from the task's "
+                         "workcell map, which vision mode relies on; add the task to planning/task_configs.py")
     label = VISION_LABEL if use_vision else GT_LABEL
     print("#" * 78)
     print(f"# {label}")
@@ -443,6 +499,8 @@ def main():
         num_inference_steps=args.n_inference_steps,
         gripper_close_sign=policy_set["gripper_close_sign"],
         color_to_pddl=task.color_to_pddl,
+        static_positions=task.static_positions,
+        area_colors=task.area_colors,
     )
     reach_pick = Executor_Diffusion(id='ReachPick', policy=policy_path('reach_pick'),
                                     Beta=termination_indicator('reach_pick'), nulified_action_indexes=[3],
@@ -506,8 +564,7 @@ def main():
                 json.dump(summary, summary_file, indent=2)
             print(f"Running: success {summary['successes']}/{summary['episodes']}, "
                   f"advancement {summary['advancement_pct']:.1f}%", flush=True)
-            if hasattr(Executor_Diffusion, "gt_fallback_summary"):
-                Executor_Diffusion.gt_fallback_summary()
+            Executor_Diffusion.perception_summary(use_vision)
     print_summary(summary, label)
 
 
