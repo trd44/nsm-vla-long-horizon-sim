@@ -248,6 +248,10 @@ class Executor_Diffusion(Executor):
         self.nulified_action_indexes = nulified_action_indexes
         self.horizon = horizon
         self.device = torch.device("cpu")
+        # YOLO on MPS is ~15x faster than CPU on Apple silicon with identical boxes (checked on
+        # 200 rollout frames, max 2e-4 px). The diffusion policy is no faster there, so it stays on CPU.
+        self.yolo_device = os.environ.get("NSM_YOLO_DEVICE") or (
+            "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
         self.oracle = oracle
         self.use_yolo = use_yolo
         self.save_data = save_data
@@ -895,11 +899,11 @@ class Executor_Diffusion(Executor):
         image1 = cv2.flip(image1, 0)
         image1 = cv2.cvtColor(image1, cv2.COLOR_RGB2BGR)
         ogi_image = image1.copy()
-        predictions1 = self.yolo_model.predict(image1, verbose=False, device=self.device)[0]
+        predictions1 = self.yolo_model.predict(image1, verbose=False, device=self.yolo_device)[0]
         
         image2 = cv2.flip(image2, 0)
         image2 = cv2.cvtColor(image2, cv2.COLOR_RGB2BGR)
-        predictions2 = self.yolo_model.predict(image2, verbose=False, device=self.device)[0]
+        predictions2 = self.yolo_model.predict(image2, verbose=False, device=self.yolo_device)[0]
 
         if not isinstance(image1, np.ndarray):
             image1 = np.array(image1)
@@ -1329,9 +1333,7 @@ class Executor_Diffusion(Executor):
         self.release_xy = tracking_data_dict.get('release_xy', {})
         self._was_grasped = tracking_data_dict.get('was_grasped', set())
         self.pick_xy = tracking_data_dict.get('pick_xy', {})
-        if 'relations' in tracking_data_dict:
-            self.relations = tracking_data_dict['relations']
-            self.map_id_semantic = tracking_data_dict['map_id_semantic']
+        if 'last_vision_pos' in tracking_data_dict:
             self.last_vision_pos = tracking_data_dict['last_vision_pos']
 
     def get_tracking_data(self):
@@ -1351,10 +1353,10 @@ class Executor_Diffusion(Executor):
             'release_xy': self.release_xy,
             'was_grasped': self._was_grasped,
             'pick_xy': self.pick_xy,
-            # Shared so all four skills agree on which track is which cube and where a
-            # cube was last seen; per-skill copies diverged and caused wrong-cube picks.
-            'relations': self.relations,
-            'map_id_semantic': self.map_id_semantic,
+            # Where each cube was last seen is shared so a skill never aborts on a cube another
+            # skill has already located. The cube-to-track mapping is not shared: each skill
+            # rebuilds it from current detections, and a shared one carried a held cube's
+            # gripper-position track past its release (tower_3_set 98% -> 76%).
             'last_vision_pos': self.last_vision_pos,
         }
 
@@ -1459,17 +1461,6 @@ class Executor_Diffusion(Executor):
         for name in self._grasped_now - self._was_grasped:
             self.pick_xy[name] = np.array(gripper_pos[:2], dtype=float)
         for name in self._was_grasped - self._grasped_now:
-            # While held, the cube's track was overwritten with the gripper position, which
-            # is ~40mm above the cube once it is set down. With relations shared across skills
-            # that stale track would outlive the release and bias the next skill's target
-            # (it is the place target of the next tower move). Drop it and remap from fresh
-            # detections.
-            yolo_id = self.relations.pop(name, None)
-            if yolo_id is not None:
-                for attr in ('tracked_objects', 'tracking_metadata', 'particle_filters_2d',
-                             'particle_filters_3d', 'detection_outlier_count', 'map_id_semantic'):
-                    getattr(self, attr, {}).pop(yolo_id, None)
-                predicted_pos.pop(yolo_id, None)
             changed = [self.pick_xy.pop(name, None), self.release_xy.get(name)]
             changed = [xy for xy in changed if xy is not None]
             for other in list(self.stable_estimates):

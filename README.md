@@ -170,9 +170,11 @@ below `hanoi_yolo.pt` (hanoi_4 0/8 vs 3/8). `--owl_fallback` queries OWLv2 at ru
 for a cube YOLO has lost; it is experimental and off by default.
 
 Object tracking: a cube is never mapped to a track of another colour, one track maps
-to at most one cube, the cube-to-track mapping and last vision positions are shared
-across the four skills, a held cube is placed at the gripper, and a cube that is not
-held keeps its last vision position instead of timing out.
+to at most one cube, each cube's last vision position is shared across the four skills
+(each skill still builds its own cube-to-track mapping), a held cube is placed at the
+gripper, and a cube that is not held keeps its last vision position instead of timing
+out. YOLO runs on MPS/CUDA when available (`NSM_YOLO_DEVICE` overrides); the diffusion
+policy runs on CPU.
 
 Rebuild the perception model with `perception/collect_data.py`,
 `perception/train_regressor.py`, `perception/collect_rollouts.py` and
