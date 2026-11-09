@@ -193,6 +193,18 @@ Rebuild the perception model with `perception/collect_data.py`,
 `perception/refit_rollouts.py`. Run the wiring tests with
 `pytest tests/test_task_configs.py`.
 
+### Results
+
+The final evaluation is in `results/nsm_final_5000/`: 8 tasks × 50 episodes, vision and GT, on seeds 5000-5049. Those seeds were never used for tuning.
+
+| | Basic tasks | Complex tasks |
+|---|---|---|
+| Paper | 100 | 92.2 |
+| Vision | 96.7 | 90.4 |
+| GT | 97.3 | 94.8 |
+
+Success is in %. Per-task numbers and failure causes are in the folder's README. `results/nsm_final/` holds an earlier run on seeds 1000-1049, made before the tracker fixes and before the ground-truth fallback was removed.
+
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 

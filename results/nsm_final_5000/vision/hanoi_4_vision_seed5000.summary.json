@@ -1,0 +1,33 @@
+{
+  "task": "hanoi_4",
+  "episodes": 10,
+  "successes": 6,
+  "success_pct": 60.0,
+  "success_wilson95_pct": [
+    31.267376792119528,
+    83.1819671473593
+  ],
+  "advancement_pct": 80.0,
+  "advancement_ci95_pct": [
+    60.52136339600184,
+    99.47863660399817
+  ],
+  "paper_success_pct": 78.0,
+  "paper_advancement_pct": 84.4,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 6616.1,
+  "mean_wall_s": 479.8518922805786,
+  "paper_success_in_ci": true,
+  "perception": "vision",
+  "perception_label": "VISION PERCEPTION (YOLO + regressor)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 5000,
+  "regressor": "models/regressors/nsm_regressor_rollout.pkl",
+  "yolo": "models/yolo/hanoi_yolo.pt",
+  "owl_fallback": false,
+  "env_kwargs": {
+    "cube_init_pos_noise_uniform": 0.025
+  }
+}

@@ -1,0 +1,160 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+[robosuite WARNING] No private macro file found! (macros.py:53)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:54)
+[robosuite WARNING] To setup, run: python /Users/timothyduggan/GitHub/nsm-vla-long-horizon-sim/robosuite/src/robosuite/scripts/setup_macros.py (macros.py:55)
+Warning: make sure gym is installed if you want to use the GymWrapper.
+##############################################################################
+# GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)
+# task=tower_4_set env=HeightStacking policy_set=original replan=False episodes=10 seed=5010
+##############################################################################
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 1/10 (seed 5010)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 1/1, advancement 100.0%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 2/10 (seed 5011)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 2/2, advancement 100.0%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 3/10 (seed 5012)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
+--- Move failed (first failed skill: Pick). moves_ok=0/4
+Move 2/4: cube2 -> cube3
+[TIMEOUT] no sub-task progress within 600 env steps
+Episode FAILED (timeout_600: no sub-task progress within 600 env steps); unmet goals: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Running: success 2/3, advancement 66.7%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 4/10 (seed 5013)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
+--- Move failed (first failed skill: Pick). moves_ok=0/4
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=3/4, advancement=0.750
+Episode FAILED (skill_failed); unmet goals: ['on cube3 platform']
+Running: success 2/4, advancement 68.8%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 5/10 (seed 5014)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 3/5, advancement 75.0%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 6/10 (seed 5015)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
+--- Move failed (first failed skill: Pick). moves_ok=2/4
+Move 4/4: cube0 -> cube1
+[TIMEOUT] no sub-task progress within 600 env steps
+Episode FAILED (timeout_600: no sub-task progress within 600 env steps); unmet goals: ['on cube0 cube1', 'on cube1 cube2']
+Running: success 3/6, advancement 70.8%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 7/10 (seed 5016)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
+--- Move failed (first failed skill: Pick). moves_ok=0/4
+Move 2/4: cube2 -> cube3
+[TIMEOUT] no sub-task progress within 600 env steps
+Episode FAILED (timeout_600: no sub-task progress within 600 env steps); unmet goals: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Running: success 3/7, advancement 60.7%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 8/10 (seed 5017)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 4/8, advancement 65.6%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 9/10 (seed 5018)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 5/9, advancement 69.4%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+
+[GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)] Episode 10/10 (seed 5019)
+Plan (8 ops): ['PICK CUBE3 TABLE', 'PLACE CUBE3 PLATFORM', 'PICK CUBE2 TABLE', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 TABLE', 'PLACE CUBE1 CUBE2', 'PICK CUBE0 TABLE', 'PLACE CUBE0 CUBE1']
+Goal predicates: ['on cube0 cube1', 'on cube1 cube2', 'on cube2 cube3', 'on cube3 platform']
+Move 1/4: cube3 -> platform
++++ Move verified. moves_ok=1/4, advancement=0.250
+Move 2/4: cube2 -> cube3
++++ Move verified. moves_ok=2/4, advancement=0.500
+Move 3/4: cube1 -> cube2
++++ Move verified. moves_ok=3/4, advancement=0.750
+Move 4/4: cube0 -> cube1
++++ Move verified. moves_ok=4/4, advancement=1.000
+Episode SUCCEEDED
+Running: success 6/10, advancement 72.5%
+[PERCEPTION] ground truth: object positions read from the simulator (--perception gt)
+==============================================================================
+tower_4_set | GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)
+episodes=10 unsolvable_resets=0
+success       60.0%  Wilson 95% [31.3, 83.2]  paper 97.0
+advancement   72.5%  95% CI [46.7, 98.3]  paper 99.5
+==============================================================================

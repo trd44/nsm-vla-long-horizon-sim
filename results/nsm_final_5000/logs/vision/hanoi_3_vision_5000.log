@@ -1,0 +1,237 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+[robosuite WARNING] No private macro file found! (macros.py:53)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:54)
+[robosuite WARNING] To setup, run: python /Users/timothyduggan/GitHub/nsm-vla-long-horizon-sim/robosuite/src/robosuite/scripts/setup_macros.py (macros.py:55)
+Warning: make sure gym is installed if you want to use the GymWrapper.
+##############################################################################
+# VISION PERCEPTION (YOLO + regressor)
+# task=hanoi_3 env=Hanoi policy_set=original replan=False episodes=10 seed=5000
+##############################################################################
+Pegs XY center from detector: [[0, -0.18, 0.8], [0, 0.02, 0.8], [0, 0.22, 0.8]]
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 1/10 (seed 5000)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 1/1, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 2/10 (seed 5001)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 2/2, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 3/10 (seed 5002)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 3/3, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 4/10 (seed 5003)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 4/4, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 5/10 (seed 5004)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 5/5, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 6/10 (seed 5005)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 6/6, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 7/10 (seed 5006)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 7/7, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 8/10 (seed 5007)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 8/8, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 9/10 (seed 5008)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 9/9, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 10/10 (seed 5009)
+Plan (14 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG3', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG2', 'PICK CUBE1 PEG3', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG1', 'PLACE CUBE3 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG1', 'PICK CUBE2 PEG2', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG1', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube3 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/7: cube1 -> peg3
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/7, advancement=0.143
+Move 2/7: cube2 -> peg2
++++ Move verified. moves_ok=2/7, advancement=0.286
+Move 3/7: cube1 -> cube2
++++ Move verified. moves_ok=3/7, advancement=0.429
+Move 4/7: cube3 -> peg3
++++ Move verified. moves_ok=4/7, advancement=0.571
+Move 5/7: cube1 -> peg1
++++ Move verified. moves_ok=5/7, advancement=0.714
+Move 6/7: cube2 -> cube3
++++ Move verified. moves_ok=6/7, advancement=0.857
+Move 7/7: cube1 -> cube2
++++ Move verified. moves_ok=7/7, advancement=1.000
+Episode SUCCEEDED
+Running: success 10/10, advancement 100.0%
+[PERCEPTION] vision: cube positions from YOLO + regressor, fixtures from the workcell map; no simulator positions are read (only gripper proprioception and the symbolic state)
+==============================================================================
+hanoi_3 | VISION PERCEPTION (YOLO + regressor)
+episodes=10 unsolvable_resets=0
+success      100.0%  Wilson 95% [72.2, 100.0]  paper 100.0
+advancement  100.0%  95% CI [100.0, 100.0]  paper 100.0
+==============================================================================

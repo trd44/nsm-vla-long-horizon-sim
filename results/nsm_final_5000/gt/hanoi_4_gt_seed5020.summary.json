@@ -1,0 +1,33 @@
+{
+  "task": "hanoi_4",
+  "episodes": 10,
+  "successes": 9,
+  "success_pct": 90.0,
+  "success_wilson95_pct": [
+    59.58499704752279,
+    98.2123787103926
+  ],
+  "advancement_pct": 90.66666666666666,
+  "advancement_ci95_pct": [
+    72.37333333333333,
+    100.0
+  ],
+  "paper_success_pct": 78.0,
+  "paper_advancement_pct": 84.4,
+  "unsolvable_resets": 0,
+  "mean_env_steps": 6982.2,
+  "mean_wall_s": 211.64261603355408,
+  "paper_success_in_ci": true,
+  "perception": "gt",
+  "perception_label": "GROUND-TRUTH PERCEPTION (simulator poses, NOT vision)",
+  "policy_set": "original",
+  "replan": false,
+  "n_inference_steps": 8,
+  "seed": 5020,
+  "regressor": null,
+  "yolo": null,
+  "owl_fallback": false,
+  "env_kwargs": {
+    "cube_init_pos_noise_uniform": 0.025
+  }
+}

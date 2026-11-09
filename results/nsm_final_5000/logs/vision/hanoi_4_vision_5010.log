@@ -1,0 +1,767 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+[robosuite WARNING] No private macro file found! (macros.py:53)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:54)
+[robosuite WARNING] To setup, run: python /Users/timothyduggan/GitHub/nsm-vla-long-horizon-sim/robosuite/src/robosuite/scripts/setup_macros.py (macros.py:55)
+Warning: make sure gym is installed if you want to use the GymWrapper.
+##############################################################################
+# VISION PERCEPTION (YOLO + regressor)
+# task=hanoi_4 env=Hanoi4x3 policy_set=original replan=False episodes=10 seed=5010
+##############################################################################
+Pegs XY center from detector: [[0, -0.18, 0.8], [0, 0.02, 0.8], [0, 0.22, 0.8]]
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 1/10 (seed 5010)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
+[VISION-LOST] cube4: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
+--- Move failed (first failed skill: ReachDrop). moves_ok=14/15
+Episode FAILED (skill_failed); unmet goals: ['on cube2 cube3', 'on cube1 cube2']
+Running: success 0/1, advancement 93.3%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 1092, ('peg3', 'no-relation-match'): 677, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 280}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 2/10 (seed 5011)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 1/2, advancement 96.7%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 2352, ('peg3', 'no-relation-match'): 1405, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 560}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 3/10 (seed 5012)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 2/3, advancement 97.8%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 3632, ('peg3', 'no-relation-match'): 2197, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 840}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 4/10 (seed 5013)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 3/4, advancement 98.3%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 4868, ('peg3', 'no-relation-match'): 3157, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 1120}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 5/10 (seed 5014)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
+[VISION-LOST] cube4: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 4/5, advancement 98.7%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 6088, ('peg3', 'no-relation-match'): 3965, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 1404}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 6/10 (seed 5015)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
+[VISION-LOST] cube4: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube4: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 5/6, advancement 98.9%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 7477, ('peg3', 'no-relation-match'): 4737, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 1688, ('peg2', 'too-few-detections'): 7}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 7/10 (seed 5016)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
+[VISION-LOST] cube4: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube3: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 6/7, advancement 99.0%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 8857, ('peg3', 'no-relation-match'): 5465, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 1968, ('peg2', 'too-few-detections'): 7}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 8/10 (seed 5017)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
+[TIMEOUT] no sub-task progress within 600 env steps
+Episode FAILED (timeout_600: no sub-task progress within 600 env steps); unmet goals: ['on cube4 peg3', 'on cube2 cube3', 'on cube1 cube2']
+Running: success 6/8, advancement 87.5%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 9145, ('peg3', 'no-relation-match'): 5873, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 1968, ('peg2', 'too-few-detections'): 7}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 9/10 (seed 5018)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
+[VISION-LOST] cube1: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 7/9, advancement 88.9%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 10270, ('peg3', 'no-relation-match'): 6877, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 2252, ('peg2', 'too-few-detections'): 14}
+
+[VISION PERCEPTION (YOLO + regressor)] Episode 10/10 (seed 5019)
+Plan (30 ops): ['PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 CUBE4', 'PLACE CUBE3 PEG2', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 PEG3', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE4 PEG1', 'PLACE CUBE4 PEG3', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 CUBE4', 'PICK CUBE2 CUBE3', 'PLACE CUBE2 PEG1', 'PICK CUBE1 CUBE4', 'PLACE CUBE1 CUBE2', 'PICK CUBE3 PEG2', 'PLACE CUBE3 CUBE4', 'PICK CUBE1 CUBE2', 'PLACE CUBE1 PEG2', 'PICK CUBE2 PEG1', 'PLACE CUBE2 CUBE3', 'PICK CUBE1 PEG2', 'PLACE CUBE1 CUBE2']
+Goal predicates: ['on cube4 peg3', 'on cube3 cube4', 'on cube2 cube3', 'on cube1 cube2']
+Move 1/15: cube1 -> peg2
++++ Move verified. moves_ok=1/15, advancement=0.067
+Move 2/15: cube2 -> peg3
++++ Move verified. moves_ok=2/15, advancement=0.133
+Move 3/15: cube1 -> cube2
+[VISION-LOST] cube2: reusing last vision position (1/45 steps without vision)
++++ Move verified. moves_ok=3/15, advancement=0.200
+Move 4/15: cube3 -> peg2
++++ Move verified. moves_ok=4/15, advancement=0.267
+Move 5/15: cube1 -> cube4
++++ Move verified. moves_ok=5/15, advancement=0.333
+Move 6/15: cube2 -> cube3
++++ Move verified. moves_ok=6/15, advancement=0.400
+Move 7/15: cube1 -> cube2
++++ Move verified. moves_ok=7/15, advancement=0.467
+Move 8/15: cube4 -> peg3
++++ Move verified. moves_ok=8/15, advancement=0.533
+Move 9/15: cube1 -> cube4
++++ Move verified. moves_ok=9/15, advancement=0.600
+Move 10/15: cube2 -> peg1
++++ Move verified. moves_ok=10/15, advancement=0.667
+Move 11/15: cube1 -> cube2
++++ Move verified. moves_ok=11/15, advancement=0.733
+Move 12/15: cube3 -> cube4
++++ Move verified. moves_ok=12/15, advancement=0.800
+Move 13/15: cube1 -> peg2
++++ Move verified. moves_ok=13/15, advancement=0.867
+Move 14/15: cube2 -> cube3
++++ Move verified. moves_ok=14/15, advancement=0.933
+Move 15/15: cube1 -> cube2
++++ Move verified. moves_ok=15/15, advancement=1.000
+Episode SUCCEEDED
+Running: success 8/10, advancement 90.0%
+
+[GT-FALLBACK] ===== summary =====
+[GT-FALLBACK] manipulable objects (should be empty): NONE - vision was used throughout
+[GT-FALLBACK] static areas (expected by design): {('peg2', 'no-relation-match'): 11182, ('peg3', 'no-relation-match'): 7837, ('peg3', 'too-few-detections'): 7, ('peg1', 'no-relation-match'): 2532, ('peg2', 'too-few-detections'): 14}
+==============================================================================
+hanoi_4 | VISION PERCEPTION (YOLO + regressor)
+episodes=10 unsolvable_resets=0
+success       80.0%  Wilson 95% [49.0, 94.3]  paper 78.0
+advancement   90.0%  95% CI [71.8, 100.0]  paper 84.4
+==============================================================================
