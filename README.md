@@ -205,6 +205,29 @@ The final evaluation is in `results/nsm_final_5000/`: 8 tasks × 50 episodes, vi
 
 Success is in %. Per-task numbers and failure causes are in the folder's README. `results/nsm_final/` holds an earlier run on seeds 1000-1049, made before the tracker fixes and before the ground-truth fallback was removed.
 
+## Evaluating the VLA under the NSM protocol
+
+`analysis/experiments_vla.py` runs the fine-tuned pi0 checkpoints (Hugging Face, `tduggan93/pi0-*`) on the same episodes as the NSM evaluation. It shares these with `experiments_neurosymbolic.py`:
+- the environments from `planning/task_configs.py`, so the same seed gives the same cube layout and plan;
+- seeding: episode *i* uses seed + *i*;
+- the 600-step no-progress timeout;
+- the final goal check (`failed_goals`);
+- the record format.
+
+The VLA keeps its own controller (`OSC_POSE`), observation preprocessing and 50-step action chunks. The runner's docstring has the details.
+
+The policy needs a CUDA GPU (pi0 is about 3.3B parameters, served by openpi with JAX). On a Linux GPU machine:
+
+```bash
+git clone --recurse-submodules -b nsm-rebuild https://github.com/trd44/nsm-vla-long-horizon-sim.git
+cd nsm-vla-long-horizon-sim
+bash scripts/vla_eval/setup.sh                       # both Python envs + sanity checks
+EPISODES=2 bash scripts/vla_eval/run_all.sh hanoi_3  # quick check
+bash scripts/vla_eval/run_all.sh                     # all 12 conditions, seeds 5000-5049
+```
+
+`run_all.sh` downloads one checkpoint at a time (`params/` and `assets/` only, about 6.2 GB each), serves it, runs every condition that uses it (fine-tuned, plus the zero-shot runs for basic checkpoints), then deletes it. Results go to `results/vla_5000/` with a comparison table. A run whose summary is complete is skipped, so the script can be restarted after an interruption.
+
 ## Docker Container (Optional)
 There is an optional docker container for you to use. The docker-compose is setup to use Nvidia GPUs. You will need to install the Nvidia Container Toolkit to use this. 
 
